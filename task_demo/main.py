@@ -1,8 +1,9 @@
 # Imports
+import logging
 import pygame
 from pygame.locals import *
 import time
-import logging
+import threading
 
 
 # Variables
@@ -24,9 +25,10 @@ class StimulusManager:
     self.logger = logging.getLogger(__name__)
     self.logger.info("Initializing StimulusManager")
 
-    # Initialize pygame
+    # Initialize pygame and synchronization thread
     pygame.init()
     self.last_sync_time = time.time()
+    self.sync_thread = threading.Thread(target=self.send_sync_signal)
 
     # Get display information
     info = pygame.display.Info()
@@ -55,6 +57,7 @@ class StimulusManager:
 
 
   def handle_quit(self):
+    self.sync_thread.join()
     pygame.quit()
     quit()
 
@@ -71,6 +74,9 @@ class StimulusManager:
 
 
   def run(self):
+    # Start synchronization thread
+    self.sync_thread.start()
+
     #  Main loop
     while True:
       # Handle pygame events

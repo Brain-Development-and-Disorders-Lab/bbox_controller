@@ -1,10 +1,10 @@
-# Mouse Behavioral Stimuli
+# Behavior Box Controller (BBox Controller)
 
-This repository contains the code for various stimuli used in mouse behavioral experiments.
+This repository contains the code for the Behavior Box Controller (BBox Controller).
 
-## `task_demo`
+## Controllers
 
-This is a simple demo of a task that can be used to test the performance of the stimuli and the behavioral setup.
+Both `input` and `output` controllers are implemented. Inputs include levers and other sensors, outputs include LEDs and display modules.
 
 ## License
 

@@ -9,7 +9,7 @@ License: MIT
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-class DisplayManager:
+class DisplayController:
     def __init__(self, display_left, display_right):
         self.display_left = display_left
         self.display_right = display_right

@@ -11,6 +11,9 @@ import tkinter as tk
 from tkinter import ttk
 import datetime
 
+# Controller imports
+from controllers.IOController import IOController
+
 # Dimensions (px)
 PADDING = 2
 TOTAL_WIDTH = 1200 + (PADDING * 6)
@@ -18,10 +21,13 @@ PANEL_WIDTH = 1200
 PANEL_HEIGHT = 720
 HEADING_HEIGHT = 40
 
-class ControlPanel(tk.Frame):
+class BehaviorBoxManager(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.master = master
+
+        # Initialize IO
+        self.io = IOController()
 
         # Setup state
         self.display_state = {
@@ -204,17 +210,15 @@ class ControlPanel(tk.Frame):
         message (str): The message to log.
         """
         self.console.config(state=tk.NORMAL)
-        self.console.insert(tk.END, f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {message}\n")
+        message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {message}\n"
+        self.console.insert(tk.END, message)
+        print(message, end="")
         self.console.config(state=tk.DISABLED)
         self.console.see(tk.END)
 
     def toggle_display(self, display_name):
         self.display_state[display_name]["state"] = not self.display_state[display_name]["state"]
         self.display_state[display_name]["button_text"].set("Disable" if self.display_state[display_name]["state"] else "Enable")
-        self.update_display_state()
-
-    def update_display_state(self):
-        self.log("Display state updated")
 
     # Test functions
     def test_water_delivery(self):
@@ -238,9 +242,12 @@ class ControlPanel(tk.Frame):
         self.test_state["test_led"]["state"] = 1
         self.test_led_indicator.create_oval(2, 2, 15, 15, fill="green")
 
+def main():
+    root = tk.Tk()
+    root.resizable(False, False)
+    view = BehaviorBoxManager(root)
+    view.master.title("Control Panel")
+    view.mainloop()
 
-root = tk.Tk()
-root.resizable(False, False)
-view = ControlPanel(root)
-view.master.title("Control Panel")
-view.mainloop()
+if __name__ == "__main__":
+    main()

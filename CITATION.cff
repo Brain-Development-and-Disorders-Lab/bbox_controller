@@ -4,7 +4,7 @@ authors:
 - family-names: "Burgess"
   given-names: "Henry"
   orcid: "https://orcid.org/0000-0002-3481-952X"
-title: "Mouse Behavioral Stimuli"
+title: "BBox Controller"
 version: 0.0.1
-date-released: 2025-01-31
-url: "https://github.com/Brain-Development-and-Disorders-Lab/mouse_behavioral_stimuli"
+date-released: 2025-02-25
+url: "https://github.com/Brain-Development-and-Disorders-Lab/bbox_controller"

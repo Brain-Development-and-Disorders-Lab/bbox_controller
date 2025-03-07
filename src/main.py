@@ -166,24 +166,33 @@ class BehaviorBoxManager(tk.Frame):
             self.master,
             text="Input States",
             font="Arial 12"
-        ).grid(row=1, column=2, columnspan=2, padx=PADDING, pady=PADDING)
+        ).grid(row=1, column=2, padx=PADDING, pady=PADDING)
+
+        # Setup frame for input labels
+        input_labels_frame = tk.Frame(self.master)
+        input_labels_frame.grid(row=2, column=2, padx=PADDING, pady=PADDING, sticky="n")
+
+        left_actuator_label_frame = tk.Frame(input_labels_frame)
+        left_actuator_label_frame.pack(side=tk.TOP, fill=tk.X)
         self.left_actuator_label = tk.Label(
-            self.master,
+            left_actuator_label_frame,
             textvariable=self.input_label_states["left_lever"],
             font="Arial 10"
-        ).grid(row=2, column=2, padx=PADDING, pady=PADDING, sticky="n")
+        ).pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        right_actuator_label_frame = tk.Frame(input_labels_frame)
+        right_actuator_label_frame.pack(side=tk.TOP, fill=tk.X)
         self.right_actuator_label = tk.Label(
-            self.master,
+            right_actuator_label_frame,
             textvariable=self.input_label_states["right_lever"],
             font="Arial 10"
-        ).grid(row=2, column=3, padx=PADDING, pady=PADDING, sticky="n")
+        ).pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
         # Commands
         tk.Label(
             self.master,
             text="Commands",
             font="Arial 12"
-        ).grid(row=3, column=2, columnspan=2, padx=PADDING, pady=PADDING)
+        ).grid(row=3, column=2, padx=PADDING, pady=PADDING)
 
         # Setup frame for buttons
         commands_button_frame = tk.Frame(self.master)
@@ -195,16 +204,33 @@ class BehaviorBoxManager(tk.Frame):
             font="Arial 10"
         ).pack(side=tk.TOP, padx=2, pady=2, anchor="w")
 
+        # Console
+        tk.Label(
+            self.master,
+            text="Console",
+            font="Arial 12"
+        ).grid(row=1, column=3, padx=PADDING, pady=PADDING)
+        self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=10, width=50, bg="black", fg="white")
+        self.console.grid(row=2, column=3, rowspan=2, padx=PADDING, pady=PADDING, sticky="n")
+        self.console.config(state=tk.DISABLED)
+
+        # Add tags for the console message levels
+        self.console.tag_config("error", foreground="red")
+        self.console.tag_config("warning", foreground="yellow")
+        self.console.tag_config("success", foreground="green")
+        self.console.tag_config("info", foreground="white")
+        self.log("Console initialized")
+
         # Tests
         tk.Label(
             self.master,
             text="Test Functions",
             font="Arial 12"
-        ).grid(row=1, column=4, columnspan=2, padx=PADDING, pady=PADDING)
+        ).grid(row=3, column=3, padx=PADDING, pady=PADDING)
 
         # Setup frame for buttons
         test_buttons_frame = tk.Frame(self.master)
-        test_buttons_frame.grid(row=2, column=4, padx=PADDING, pady=PADDING, sticky="n")
+        test_buttons_frame.grid(row=4, column=3, padx=PADDING, pady=PADDING, sticky="n")
 
         # Setup test water delivery button and indicator
         test_water_delivery_pair_frame = tk.Frame(test_buttons_frame)
@@ -235,23 +261,6 @@ class BehaviorBoxManager(tk.Frame):
         self.test_led_indicator.create_oval(2, 2, 15, 15, fill="blue")
         self.test_led_button = tk.Button(test_led_pair_frame, text="Test LED", font="Arial 10", command=self.test_led)
         self.test_led_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
-
-        # Console
-        tk.Label(
-            self.master,
-            text="Console",
-            font="Arial 12"
-        ).grid(row=6, column=0, columnspan=6, padx=PADDING, pady=PADDING)
-        self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=8, width=120, bg="black", fg="white")
-        self.console.grid(row=7, column=0, columnspan=6, padx=PADDING, pady=PADDING, sticky="n")
-        self.console.config(state=tk.DISABLED)
-
-        # Add tags for the console message levels
-        self.console.tag_config("error", foreground="red")
-        self.console.tag_config("warning", foreground="yellow")
-        self.console.tag_config("success", foreground="green")
-        self.console.tag_config("info", foreground="white")
-        self.log("Console initialized")
 
     def log(self, message, state="info"):
         """
@@ -307,11 +316,16 @@ class BehaviorBoxManager(tk.Frame):
             self.test_water_delivery_button.config(state=tk.NORMAL)
 
     def test_water_delivery_task(self):
+        # Set default state to passed
+        self.test_state["test_water_delivery"]["state"] = 1
+
+        # Show that test is running
+        self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="yellow")
+
         try:
             self.io.set_water_port(True)
             time.sleep(2)
             self.io.set_water_port(False)
-            self.test_state["test_water_delivery"]["state"] = 1
         except:
             self.log("Could not activate water delivery", "error")
             self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="red")

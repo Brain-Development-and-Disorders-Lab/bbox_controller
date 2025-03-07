@@ -23,6 +23,7 @@ PADDING = 2
 TOTAL_WIDTH = 1200 + (PADDING * 6)
 PANEL_WIDTH = 1200
 PANEL_HEIGHT = 720
+COLUMN_WIDTH = 30
 HEADING_HEIGHT = 40
 UPDATE_INTERVAL = 50 # milliseconds
 
@@ -108,8 +109,6 @@ class BehaviorBoxManager(tk.Frame):
         self.master.grid_columnconfigure(1, weight=0)
         self.master.grid_columnconfigure(2, weight=0)
         self.master.grid_columnconfigure(3, weight=0)
-        self.master.grid_columnconfigure(4, weight=0)
-        self.master.grid_columnconfigure(5, weight=0)
 
         # Set the UI to resize with the window
         self.master.grid_propagate(True)
@@ -121,7 +120,8 @@ class BehaviorBoxManager(tk.Frame):
         tk.Label(
             self.master,
             text="Displays",
-            font="Arial 12"
+            font="Arial 12",
+            width=COLUMN_WIDTH
         ).grid(row=1, column=0, columnspan=2, padx=PADDING, pady=PADDING)
         tk.Canvas(
             self.master,
@@ -165,7 +165,8 @@ class BehaviorBoxManager(tk.Frame):
         tk.Label(
             self.master,
             text="Input States",
-            font="Arial 12"
+            font="Arial 12",
+            width=COLUMN_WIDTH
         ).grid(row=1, column=2, padx=PADDING, pady=PADDING)
 
         # Setup frame for input labels
@@ -211,7 +212,7 @@ class BehaviorBoxManager(tk.Frame):
             font="Arial 12"
         ).grid(row=1, column=3, padx=PADDING, pady=PADDING)
         self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=10, width=50, bg="black", fg="white")
-        self.console.grid(row=2, column=3, rowspan=2, padx=PADDING, pady=PADDING, sticky="n")
+        self.console.grid(row=2, column=3, padx=PADDING, pady=PADDING, sticky="n")
         self.console.config(state=tk.DISABLED)
 
         # Add tags for the console message levels

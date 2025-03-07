@@ -12,6 +12,8 @@ from tkinter import ttk
 import datetime
 import time
 import threading
+import atexit
+import queue  # Import the queue module
 
 # Controller imports
 from controllers.IOController import IOController
@@ -41,6 +43,9 @@ class BehaviorBoxManager(tk.Frame):
         # Initialize IO
         self.io = IOController()
 
+        # Create a queue for input states
+        self.input_queue = queue.Queue()
+
         # Setup state
         self.display_state = {
             "mini_display_1": {
@@ -69,8 +74,32 @@ class BehaviorBoxManager(tk.Frame):
             },
         }
 
+        self.input_states = {
+            "left_lever": False,
+            "right_lever": False,
+            "nose_poke": False,
+            "water_port": False,
+        }
+
+        self.input_label_states = {
+            "left_lever": tk.StringVar(self.master, "Left Actuator: False"),
+            "right_lever": tk.StringVar(self.master, "Right Actuator: False"),
+        }
+
         # Create the layout
         self.create_layout()
+
+        # Handle exiting
+        atexit.register(self.on_exit)
+
+        # Start the listen task
+        self.log("Listening for input", "start")
+        self.is_listening = True
+        self.listening_thread = threading.Thread(target=self.listen_task)
+        self.listening_thread.start()
+
+        # Start a periodic check for input states
+        self.master.after(100, self.check_input_queue)  # Check every 100 ms
 
     def create_layout(self):
         # Configure the grid
@@ -137,14 +166,14 @@ class BehaviorBoxManager(tk.Frame):
             text="Input States",
             font="Arial 12"
         ).grid(row=1, column=2, columnspan=2, padx=PADDING, pady=PADDING)
-        tk.Label(
+        self.left_actuator_label = tk.Label(
             self.master,
-            text="Actuator 1: 0.0",
+            textvariable=self.input_label_states["left_lever"],
             font="Arial 10"
         ).grid(row=2, column=2, padx=PADDING, pady=PADDING, sticky="n")
-        tk.Label(
+        self.right_actuator_label = tk.Label(
             self.master,
-            text="Actuator 2: 0.0",
+            textvariable=self.input_label_states["right_lever"],
             font="Arial 10"
         ).grid(row=2, column=3, padx=PADDING, pady=PADDING, sticky="n")
 
@@ -242,6 +271,28 @@ class BehaviorBoxManager(tk.Frame):
         self.display_state[display_name]["state"] = not self.display_state[display_name]["state"]
         self.display_state[display_name]["button_text"].set("Disable" if self.display_state[display_name]["state"] else "Enable")
 
+    def listen_task(self):
+        while self.is_listening:
+            time.sleep(0.1)
+            input_states = self.io.get_input_states()
+            self.input_queue.put(input_states)  # Put input states into the queue
+
+    def check_input_queue(self):
+        try:
+            while True:  # Process all items in the queue
+                input_states = self.input_queue.get_nowait()
+                self.input_states = input_states  # Update input states
+                self.update_state_labels()
+        except queue.Empty:
+            pass  # No items in the queue
+
+        if self.is_listening:
+            self.master.after(100, self.check_input_queue)  # Schedule the next check
+
+    def update_state_labels(self):
+        self.input_label_states["left_lever"].set(f"Left Actuator: {self.input_states['left_lever']}")
+        self.input_label_states["right_lever"].set(f"Right Actuator: {self.input_states['right_lever']}")
+
     def set_test_buttons_disabled(self, disabled):
         # Disable test buttons
         if disabled:
@@ -277,7 +328,7 @@ class BehaviorBoxManager(tk.Frame):
         running_input_test_start_time = time.time()
         while running_input_test:
             input_state = self.io.get_input_states()
-            if input_state["left_lever"] == 1.0:
+            if input_state["left_lever"] == True:
                 running_input_test = False
 
             # Ensure test doesn't run indefinitely
@@ -288,8 +339,8 @@ class BehaviorBoxManager(tk.Frame):
                 self.set_test_buttons_disabled(False)
                 return
 
-        if input_state["left_lever"] != 1.0:
-            self.log("Left actuator did not move to 1.0", "error")
+        if input_state["left_lever"] != True:
+            self.log("Left actuator did not move to `True`", "error")
             self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
             self.test_state["test_left_actuator"]["state"] = -1
             self.set_test_buttons_disabled(False)
@@ -304,19 +355,19 @@ class BehaviorBoxManager(tk.Frame):
         self.log("Waiting for right actuator input...", "info")
         while running_input_test:
             input_state = self.io.get_input_states()
-            if input_state["right_lever"] == 1.0:
+            if input_state["right_lever"] == True:
                 running_input_test = False
 
             # Ensure test doesn't run indefinitely
             if time.time() - running_input_test_start_time > 10:
-                self.log("Right actuator did not move to 1.0", "error")
+                self.log("Right actuator did not move to `True`", "error")
                 self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
                 self.test_state["test_right_actuator"]["state"] = -1
                 self.set_test_buttons_disabled(False)
                 return
 
-        if input_state["right_lever"] != 1.0:
-            self.log("Right actuator did not move to 1.0", "error")
+        if input_state["right_lever"] != True:
+            self.log("Right actuator did not move to `True`", "error")
             self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
             self.test_state["test_right_actuator"]["state"] = -1
             self.set_test_buttons_disabled(False)
@@ -334,19 +385,24 @@ class BehaviorBoxManager(tk.Frame):
 
         # Step 1: Test that both actuators default to 0.0
         input_state = self.io.get_input_states()
-        if input_state["left_lever"] != 0.0 or input_state["right_lever"] != 0.0:
-            self.log("Actuators did not default to 0.0", "error")
-            self.test_state["test_actuators"]["state"] = -1
+        if input_state["left_lever"] != False:
+            self.log("Left actuator did not default to `False`", "error")
+            self.test_state["test_left_actuator"]["state"] = -1
             self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
             return
-        self.log("Actuators defaulted to 0.0", "success")
+        if input_state["right_lever"] != False:
+            self.log("Right actuator did not default to `False`", "error")
+            self.test_state["test_right_actuator"]["state"] = -1
+            self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
+            return
+        self.log("Actuators defaulted to `False`", "success")
 
         # Disable test buttons
         self.set_test_buttons_disabled(True)
 
         # Run the test in a separate thread
-        left_actuator_test_thread = threading.Thread(target=self.test_actuators_task)
-        left_actuator_test_thread.start()
+        actuator_test_thread = threading.Thread(target=self.test_actuators_task)
+        actuator_test_thread.start()
 
     def test_led(self):
         self.log("Testing LED")
@@ -354,6 +410,12 @@ class BehaviorBoxManager(tk.Frame):
         # Simulate a successful test
         self.test_state["test_led"]["state"] = 1
         self.test_led_indicator.create_oval(2, 2, 15, 15, fill="green")
+
+    def on_exit(self):
+        self.is_listening = False
+        self.is_input_alive = False
+        if hasattr(self, "listening_thread") and self.listening_thread is not None:
+            self.listening_thread.join()
 
 def main():
     root = tk.Tk()

@@ -306,13 +306,33 @@ class BehaviorBoxManager(tk.Frame):
             self.test_actuators_button.config(state=tk.NORMAL)
             self.test_water_delivery_button.config(state=tk.NORMAL)
 
+    def test_water_delivery_task(self):
+        try:
+            self.io.set_water_port(True)
+            time.sleep(2)
+            self.io.set_water_port(False)
+            self.test_state["test_water_delivery"]["state"] = 1
+        except:
+            self.log("Could not activate water delivery", "error")
+            self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="red")
+            self.test_state["test_water_delivery"]["state"] = 0
+
+        self.set_test_buttons_disabled(False)
+
+        if self.test_state["test_water_delivery"]["state"] == 1:
+            self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="green")
+            self.log("Test water delivery passed", "start")
+
     # Test functions
     def test_water_delivery(self):
-        self.log("Testing water delivery")
+        self.log("Testing water delivery", "start")
 
-        # Simulate a successful test
-        self.test_state["test_water_delivery"]["state"] = 1
-        self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="green")
+        # Disable test buttons
+        self.set_test_buttons_disabled(True)
+
+        # Run the test in a separate thread
+        water_delivery_test_thread = threading.Thread(target=self.test_water_delivery_task)
+        water_delivery_test_thread.start()
 
     def test_actuators_task(self):
         # Set default state to passed

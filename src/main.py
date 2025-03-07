@@ -95,8 +95,8 @@ class BehaviorBoxManager(tk.Frame):
         ).grid(row=1, column=0, columnspan=2, padx=PADDING, pady=PADDING)
         tk.Canvas(
             self.master,
-            width=PANEL_WIDTH / 3 - 50,
-            height=(PANEL_WIDTH / 3 - 50) * 0.75,
+            width=PANEL_WIDTH / 5 - 50,
+            height=(PANEL_WIDTH / 5 - 50) * 0.75,
             bg="black"
         ).grid(row=2, column=0, columnspan=2, padx=PADDING, pady=PADDING)
 
@@ -212,7 +212,7 @@ class BehaviorBoxManager(tk.Frame):
             text="Console",
             font="Arial 12"
         ).grid(row=6, column=0, columnspan=6, padx=PADDING, pady=PADDING)
-        self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=10, width=120, bg="black", fg="white")
+        self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=8, width=120, bg="black", fg="white")
         self.console.grid(row=7, column=0, columnspan=6, padx=PADDING, pady=PADDING, sticky="n")
         self.console.config(state=tk.DISABLED)
 

@@ -18,12 +18,13 @@ import queue  # Import the queue module
 # Controller imports
 from controllers.IOController import IOController
 
-# Dimensions (px)
+# Variables
 PADDING = 2
 TOTAL_WIDTH = 1200 + (PADDING * 6)
 PANEL_WIDTH = 1200
 PANEL_HEIGHT = 720
 HEADING_HEIGHT = 40
+UPDATE_INTERVAL = 50 # milliseconds
 
 # Log states
 LOG_STATES = {
@@ -99,7 +100,7 @@ class BehaviorBoxManager(tk.Frame):
         self.listening_thread.start()
 
         # Start a periodic check for input states
-        self.master.after(100, self.check_input_queue)  # Check every 100 ms
+        self.master.after(UPDATE_INTERVAL, self.check_input_queue)  # Check every 50 ms
 
     def create_layout(self):
         # Configure the grid
@@ -273,7 +274,7 @@ class BehaviorBoxManager(tk.Frame):
 
     def listen_task(self):
         while self.is_listening:
-            time.sleep(0.1)
+            time.sleep(UPDATE_INTERVAL/1000)
             input_states = self.io.get_input_states()
             self.input_queue.put(input_states)  # Put input states into the queue
 
@@ -287,7 +288,7 @@ class BehaviorBoxManager(tk.Frame):
             pass  # No items in the queue
 
         if self.is_listening:
-            self.master.after(100, self.check_input_queue)  # Schedule the next check
+            self.master.after(UPDATE_INTERVAL, self.check_input_queue)  # Schedule the next check
 
     def update_state_labels(self):
         self.input_label_states["left_lever"].set(f"Left Actuator: {self.input_states['left_lever']}")

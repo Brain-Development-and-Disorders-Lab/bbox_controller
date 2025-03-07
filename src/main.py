@@ -10,6 +10,8 @@ License: MIT
 import tkinter as tk
 from tkinter import ttk
 import datetime
+import time
+import threading
 
 # Controller imports
 from controllers.IOController import IOController
@@ -20,6 +22,16 @@ TOTAL_WIDTH = 1200 + (PADDING * 6)
 PANEL_WIDTH = 1200
 PANEL_HEIGHT = 720
 HEADING_HEIGHT = 40
+
+# Log states
+LOG_STATES = {
+    "start": "Start",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "debug": "Debug",
+}
 
 class BehaviorBoxManager(tk.Frame):
     def __init__(self, master=None):
@@ -46,7 +58,10 @@ class BehaviorBoxManager(tk.Frame):
             "test_water_delivery": {
                 "state": 0, # -1: failed, 0: not tested, 1: passed
             },
-            "test_actuators": {
+            "test_left_actuator": {
+                "state": 0, # -1: failed, 0: not tested, 1: passed
+            },
+            "test_right_actuator": {
                 "state": 0, # -1: failed, 0: not tested, 1: passed
             },
             "test_led": {
@@ -168,8 +183,8 @@ class BehaviorBoxManager(tk.Frame):
         self.test_water_delivery_indicator = tk.Canvas(test_water_delivery_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
         self.test_water_delivery_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
         self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        test_water_delivery_button = tk.Button(test_water_delivery_pair_frame, text="Test Water Delivery", font="Arial 10", command=self.test_water_delivery)
-        test_water_delivery_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        self.test_water_delivery_button = tk.Button(test_water_delivery_pair_frame, text="Test Water Delivery", font="Arial 10", command=self.test_water_delivery)
+        self.test_water_delivery_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
         # Setup test actuators button and indicator
         test_actuators_pair_frame = tk.Frame(test_buttons_frame)
@@ -178,8 +193,8 @@ class BehaviorBoxManager(tk.Frame):
         self.test_actuators_indicator = tk.Canvas(test_actuators_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
         self.test_actuators_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
         self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        test_actuators_button = tk.Button(test_actuators_pair_frame, text="Test Actuators", font="Arial 10", command=self.test_actuators)
-        test_actuators_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        self.test_actuators_button = tk.Button(test_actuators_pair_frame, text="Test Actuators", font="Arial 10", command=self.test_actuators)
+        self.test_actuators_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
         # Setup test LED button and indicator
         test_led_pair_frame = tk.Frame(test_buttons_frame)
@@ -188,8 +203,8 @@ class BehaviorBoxManager(tk.Frame):
         self.test_led_indicator = tk.Canvas(test_led_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
         self.test_led_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
         self.test_led_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        test_led_button = tk.Button(test_led_pair_frame, text="Test LED", font="Arial 10", command=self.test_led)
-        test_led_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        self.test_led_button = tk.Button(test_led_pair_frame, text="Test LED", font="Arial 10", command=self.test_led)
+        self.test_led_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
         # Console
         tk.Label(
@@ -200,18 +215,25 @@ class BehaviorBoxManager(tk.Frame):
         self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=10, width=120, bg="black", fg="white")
         self.console.grid(row=7, column=0, columnspan=6, padx=PADDING, pady=PADDING, sticky="n")
         self.console.config(state=tk.DISABLED)
+
+        # Add tags for the console message levels
+        self.console.tag_config("error", foreground="red")
+        self.console.tag_config("warning", foreground="yellow")
+        self.console.tag_config("success", foreground="green")
+        self.console.tag_config("info", foreground="white")
         self.log("Console initialized")
 
-    def log(self, message):
+    def log(self, message, state="info"):
         """
         Logs a message to the console with a timestamp.
 
         Parameters:
         message (str): The message to log.
+        state (str): The state of the message.
         """
         self.console.config(state=tk.NORMAL)
-        message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {message}\n"
-        self.console.insert(tk.END, message)
+        message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{LOG_STATES[state]}] {message}\n"
+        self.console.insert(tk.END, message, state)
         print(message, end="")
         self.console.config(state=tk.DISABLED)
         self.console.see(tk.END)
@@ -219,6 +241,18 @@ class BehaviorBoxManager(tk.Frame):
     def toggle_display(self, display_name):
         self.display_state[display_name]["state"] = not self.display_state[display_name]["state"]
         self.display_state[display_name]["button_text"].set("Disable" if self.display_state[display_name]["state"] else "Enable")
+
+    def set_test_buttons_disabled(self, disabled):
+        # Disable test buttons
+        if disabled:
+            self.test_led_button.config(state=tk.DISABLED)
+            self.test_actuators_button.config(state=tk.DISABLED)
+            self.test_water_delivery_button.config(state=tk.DISABLED)
+        else:
+            # Enable test buttons
+            self.test_led_button.config(state=tk.NORMAL)
+            self.test_actuators_button.config(state=tk.NORMAL)
+            self.test_water_delivery_button.config(state=tk.NORMAL)
 
     # Test functions
     def test_water_delivery(self):
@@ -228,12 +262,91 @@ class BehaviorBoxManager(tk.Frame):
         self.test_state["test_water_delivery"]["state"] = 1
         self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="green")
 
-    def test_actuators(self):
-        self.log("Testing actuators")
+    def test_actuators_task(self):
+        # Set default state to passed
+        self.test_state["test_left_actuator"]["state"] = 1
+        self.test_state["test_right_actuator"]["state"] = 1
 
-        # Simulate a successful test
-        self.test_state["test_actuators"]["state"] = 1
-        self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="green")
+        # Show that test is running
+        self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="yellow")
+
+        # Step 2: Test that the left actuator can be moved to 1.0
+        self.log("Testing left actuator", "start")
+        self.log("Waiting for left actuator input...", "info")
+        running_input_test = True
+        running_input_test_start_time = time.time()
+        while running_input_test:
+            input_state = self.io.get_input_states()
+            if input_state["left_lever"] == 1.0:
+                running_input_test = False
+
+            # Ensure test doesn't run indefinitely
+            if time.time() - running_input_test_start_time > 10:
+                self.log("Left actuator did not move to 1.0", "error")
+                self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
+                self.test_state["test_left_actuator"]["state"] = -1
+                self.set_test_buttons_disabled(False)
+                return
+
+        if input_state["left_lever"] != 1.0:
+            self.log("Left actuator did not move to 1.0", "error")
+            self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
+            self.test_state["test_left_actuator"]["state"] = -1
+            self.set_test_buttons_disabled(False)
+            return
+
+        self.log("Left actuator test passed", "success")
+
+        # Step 3: Test that the right actuator can be moved to 1.0
+        running_input_test = True
+        running_input_test_start_time = time.time()
+        self.log("Testing right actuator", "start")
+        self.log("Waiting for right actuator input...", "info")
+        while running_input_test:
+            input_state = self.io.get_input_states()
+            if input_state["right_lever"] == 1.0:
+                running_input_test = False
+
+            # Ensure test doesn't run indefinitely
+            if time.time() - running_input_test_start_time > 10:
+                self.log("Right actuator did not move to 1.0", "error")
+                self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
+                self.test_state["test_right_actuator"]["state"] = -1
+                self.set_test_buttons_disabled(False)
+                return
+
+        if input_state["right_lever"] != 1.0:
+            self.log("Right actuator did not move to 1.0", "error")
+            self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
+            self.test_state["test_right_actuator"]["state"] = -1
+            self.set_test_buttons_disabled(False)
+            return
+
+        self.log("Right actuator test passed", "success")
+
+        # Set test to passed
+        if self.test_state["test_left_actuator"]["state"] == 1 and self.test_state["test_right_actuator"]["state"] == 1:
+            self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="green")
+            self.log("Actuators test passed", "success")
+
+    def test_actuators(self):
+        self.log("Testing actuators", "start")
+
+        # Step 1: Test that both actuators default to 0.0
+        input_state = self.io.get_input_states()
+        if input_state["left_lever"] != 0.0 or input_state["right_lever"] != 0.0:
+            self.log("Actuators did not default to 0.0", "error")
+            self.test_state["test_actuators"]["state"] = -1
+            self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
+            return
+        self.log("Actuators defaulted to 0.0", "success")
+
+        # Disable test buttons
+        self.set_test_buttons_disabled(True)
+
+        # Run the test in a separate thread
+        left_actuator_test_thread = threading.Thread(target=self.test_actuators_task)
+        left_actuator_test_thread.start()
 
     def test_led(self):
         self.log("Testing LED")

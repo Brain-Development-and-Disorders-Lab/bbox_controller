@@ -179,14 +179,14 @@ class BehaviorBoxManager(tk.Frame):
             left_actuator_label_frame,
             textvariable=self.input_label_states["left_lever"],
             font="Arial 10"
-        ).pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        ).pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
         right_actuator_label_frame = tk.Frame(input_labels_frame)
         right_actuator_label_frame.pack(side=tk.TOP, fill=tk.X)
         self.right_actuator_label = tk.Label(
             right_actuator_label_frame,
             textvariable=self.input_label_states["right_lever"],
             font="Arial 10"
-        ).pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        ).pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
 
         # Commands
         tk.Label(

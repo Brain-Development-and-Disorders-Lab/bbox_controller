@@ -380,6 +380,9 @@ class BehaviorBoxManager(tk.Frame):
             self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="green")
             self.log("Actuators test passed", "success")
 
+        # Re-enable test buttons
+        self.set_test_buttons_disabled(False)
+
     def test_actuators(self):
         self.log("Testing actuators", "start")
 

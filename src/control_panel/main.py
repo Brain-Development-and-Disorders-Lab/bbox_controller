@@ -14,7 +14,7 @@ import threading
 import atexit
 import queue
 import websocket
-import time  # New import for time handling
+import time
 
 # Variables
 PADDING = 2
@@ -36,6 +36,20 @@ LOG_STATES = {
     "debug": "Debug",
 }
 
+# Test commands
+TEST_COMMANDS = [
+    "test_water_delivery",
+    "test_actuators",
+    "test_ir",
+]
+
+TEST_STATES = {
+    "NOT_TESTED": 0,
+    "FAILED": -1,
+    "PASSED": 1,
+    "RUNNING": 2,
+}
+
 class ControlPanel(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
@@ -43,6 +57,9 @@ class ControlPanel(tk.Frame):
 
         # Create a queue for input states
         self.input_queue = queue.Queue()
+
+        # Connection state
+        self.is_connected = False
 
         # Setup state
         self.display_state = {
@@ -59,16 +76,13 @@ class ControlPanel(tk.Frame):
         # Test state
         self.test_state = {
             "test_water_delivery": {
-                "state": 0, # -1: failed, 0: not tested, 1: passed
+                "state": TEST_STATES["NOT_TESTED"],
             },
-            "test_left_actuator": {
-                "state": 0, # -1: failed, 0: not tested, 1: passed
-            },
-            "test_right_actuator": {
-                "state": 0, # -1: failed, 0: not tested, 1: passed
+            "test_actuators": {
+                "state": TEST_STATES["NOT_TESTED"],
             },
             "test_ir": {
-                "state": 0, # -1: failed, 0: not tested, 1: passed
+                "state": TEST_STATES["NOT_TESTED"],
             },
         }
 
@@ -117,7 +131,8 @@ class ControlPanel(tk.Frame):
         tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT)
         tk.Entry(connection_frame, textvariable=self.port_var).pack(side=tk.LEFT)
 
-        tk.Button(connection_frame, text="Connect", command=self.connect_to_device).pack(side=tk.LEFT)
+        self.connect_button = tk.Button(connection_frame, text="Connect", command=self.connect_to_device)
+        self.connect_button.pack(side=tk.LEFT)
 
         # Large display
         tk.Label(
@@ -145,24 +160,28 @@ class ControlPanel(tk.Frame):
             height=60,
             bg="black"
         ).grid(row=5, column=0, padx=PADDING, pady=PADDING, sticky="w")
-        tk.Button(
+        self.mini_display_one_button = tk.Button(
             self.master,
             textvariable=self.display_state["mini_display_1"]["button_text"],
             font="Arial 10",
-            command=lambda: self.execute_command("toggle_display:mini_display_1")
-        ).grid(row=5, column=1, padx=PADDING, pady=PADDING, sticky="w")
+            command=lambda: self.execute_command("toggle_display:mini_display_1"),
+            state=tk.DISABLED
+        )
+        self.mini_display_one_button.grid(row=5, column=1, padx=PADDING, pady=PADDING, sticky="w")
         tk.Canvas(
             self.master,
             width=100,
             height=60,
             bg="black"
         ).grid(row=6, column=0, padx=PADDING, pady=PADDING, sticky="w")
-        tk.Button(
+        self.mini_display_two_button = tk.Button(
             self.master,
             textvariable=self.display_state["mini_display_2"]["button_text"],
             font="Arial 10",
-            command=lambda: self.execute_command("toggle_display:mini_display_2")
-        ).grid(row=6, column=1, padx=PADDING, pady=PADDING, sticky="w")
+            command=lambda: self.execute_command("toggle_display:mini_display_2"),
+            state=tk.DISABLED
+        )
+        self.mini_display_two_button.grid(row=6, column=1, padx=PADDING, pady=PADDING, sticky="w")
 
         # Inputs
         tk.Label(
@@ -182,14 +201,16 @@ class ControlPanel(tk.Frame):
             left_actuator_label_frame,
             textvariable=self.input_label_states["left_lever"],
             font="Arial 10"
-        ).pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
+        )
+        self.left_actuator_label.pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
         right_actuator_label_frame = tk.Frame(input_labels_frame)
         right_actuator_label_frame.pack(side=tk.TOP, fill=tk.X)
         self.right_actuator_label = tk.Label(
             right_actuator_label_frame,
             textvariable=self.input_label_states["right_lever"],
             font="Arial 10"
-        ).pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
+        )
+        self.right_actuator_label.pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
 
         # Commands
         tk.Label(
@@ -202,12 +223,14 @@ class ControlPanel(tk.Frame):
         commands_button_frame = tk.Frame(self.master)
         commands_button_frame.grid(row=5, column=2, padx=PADDING, pady=PADDING, sticky="n")
 
-        tk.Button(
+        self.release_water_button = tk.Button(
             commands_button_frame,
             text="Release Water",
             font="Arial 10",
-            command=lambda: self.execute_command("release_water")
-        ).pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+            command=lambda: self.execute_command("release_water"),
+            state=tk.DISABLED
+        )
+        self.release_water_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
 
         # Console
         tk.Label(
@@ -244,7 +267,13 @@ class ControlPanel(tk.Frame):
         self.test_water_delivery_indicator = tk.Canvas(test_water_delivery_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
         self.test_water_delivery_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
         self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_water_delivery_button = tk.Button(test_water_delivery_pair_frame, text="Test Water Delivery", font="Arial 10", command=lambda: self.execute_command("test_water_delivery"))
+        self.test_water_delivery_button = tk.Button(
+            test_water_delivery_pair_frame,
+            text="Test Water Delivery",
+            font="Arial 10",
+            command=lambda: self.execute_command("test_water_delivery"),
+            state=tk.DISABLED
+        )
         self.test_water_delivery_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
         # Setup test actuators button and indicator
@@ -254,7 +283,13 @@ class ControlPanel(tk.Frame):
         self.test_actuators_indicator = tk.Canvas(test_actuators_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
         self.test_actuators_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
         self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_actuators_button = tk.Button(test_actuators_pair_frame, text="Test Actuators", font="Arial 10", command=lambda: self.execute_command("test_actuators"))
+        self.test_actuators_button = tk.Button(
+            test_actuators_pair_frame,
+            text="Test Actuators",
+            font="Arial 10",
+            command=lambda: self.execute_command("test_actuators"),
+            state=tk.DISABLED
+        )
         self.test_actuators_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
         # Setup test IR button and indicator
@@ -264,7 +299,13 @@ class ControlPanel(tk.Frame):
         self.test_ir_indicator = tk.Canvas(test_ir_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
         self.test_ir_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
         self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_ir_button = tk.Button(test_ir_pair_frame, text="Test IR", font="Arial 10", command=lambda: self.execute_command("test_ir"))
+        self.test_ir_button = tk.Button(
+            test_ir_pair_frame,
+            text="Test IR",
+            font="Arial 10",
+            command=lambda: self.execute_command("test_ir"),
+            state=tk.DISABLED
+        )
         self.test_ir_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
     def log(self, message, state="info"):
@@ -286,18 +327,33 @@ class ControlPanel(tk.Frame):
         self.display_state[display_name]["state"] = not self.display_state[display_name]["state"]
         self.display_state[display_name]["button_text"].set("Disable" if self.display_state[display_name]["state"] else "Enable")
 
-    def check_input_queue(self):
-        try:
-            while True:  # Process all items in the queue
-                input_states = self.input_queue.get_nowait()
-                self.input_states = input_states  # Update input states
-                self.update_state_labels()
-        except queue.Empty:
-            pass  # No items in the queue
-
     def update_state_labels(self):
         self.input_label_states["left_lever"].set(f"Left Actuator: {self.input_states['left_lever']}")
         self.input_label_states["right_lever"].set(f"Right Actuator: {self.input_states['right_lever']}")
+
+    def update_test_state(self, command_name, state):
+        self.test_state[command_name]["state"] = state
+        self.update_test_state_indicators()
+
+    def update_test_state_indicators(self):
+        for command_name, command_state in self.test_state.items():
+            # Determine which indicator to update
+            if command_name == "test_water_delivery":
+                indicator = self.test_water_delivery_indicator
+            elif command_name == "test_actuators":
+                indicator = self.test_actuators_indicator
+            elif command_name == "test_ir":
+                indicator = self.test_ir_indicator
+
+            # Update the indicator
+            if command_state["state"] == TEST_STATES["FAILED"]:
+                indicator.create_oval(2, 2, 15, 15, fill="red")
+                self.set_test_buttons_disabled(False)
+            elif command_state["state"] == TEST_STATES["PASSED"]:
+                indicator.create_oval(2, 2, 15, 15, fill="green")
+                self.set_test_buttons_disabled(False)
+            elif command_state["state"] == TEST_STATES["RUNNING"]:
+                indicator.create_oval(2, 2, 15, 15, fill="yellow")
 
     def set_test_buttons_disabled(self, disabled):
         # Disable test buttons
@@ -318,6 +374,25 @@ class ControlPanel(tk.Frame):
             self.log("Invalid JSON message received", "error")
             return None
 
+    def on_connect(self):
+        self.is_connected = True
+        self.log("Connected to the device", "success")
+
+        # Enable all buttons
+        self.connect_button.config(state=tk.DISABLED)
+
+        # Test buttons
+        self.test_water_delivery_button.config(state=tk.NORMAL)
+        self.test_actuators_button.config(state=tk.NORMAL)
+        self.test_ir_button.config(state=tk.NORMAL)
+
+        # Display buttons
+        self.mini_display_one_button.config(state=tk.NORMAL)
+        self.mini_display_two_button.config(state=tk.NORMAL)
+
+        # Release water button
+        self.release_water_button.config(state=tk.NORMAL)
+
     def on_message(self, ws, message):
         # Handle incoming messages from the WebSocket
         received_message = self.parse_message(message)
@@ -326,13 +401,34 @@ class ControlPanel(tk.Frame):
             if received_message_type == "input_state":
                 self.input_states = received_message["data"]
                 self.update_state_labels()
-            self.log(f"Received message: {received_message}", "info")
+            elif received_message_type == "test_state":
+                self.test_state = received_message["data"]
+                self.update_test_state_indicators()
+            else:
+                self.log(f"Received message: {received_message}", "info")
 
     def on_error(self, ws, error):
         self.log(f"WebSocket error: {error}", "error")
 
     def on_close(self, ws):
-        self.log("WebSocket connection closed", "info")
+        # Perform opposite of on_connect
+        self.is_connected = False
+        self.log("Disconnected from the device", "error")
+
+        # Enable all buttons
+        self.connect_button.config(state=tk.NORMAL)
+
+        # Test buttons
+        self.test_water_delivery_button.config(state=tk.DISABLED)
+        self.test_actuators_button.config(state=tk.DISABLED)
+        self.test_ir_button.config(state=tk.DISABLED)
+
+        # Display buttons
+        self.mini_display_one_button.config(state=tk.DISABLED)
+        self.mini_display_two_button.config(state=tk.DISABLED)
+
+        # Release water button
+        self.release_water_button.config(state=tk.DISABLED)
 
     def send_command(self, command):
         # Send a command to the device via WebSocket
@@ -345,28 +441,34 @@ class ControlPanel(tk.Frame):
 
     def execute_command(self, command_name):
         # Send the command to the device
-        self.send_command(command_name)
+        if command_name in TEST_COMMANDS:
+            self.send_command(command_name)
+            self.update_test_state(command_name, TEST_STATES["RUNNING"])
+            self.set_test_buttons_disabled(True)
+        else:
+            self.log(f"Invalid command: {command_name}", "error")
 
     def connect_to_device(self):
-        ip_address = self.ip_address_var.get()
-        port = self.port_var.get()
-        websocket_url = f"ws://{ip_address}:{port}"
+        if not self.is_connected:
+            ip_address = self.ip_address_var.get()
+            port = self.port_var.get()
+            websocket_url = f"ws://{ip_address}:{port}"
 
         # Attempt to connect to the WebSocket service for 10 seconds
         self.log(f"Attempting to connect to {websocket_url}", "info")
         self.ws = websocket.WebSocketApp(websocket_url,
-                                          on_message=self.on_message,
-                                          on_error=self.on_error,
-                                          on_close=self.on_close)
+                                            on_message=self.on_message,
+                                            on_error=self.on_error,
+                                            on_close=self.on_close)
         self.ws_thread = threading.Thread(target=self.run_websocket)
         self.ws_thread.start()
 
         # Wait for connection attempt
-        for _ in range(10):
+        for _ in range(20):
             if self.ws.sock and self.ws.sock.connected:
-                self.log("Connected to the device", "success")
+                self.on_connect()
                 return
-            time.sleep(1)
+            time.sleep(0.5)
 
         self.log("Failed to connect to the device within 10 seconds", "error")
 

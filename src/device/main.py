@@ -5,6 +5,8 @@ import threading
 import time
 import websockets
 
+from controllers import IOController
+
 # Log states
 LOG_STATES = {
     "start": "Start",
@@ -31,7 +33,7 @@ def log(message, state="info"):
     message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{LOG_STATES[state]}] {message}\n"
     print(message, end="")
 
-async def handle_message(websocket, path):
+async def handle_message(websocket):
     """
     Handles incoming messages from the WebSocket connection.
     """

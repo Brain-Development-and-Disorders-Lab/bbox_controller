@@ -476,9 +476,13 @@ class BehaviorBoxManager(tk.Frame):
             self.set_test_buttons_disabled(False)
             return
 
+        # Set test to passed
+        if self.test_state["test_ir"]["state"] == 1:
+            self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="green")
+            self.log("IR test passed", "success")
+
         # Re-enable test buttons
         self.set_test_buttons_disabled(False)
-        self.log("IR test passed", "success")
 
     def test_ir(self):
         self.log("Testing IR", "start")

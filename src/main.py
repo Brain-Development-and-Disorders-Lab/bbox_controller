@@ -452,13 +452,13 @@ class BehaviorBoxManager(tk.Frame):
         # Show that test is running
         self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="yellow")
 
-        # Step 2: Test that the left actuator can be moved to 1.0
+        # Step 1: Test that the IR is broken
         self.log("Waiting for IR input...", "info")
         running_input_test = True
         running_input_test_start_time = time.time()
         while running_input_test:
             input_state = self.io.get_input_states()
-            if input_state["nose_poke"] == True:
+            if input_state["nose_poke"] == False:
                 running_input_test = False
 
             # Ensure test doesn't run indefinitely
@@ -469,13 +469,15 @@ class BehaviorBoxManager(tk.Frame):
                 self.set_test_buttons_disabled(False)
                 return
 
-        if input_state["nose_poke"] != True:
+        if input_state["nose_poke"] != False:
             self.log("IR was not broken", "error")
             self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="red")
             self.test_state["test_ir"]["state"] = -1
             self.set_test_buttons_disabled(False)
             return
 
+        # Re-enable test buttons
+        self.set_test_buttons_disabled(False)
         self.log("IR test passed", "success")
 
     def test_ir(self):

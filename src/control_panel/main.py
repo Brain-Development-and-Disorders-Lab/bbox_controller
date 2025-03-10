@@ -7,6 +7,7 @@ License: MIT
 """
 
 # GUI imports
+import json
 import tkinter as tk
 import datetime
 import threading
@@ -310,10 +311,21 @@ class ControlPanel(tk.Frame):
             self.test_actuators_button.config(state=tk.NORMAL)
             self.test_water_delivery_button.config(state=tk.NORMAL)
 
+    def parse_message(self, message):
+        try:
+            return json.loads(message)
+        except json.JSONDecodeError:
+            self.log("Invalid JSON message received", "error")
+            return None
+
     def on_message(self, ws, message):
         # Handle incoming messages from the WebSocket
-        received_message = self.parse_message(message)  # Implement this method to parse the message
+        received_message = self.parse_message(message)
         if received_message:
+            received_message_type = received_message["type"]
+            if received_message_type == "input_state":
+                self.input_states = received_message["data"]
+                self.update_state_labels()
             self.log(f"Received message: {received_message}", "info")
 
     def on_error(self, ws, error):

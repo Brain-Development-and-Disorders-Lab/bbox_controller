@@ -1,11 +1,11 @@
 import datetime
 import asyncio
-import queue
 import threading
 import time
 import websockets
+import json
 
-from controllers import IOController
+from controllers.IOController import IOController
 
 # Log states
 LOG_STATES = {
@@ -18,9 +18,11 @@ LOG_STATES = {
 }
 
 # Variables
-HOST = "localhost"
+HOST = ""  # Listen on all available interfaces
 PORT = 8765
 INPUT_TEST_TIMEOUT = 10 # seconds
+
+IO = IOController()
 
 def log(message, state="info"):
     """
@@ -33,28 +35,48 @@ def log(message, state="info"):
     message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{LOG_STATES[state]}] {message}\n"
     print(message, end="")
 
+async def send_state_message(websocket):
+    """
+    Sends a state message to the control panel.
+    """
+    while True:
+        try:
+            input_state = {
+                "type": "input_state",
+                "data": IO.get_input_states()
+            }
+            await websocket.send(json.dumps(input_state))  # Send your desired message here
+            await asyncio.sleep(0.05)  # Sleep for 50ms
+        except websockets.exceptions.ConnectionClosed:
+            log("Control panel connection closed", "warning")
+            break  # Exit the loop if the connection is closed
+
 async def handle_message(websocket):
     """
     Handles incoming messages from the WebSocket connection.
     """
-    async for message in websocket:
-        log(f"Received message: {message}", "info")
+
+    # Start the periodic message sending in the background
+    asyncio.create_task(send_state_message(websocket))
+
+    try:
+        async for message in websocket:
+            log(f"Received message: {message}", "info")
+    except websockets.exceptions.ConnectionClosed:
+        log("Control panel connection closed during message handling", "warning")
 
 async def listen():
     """
     Listens for WebSocket connections and handles incoming messages.
     """
     async with websockets.serve(handle_message, HOST, PORT):
-        log(f"Listening on {HOST}:{PORT}", "success")
+        log(f"Listening on port {PORT}", "success")
         await asyncio.Future()
 
 class Device:
     def __init__(self):
-        # Create a queue for input states
-        self.input_queue = queue.Queue()
-
         # Initialize IO
-        self.io = IOController()
+        self.io = IO
 
         # Setup state
         self.display_state = {

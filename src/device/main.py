@@ -5,8 +5,6 @@ import threading
 import time
 import websockets
 
-from device.controllers import IOController
-
 # Log states
 LOG_STATES = {
     "start": "Start",

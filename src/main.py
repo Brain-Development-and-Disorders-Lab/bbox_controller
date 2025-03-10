@@ -26,6 +26,7 @@ PANEL_HEIGHT = 720
 COLUMN_WIDTH = 30
 HEADING_HEIGHT = 40
 UPDATE_INTERVAL = 50 # milliseconds
+INPUT_TEST_TIMEOUT = 10 # seconds
 
 # Log states
 LOG_STATES = {
@@ -71,7 +72,7 @@ class BehaviorBoxManager(tk.Frame):
             "test_right_actuator": {
                 "state": 0, # -1: failed, 0: not tested, 1: passed
             },
-            "test_led": {
+            "test_ir": {
                 "state": 0, # -1: failed, 0: not tested, 1: passed
             },
         }
@@ -253,15 +254,15 @@ class BehaviorBoxManager(tk.Frame):
         self.test_actuators_button = tk.Button(test_actuators_pair_frame, text="Test Actuators", font="Arial 10", command=self.test_actuators)
         self.test_actuators_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
-        # Setup test LED button and indicator
-        test_led_pair_frame = tk.Frame(test_buttons_frame)
-        test_led_pair_frame.pack(side=tk.TOP, fill=tk.X)
+        # Setup test IR button and indicator
+        test_ir_pair_frame = tk.Frame(test_buttons_frame)
+        test_ir_pair_frame.pack(side=tk.TOP, fill=tk.X)
 
-        self.test_led_indicator = tk.Canvas(test_led_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
-        self.test_led_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
-        self.test_led_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_led_button = tk.Button(test_led_pair_frame, text="Test LED", font="Arial 10", command=self.test_led)
-        self.test_led_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        self.test_ir_indicator = tk.Canvas(test_ir_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
+        self.test_ir_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
+        self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="blue")
+        self.test_ir_button = tk.Button(test_ir_pair_frame, text="Test IR", font="Arial 10", command=self.test_ir)
+        self.test_ir_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
 
     def log(self, message, state="info"):
         """
@@ -307,12 +308,12 @@ class BehaviorBoxManager(tk.Frame):
     def set_test_buttons_disabled(self, disabled):
         # Disable test buttons
         if disabled:
-            self.test_led_button.config(state=tk.DISABLED)
+            self.test_ir_button.config(state=tk.DISABLED)
             self.test_actuators_button.config(state=tk.DISABLED)
             self.test_water_delivery_button.config(state=tk.DISABLED)
         else:
             # Enable test buttons
-            self.test_led_button.config(state=tk.NORMAL)
+            self.test_ir_button.config(state=tk.NORMAL)
             self.test_actuators_button.config(state=tk.NORMAL)
             self.test_water_delivery_button.config(state=tk.NORMAL)
 
@@ -368,7 +369,7 @@ class BehaviorBoxManager(tk.Frame):
                 running_input_test = False
 
             # Ensure test doesn't run indefinitely
-            if time.time() - running_input_test_start_time > 10:
+            if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
                 self.log("Left actuator did not move to 1.0", "error")
                 self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
                 self.test_state["test_left_actuator"]["state"] = -1
@@ -395,7 +396,7 @@ class BehaviorBoxManager(tk.Frame):
                 running_input_test = False
 
             # Ensure test doesn't run indefinitely
-            if time.time() - running_input_test_start_time > 10:
+            if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
                 self.log("Right actuator did not move to `True`", "error")
                 self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="red")
                 self.test_state["test_right_actuator"]["state"] = -1
@@ -443,12 +444,55 @@ class BehaviorBoxManager(tk.Frame):
         actuator_test_thread = threading.Thread(target=self.test_actuators_task)
         actuator_test_thread.start()
 
-    def test_led(self):
-        self.log("Testing LED")
 
-        # Simulate a successful test
-        self.test_state["test_led"]["state"] = 1
-        self.test_led_indicator.create_oval(2, 2, 15, 15, fill="green")
+    def test_ir_task(self):
+        # Set default state to passed
+        self.test_state["test_ir"]["state"] = 1
+
+        # Show that test is running
+        self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="yellow")
+
+        # Step 1: Test that the IR is broken
+        self.log("Waiting for IR input...", "info")
+        running_input_test = True
+        running_input_test_start_time = time.time()
+        while running_input_test:
+            input_state = self.io.get_input_states()
+            if input_state["nose_poke"] == False:
+                running_input_test = False
+
+            # Ensure test doesn't run indefinitely
+            if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
+                self.log("IR was not broken", "error")
+                self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="red")
+                self.test_state["test_ir"]["state"] = -1
+                self.set_test_buttons_disabled(False)
+                return
+
+        if input_state["nose_poke"] != False:
+            self.log("IR was not broken", "error")
+            self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="red")
+            self.test_state["test_ir"]["state"] = -1
+            self.set_test_buttons_disabled(False)
+            return
+
+        # Set test to passed
+        if self.test_state["test_ir"]["state"] == 1:
+            self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="green")
+            self.log("IR test passed", "success")
+
+        # Re-enable test buttons
+        self.set_test_buttons_disabled(False)
+
+    def test_ir(self):
+        self.log("Testing IR", "start")
+
+        # Disable test buttons
+        self.set_test_buttons_disabled(True)
+
+        # Run the test in a separate thread
+        ir_test_thread = threading.Thread(target=self.test_ir_task)
+        ir_test_thread.start()
 
     def on_exit(self):
         self.is_listening = False

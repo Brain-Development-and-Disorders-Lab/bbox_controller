@@ -397,11 +397,10 @@ class ControlPanel(tk.Frame):
         # Handle incoming messages from the WebSocket
         received_message = self.parse_message(message)
         if received_message:
-            received_message_type = received_message["type"]
-            if received_message_type == "input_state":
+            if received_message["type"] == "input_state":
                 self.input_states = received_message["data"]
                 self.update_state_labels()
-            elif received_message_type == "test_state":
+            elif received_message["type"] == "test_state":
                 self.test_state = received_message["data"]
                 self.update_test_state_indicators()
             else:

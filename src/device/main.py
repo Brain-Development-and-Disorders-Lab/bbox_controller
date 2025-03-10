@@ -236,7 +236,7 @@ def log(message, state="info"):
     message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{LOG_STATES[state]}] {message}\n"
     print(message, end="")
 
-async def send_state_message(websocket):
+async def send_queued_messages(websocket):
     """
     Sends messages from the message queue to the control panel.
     """
@@ -251,13 +251,21 @@ async def send_state_message(websocket):
             log("Control panel connection closed", "warning")
             break  # Exit the loop if the connection is closed
 
+async def send_state_message(websocket):
+    """
+    Sends the current state of the device to the control panel.
+    """
+    while True:
+        await websocket.send(json.dumps({"type": "input_state", "data": DEVICE.get_io_input_state()}))
+        await asyncio.sleep(0.05)
+
 async def handle_message(websocket):
     """
     Handles incoming messages from the WebSocket connection.
     """
     # Start the periodic message sending in the background
+    asyncio.create_task(send_queued_messages(websocket))
     asyncio.create_task(send_state_message(websocket))
-
     try:
         async for message in websocket:
             log(f"Received message: {message}", "info")

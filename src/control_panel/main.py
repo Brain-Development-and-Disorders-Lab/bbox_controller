@@ -43,6 +43,11 @@ TEST_COMMANDS = [
     "test_ir",
 ]
 
+# Experiment commands
+EXPERIMENT_COMMANDS = [
+    "run_experiment_test",
+]
+
 TEST_STATES = {
     "NOT_TESTED": 0,
     "FAILED": -1,
@@ -232,6 +237,16 @@ class ControlPanel(tk.Frame):
         )
         self.release_water_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
 
+        # Run experiment button
+        self.run_experiment_button = tk.Button(
+            commands_button_frame,
+            text="Run Experiment",
+            font="Arial 10",
+            command=lambda: self.execute_command("run_experiment_test"),
+            state=tk.DISABLED
+        )
+        self.run_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+
         # Console
         tk.Label(
             self.master,
@@ -367,6 +382,14 @@ class ControlPanel(tk.Frame):
             self.test_actuators_button.config(state=tk.NORMAL)
             self.test_water_delivery_button.config(state=tk.NORMAL)
 
+    def set_experiment_buttons_disabled(self, disabled):
+        # Disable experiment buttons
+        if disabled:
+            self.run_experiment_button.config(state=tk.DISABLED)
+        else:
+            # Enable experiment buttons
+            self.run_experiment_button.config(state=tk.NORMAL)
+
     def parse_message(self, message):
         try:
             return json.loads(message)
@@ -392,6 +415,9 @@ class ControlPanel(tk.Frame):
 
         # Release water button
         self.release_water_button.config(state=tk.NORMAL)
+
+        # Run experiment button
+        self.run_experiment_button.config(state=tk.NORMAL)
 
     def on_message(self, ws, message):
         # Handle incoming messages from the WebSocket
@@ -429,6 +455,9 @@ class ControlPanel(tk.Frame):
         # Release water button
         self.release_water_button.config(state=tk.DISABLED)
 
+        # Run experiment button
+        self.run_experiment_button.config(state=tk.DISABLED)
+
     def send_command(self, command):
         # Send a command to the device via WebSocket
         self.ws.send(command)
@@ -444,6 +473,9 @@ class ControlPanel(tk.Frame):
             self.send_command(command_name)
             self.update_test_state(command_name, TEST_STATES["RUNNING"])
             self.set_test_buttons_disabled(True)
+        elif command_name in EXPERIMENT_COMMANDS:
+            self.send_command(command_name)
+            self.set_experiment_buttons_disabled(True)
         else:
             self.log(f"Invalid command: {command_name}", "error")
 

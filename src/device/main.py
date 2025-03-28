@@ -1,4 +1,3 @@
-import datetime
 import asyncio
 import threading
 import time
@@ -7,16 +6,7 @@ import json
 import queue  # Import the queue module
 
 from controllers.IOController import IOController
-
-# Log states
-LOG_STATES = {
-    "start": "Start",
-    "success": "Success",
-    "error": "Error",
-    "warning": "Warning",
-    "info": "Info",
-    "debug": "Debug",
-}
+from util import log
 
 # Test commands
 TEST_COMMANDS = [
@@ -224,17 +214,6 @@ class Device:
             self.test_ir()
 
 DEVICE = Device()
-
-def log(message, state="info"):
-    """
-    Logs a message to the console with a timestamp.
-
-    Parameters:
-    message (str): The message to log.
-    state (str): The state of the message.
-    """
-    message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{LOG_STATES[state]}] {message}\n"
-    print(message, end="")
 
 async def send_queued_messages(websocket):
     """

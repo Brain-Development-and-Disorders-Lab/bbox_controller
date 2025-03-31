@@ -6,6 +6,7 @@ import json
 import queue  # Import the queue module
 
 from controllers.IOController import IOController
+from controllers.DisplayController import DisplayController
 from util import log
 
 # Test commands
@@ -13,6 +14,11 @@ TEST_COMMANDS = [
     "test_water_delivery",
     "test_actuators",
     "test_ir",
+]
+
+# Experiment commands
+EXPERIMENT_COMMANDS = [
+    "run_experiment_test",
 ]
 
 TEST_STATES = {
@@ -32,8 +38,9 @@ message_queue = queue.Queue()
 
 class Device:
     def __init__(self):
-        # Initialize IO
+        # Initialize controllers
         self.io = IOController()
+        self.display = DisplayController()
 
         # Setup state
         self.display_state = {
@@ -213,6 +220,14 @@ class Device:
         elif command_name == "test_ir":
             self.test_ir()
 
+    def run_experiment_test(self):
+        log("Running experiment: `test`", "start")
+        self.display.start_fullscreen()
+
+    def run_experiment(self, command_name):
+        if command_name == "run_experiment_test":
+            self.run_experiment_test()
+
 DEVICE = Device()
 
 async def send_queued_messages(websocket):
@@ -250,8 +265,10 @@ async def handle_message(websocket):
             log(f"Received message: {message}", "info")
             if message in TEST_COMMANDS:
                 DEVICE.run_test(message)
-            # Add any additional messages to the queue
-            # message_queue.put({"type": "received", "data": message})
+            elif message in EXPERIMENT_COMMANDS:
+                DEVICE.run_experiment(message)
+            else:
+                log(f"Unknown command: {message}", "error")
     except websockets.exceptions.ConnectionClosed:
         log("Control panel connection closed during message handling", "warning")
 

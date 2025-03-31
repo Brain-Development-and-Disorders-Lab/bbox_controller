@@ -426,7 +426,6 @@ class ControlPanel(tk.Frame):
 
     def on_disconnect(self):
         self.is_connected = False
-        self.log("Disconnected from the device", "success")
 
         # Enable all buttons
         self.connect_button.config(state=tk.NORMAL)
@@ -469,27 +468,10 @@ class ControlPanel(tk.Frame):
         self.log(f"WebSocket error: {error}", "error")
 
     def on_close(self, ws):
+        self.log("Connection closed", "info")
+
         # Perform opposite of on_connect
-        self.is_connected = False
-        self.log("Disconnected from the device", "error")
-
-        # Enable all buttons
-        self.connect_button.config(state=tk.NORMAL)
-
-        # Test buttons
-        self.test_water_delivery_button.config(state=tk.DISABLED)
-        self.test_actuators_button.config(state=tk.DISABLED)
-        self.test_ir_button.config(state=tk.DISABLED)
-
-        # Display buttons
-        self.mini_display_one_button.config(state=tk.DISABLED)
-        self.mini_display_two_button.config(state=tk.DISABLED)
-
-        # Release water button
-        self.release_water_button.config(state=tk.DISABLED)
-
-        # Run experiment button
-        self.run_experiment_button.config(state=tk.DISABLED)
+        self.on_disconnect()
 
     def send_command(self, command):
         # Send a command to the device via WebSocket
@@ -562,7 +544,6 @@ class ControlPanel(tk.Frame):
     def disconnect_from_device(self):
         self.ws.close()
         self.log("Disconnected from the device", "success")
-
         self.reset_state()
         self.on_disconnect()
 

@@ -243,20 +243,27 @@ async def send_queued_messages(websocket):
             await asyncio.sleep(0.05)  # Sleep for 50ms
         except websockets.exceptions.ConnectionClosed:
             log("Control panel connection closed", "warning")
-            break  # Exit the loop if the connection is closed
+            break
 
 async def send_state_message(websocket):
     """
     Sends the current state of the device to the control panel.
     """
     while True:
-        await websocket.send(json.dumps({"type": "input_state", "data": DEVICE.get_io_input_state()}))
-        await asyncio.sleep(0.05)
+        try:
+            await websocket.send(json.dumps({"type": "input_state", "data": DEVICE.get_io_input_state()}))
+            await asyncio.sleep(0.05)
+        except websockets.exceptions.ConnectionClosed:
+            log("Control panel connection closed", "warning")
+            break
 
 async def handle_message(websocket):
     """
     Handles incoming messages from the WebSocket connection.
     """
+    # Log new connection
+    log("Control panel connected", "info")
+
     # Start the periodic message sending in the background
     asyncio.create_task(send_queued_messages(websocket))
     asyncio.create_task(send_state_message(websocket))

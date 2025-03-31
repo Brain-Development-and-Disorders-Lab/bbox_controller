@@ -138,6 +138,8 @@ class ControlPanel(tk.Frame):
 
         self.connect_button = tk.Button(connection_frame, text="Connect", command=self.connect_to_device)
         self.connect_button.pack(side=tk.LEFT)
+        self.disconnect_button = tk.Button(connection_frame, text="Disconnect", command=self.disconnect_from_device, state=tk.DISABLED)
+        self.disconnect_button.pack(side=tk.LEFT)
 
         # Large display
         tk.Label(
@@ -419,6 +421,37 @@ class ControlPanel(tk.Frame):
         # Run experiment button
         self.run_experiment_button.config(state=tk.NORMAL)
 
+        # Disconnect button
+        self.disconnect_button.config(state=tk.NORMAL)
+
+    def on_disconnect(self):
+        self.is_connected = False
+        self.log("Disconnected from the device", "success")
+
+        # Enable all buttons
+        self.connect_button.config(state=tk.NORMAL)
+
+        # Test buttons
+        self.test_water_delivery_button.config(state=tk.DISABLED)
+        self.test_actuators_button.config(state=tk.DISABLED)
+        self.test_ir_button.config(state=tk.DISABLED)
+
+        # Display buttons
+        self.mini_display_one_button.config(state=tk.DISABLED)
+        self.mini_display_two_button.config(state=tk.DISABLED)
+
+        # Release water button
+        self.release_water_button.config(state=tk.DISABLED)
+
+        # Run experiment button
+        self.run_experiment_button.config(state=tk.DISABLED)
+
+        # Connect button
+        self.connect_button.config(state=tk.NORMAL)
+
+        # Disconnect button
+        self.disconnect_button.config(state=tk.DISABLED)
+
     def on_message(self, ws, message):
         # Handle incoming messages from the WebSocket
         received_message = self.parse_message(message)
@@ -502,6 +535,36 @@ class ControlPanel(tk.Frame):
             time.sleep(0.5)
 
         self.log("Failed to connect to the device within 10 seconds", "error")
+
+    def reset_state(self):
+        self.is_connected = False
+        self.input_states = {
+            "left_lever": False,
+            "right_lever": False,
+            "nose_poke": False,
+            "water_port": False,
+        }
+        self.test_state = {
+            "test_water_delivery": {
+                "state": TEST_STATES["NOT_TESTED"],
+            },
+            "test_actuators": {
+                "state": TEST_STATES["NOT_TESTED"],
+            },
+            "test_ir": {
+                "state": TEST_STATES["NOT_TESTED"],
+            },
+        }
+
+        # Reset the status icons
+        self.update_test_state_indicators()
+
+    def disconnect_from_device(self):
+        self.ws.close()
+        self.log("Disconnected from the device", "success")
+
+        self.reset_state()
+        self.on_disconnect()
 
     def run_websocket(self):
         self.ws.run_forever()

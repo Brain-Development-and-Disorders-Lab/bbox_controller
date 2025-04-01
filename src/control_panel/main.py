@@ -373,6 +373,12 @@ class ControlPanel(tk.Frame):
                 indicator.create_oval(2, 2, 15, 15, fill="yellow")
 
     def set_test_buttons_disabled(self, disabled):
+        """
+        Disables or enables the test buttons.
+
+        Parameters:
+        disabled (bool): Whether to disable the test buttons.
+        """
         # Disable test buttons
         if disabled:
             self.test_ir_button.config(state=tk.DISABLED)
@@ -385,6 +391,12 @@ class ControlPanel(tk.Frame):
             self.test_water_delivery_button.config(state=tk.NORMAL)
 
     def set_experiment_buttons_disabled(self, disabled):
+        """
+        Disables or enables the experiment buttons.
+
+        Parameters:
+        disabled (bool): Whether to disable the experiment buttons.
+        """
         # Disable experiment buttons
         if disabled:
             self.run_experiment_button.config(state=tk.DISABLED)
@@ -400,6 +412,9 @@ class ControlPanel(tk.Frame):
             return None
 
     def on_connect(self):
+        """
+        Enables all buttons and sets the connection state to connected.
+        """
         self.is_connected = True
         self.log("Connected to the device", "success")
 
@@ -425,6 +440,11 @@ class ControlPanel(tk.Frame):
         self.disconnect_button.config(state=tk.NORMAL)
 
     def on_disconnect(self):
+        """
+        Resets the state of the control panel and disables all buttons.
+        """
+        self.reset_state()
+
         self.is_connected = False
 
         # Enable all buttons
@@ -450,6 +470,7 @@ class ControlPanel(tk.Frame):
 
         # Disconnect button
         self.disconnect_button.config(state=tk.DISABLED)
+        self.log("Disconnected from the device", "success")
 
     def on_message(self, ws, message):
         # Handle incoming messages from the WebSocket
@@ -518,6 +539,13 @@ class ControlPanel(tk.Frame):
 
         self.log("Failed to connect to the device within 10 seconds", "error")
 
+    def disconnect_from_device(self):
+        """
+        Disconnects from the device.
+        """
+        # Invoke the close method, which will trigger the on_close method
+        self.ws.close()
+
     def reset_state(self):
         self.is_connected = False
         self.input_states = {
@@ -540,12 +568,6 @@ class ControlPanel(tk.Frame):
 
         # Reset the status icons
         self.update_test_state_indicators()
-
-    def disconnect_from_device(self):
-        self.ws.close()
-        self.log("Disconnected from the device", "success")
-        self.reset_state()
-        self.on_disconnect()
 
     def run_websocket(self):
         self.ws.run_forever()

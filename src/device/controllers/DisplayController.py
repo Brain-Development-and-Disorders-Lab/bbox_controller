@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 
 # Import experiments
-from tasks.example import Example
+from tasks.Example import Example
 
 try:
     from board import SCL, SDA

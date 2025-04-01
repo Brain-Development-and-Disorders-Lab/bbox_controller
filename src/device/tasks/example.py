@@ -1,8 +1,21 @@
 import time
 
-class Example:
+# ITask interface
+from tasks.ITask import ITask
+
+class Example(ITask):
   def __init__(self):
-    pass
+    """
+    Initializes the example task.
+    """
+    super().__init__()
+
+  def check_inputs(self):
+    """
+    Checks the inputs from the IOController.
+    """
+    input_states = self.io.get_input_states()
+    print(input_states)
 
   def run(self):
     """
@@ -30,7 +43,7 @@ class Example:
     # Set up the font
     font_size = 72  # Large font size
     try:
-        font = pygame.font.SysFont('Arial', font_size)
+        font = pygame.font.SysFont("Arial", font_size)
     except:
         font = pygame.font.Font(None, font_size)  # Fallback to default font
 

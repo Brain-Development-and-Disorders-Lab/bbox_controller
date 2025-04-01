@@ -25,7 +25,7 @@ class Example(ITask):
 
     # Check if pygame is already initialized
     if pygame.get_init():
-        pygame.quit()
+      pygame.quit()
 
     # Initialize Pygame
     pygame.init()
@@ -34,8 +34,7 @@ class Example(ITask):
     screen_info = pygame.display.Info()
 
     # Set up fullscreen display
-    screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h),
-                                    pygame.FULLSCREEN)
+    screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h), pygame.FULLSCREEN)
 
     # Fill screen with black
     screen.fill((0, 0, 0))
@@ -43,9 +42,9 @@ class Example(ITask):
     # Set up the font
     font_size = 72  # Large font size
     try:
-        font = pygame.font.SysFont("Arial", font_size)
+      font = pygame.font.SysFont("Arial", font_size)
     except:
-        font = pygame.font.Font(None, font_size)  # Fallback to default font
+      font = pygame.font.Font(None, font_size)  # Fallback to default font
 
     # Create the text surface
     text = font.render("Test Experiment", True, (255, 255, 255))
@@ -62,27 +61,32 @@ class Example(ITask):
     running = True
 
     try:
-        while running:
-            # Handle events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
+      while running:
+        # Handle events
+        for event in pygame.event.get():
+          if event.type == pygame.QUIT:
+            running = False
+          elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+              running = False
 
-            # Check if 5 seconds have passed
-            if time.time() - start_time >= 5:
-                running = False
+        # Check if 30 seconds have passed
+        if time.time() - start_time >= 30:
+          running = False
 
-            pygame.time.delay(10)
+        # Check inputs
+        input_states = self.io.get_input_states()
+        if input_states["right_lever"]:
+          running = False
+
+        pygame.time.delay(10)
 
     finally:
-        # Ensure cleanup happens even if there's an error
-        pygame.display.quit()
-        pygame.quit()
+      # Ensure cleanup happens even if there's an error
+      pygame.display.quit()
+      pygame.quit()
 
 if __name__ == "__main__":
-    # Run the experiment from the command line
-    experiment = Example()
-    experiment.run()
+  # Run the experiment from the command line
+  experiment = Example()
+  experiment.run()

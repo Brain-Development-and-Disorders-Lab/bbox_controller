@@ -110,6 +110,9 @@ class ControlPanel(tk.Frame):
         atexit.register(self.on_exit)
 
     def create_layout(self):
+        """
+        Creates the layout of the control panel.
+        """
         # Configure the grid
         self.master.grid_columnconfigure(0, weight=0)
         self.master.grid_columnconfigure(1, weight=0)
@@ -341,18 +344,37 @@ class ControlPanel(tk.Frame):
         self.console.see(tk.END)
 
     def toggle_display(self, display_name):
+        """
+        Toggles the state of a display.
+
+        Parameters:
+        display_name (str): The name of the display to toggle.
+        """
         self.display_state[display_name]["state"] = not self.display_state[display_name]["state"]
         self.display_state[display_name]["button_text"].set("Disable" if self.display_state[display_name]["state"] else "Enable")
 
     def update_state_labels(self):
+        """
+        Updates the state labels for the input states.
+        """
         self.input_label_states["left_lever"].set(f"Left Actuator: {self.input_states['left_lever']}")
         self.input_label_states["right_lever"].set(f"Right Actuator: {self.input_states['right_lever']}")
 
     def update_test_state(self, command_name, state):
+        """
+        Updates the state of a test.
+
+        Parameters:
+        command_name (str): The name of the command to update.
+        state (int): The state to set the command to.
+        """
         self.test_state[command_name]["state"] = state
         self.update_test_state_indicators()
 
     def update_test_state_indicators(self):
+        """
+        Updates the state indicators for the test states.
+        """
         for command_name, command_state in self.test_state.items():
             # Determine which indicator to update
             if command_name == "test_water_delivery":
@@ -405,6 +427,12 @@ class ControlPanel(tk.Frame):
             self.run_experiment_button.config(state=tk.NORMAL)
 
     def parse_message(self, message):
+        """
+        Parses a message from the device.
+
+        Parameters:
+        message (str): The message to parse.
+        """
         try:
             return json.loads(message)
         except json.JSONDecodeError:
@@ -473,7 +501,13 @@ class ControlPanel(tk.Frame):
         self.log("Disconnected from the device", "success")
 
     def on_message(self, ws, message):
-        # Handle incoming messages from the WebSocket
+        """
+        Handles incoming messages from the WebSocket.
+
+        Parameters:
+        ws (websocket.WebSocketApp): The WebSocket application.
+        message (str): The message to handle.
+        """
         received_message = self.parse_message(message)
         if received_message:
             if received_message["type"] == "input_state":
@@ -486,24 +520,51 @@ class ControlPanel(tk.Frame):
                 self.log(f"Received message: {received_message}", "info")
 
     def on_error(self, ws, error):
+        """
+        Handles errors from the WebSocket.
+
+        Parameters:
+        ws (websocket.WebSocketApp): The WebSocket application.
+        error (str): The error to handle.
+        """
         self.log(f"WebSocket error: {error}", "error")
 
     def on_close(self, ws):
+        """
+        Handles the closing of the WebSocket connection.
+
+        Parameters:
+        ws (websocket.WebSocketApp): The WebSocket application.
+        """
         self.log("Connection closed", "info")
 
         # Perform opposite of on_connect
         self.on_disconnect()
 
     def send_command(self, command):
-        # Send a command to the device via WebSocket
+        """
+        Sends a command to the device via WebSocket.
+
+        Parameters:
+        command (str): The command to send.
+        """
         self.ws.send(command)
 
     def on_exit(self):
+        """
+        Closes the WebSocket connection and joins the WebSocket thread.
+        """
         self.ws.close()  # Close WebSocket connection
         if hasattr(self, "ws_thread") and self.ws_thread is not None:
             self.ws_thread.join()
 
     def execute_command(self, command_name):
+        """
+        Executes a command on the device.
+
+        Parameters:
+        command_name (str): The name of the command to execute.
+        """
         # Send the command to the device
         if command_name in TEST_COMMANDS:
             self.send_command(command_name)
@@ -516,6 +577,9 @@ class ControlPanel(tk.Frame):
             self.log(f"Invalid command: {command_name}", "error")
 
     def connect_to_device(self):
+        """
+        Connects to the device.
+        """
         if not self.is_connected:
             ip_address = self.ip_address_var.get()
             port = self.port_var.get()
@@ -547,6 +611,9 @@ class ControlPanel(tk.Frame):
         self.ws.close()
 
     def reset_state(self):
+        """
+        Resets the state of the control panel.
+        """
         self.is_connected = False
         self.input_states = {
             "left_lever": False,

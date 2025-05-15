@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 
 # Import experiments
-from tasks.Example import Example
+from task import Task
 
 try:
   from board import SCL, SDA
@@ -99,7 +99,7 @@ class DisplayController:
     self.display_right.show()
 
   def start_fullscreen(self):
-    self.experiment = Example()
+    self.experiment = Task()
     self.experiment.run()
 
 class DummyDisplay:

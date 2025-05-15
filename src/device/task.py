@@ -1,14 +1,23 @@
+import json
 import time
 
-# ITask interface
-from tasks.ITask import ITask
+# Controllers
+from controllers.IOController import IOController
 
-class Example(ITask):
-  def __init__(self):
+class Task():
+  def __init__(self, animal_id=None):
     """
     Initializes the example task.
     """
-    super().__init__()
+    self.io = IOController()
+    self.trials = []
+
+    # Load the configuration file
+    with open("config.json") as config_file:
+        self.variables = json.load(config_file)["task"]
+
+    if animal_id is None:
+      raise ValueError("`animal_id` is required")
 
   def check_inputs(self):
     """
@@ -88,5 +97,5 @@ class Example(ITask):
 
 if __name__ == "__main__":
   # Run the experiment from the command line
-  experiment = Example()
+  experiment = Task("test_animal_0")
   experiment.run()

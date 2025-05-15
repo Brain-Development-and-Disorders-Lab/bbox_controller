@@ -1,0 +1,13 @@
+{
+  "task": {
+    "iti_minimum": 100,
+    "iti_maximum": 1000,
+    "response_limit": 1000,
+    "cue_minimum": 100,
+    "cue_maximum": 1000,
+    "hold_minimum": 100,
+    "hold_maximum": 1000,
+    "valve_open": 100,
+    "punish_time": 1000
+  }
+}

@@ -245,7 +245,7 @@ class ControlPanel(tk.Frame):
             experiment_button_frame,
             text="Run Experiment",
             font="Arial 10",
-            command=lambda: self.execute_command("run_experiment"),
+            command=lambda: self.execute_command("run_experiment " + self.animal_id_var.get()),
             state=tk.DISABLED
         )
         self.run_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
@@ -562,23 +562,27 @@ class ControlPanel(tk.Frame):
         if hasattr(self, "ws_thread") and self.ws_thread is not None:
             self.ws_thread.join()
 
-    def execute_command(self, command_name):
+    def execute_command(self, command):
         """
         Executes a command on the device.
 
         Parameters:
-        command_name (str): The name of the command to execute.
+        command (str): The entire command to execute.
         """
+        # Split the command and extract the primary instruction from any arguments
+        command_groups = command.split(" ")
+        primary_command = command_groups[0]
+
         # Send the command to the device
-        if command_name in TEST_COMMANDS:
-            self.send_command(command_name)
-            self.update_test_state(command_name, TEST_STATES["RUNNING"])
+        if primary_command in TEST_COMMANDS:
+            self.send_command(command)
+            self.update_test_state(command, TEST_STATES["RUNNING"])
             self.set_test_buttons_disabled(True)
-        elif command_name in EXPERIMENT_COMMANDS:
-            self.send_command(command_name)
+        elif primary_command in EXPERIMENT_COMMANDS:
+            self.send_command(command)
             self.set_experiment_buttons_disabled(True)
         else:
-            self.log(f"Invalid command: {command_name}", "error")
+            self.log(f"Invalid command: {command}", "error")
 
     def connect_to_device(self):
         """

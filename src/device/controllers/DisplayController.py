@@ -9,9 +9,6 @@ License: MIT
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-# Import experiments
-from task import Task
-
 try:
   from board import SCL, SDA
   import busio

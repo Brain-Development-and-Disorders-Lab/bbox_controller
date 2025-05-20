@@ -5,8 +5,12 @@ import websockets
 import json
 import queue  # Import the queue module
 
+# Controllers
 from controllers.IOController import IOController
 from controllers.DisplayController import DisplayController
+
+# Other imports
+from task import Task
 from util import log
 
 # Test commands
@@ -18,7 +22,7 @@ TEST_COMMANDS = [
 
 # Experiment commands
 EXPERIMENT_COMMANDS = [
-  "run_experiment_test",
+  "run_experiment",
 ]
 
 TEST_STATES = {
@@ -212,21 +216,22 @@ class Device:
     ir_test_thread = threading.Thread(target=self.test_ir_task)
     ir_test_thread.start()
 
-  def run_test(self, command_name):
-    if command_name == "test_water_delivery":
+  def run_test(self, command):
+    if command == "test_water_delivery":
       self.test_water_delivery()
-    elif command_name == "test_actuators":
+    elif command == "test_actuators":
       self.test_actuators()
-    elif command_name == "test_ir":
+    elif command == "test_ir":
       self.test_ir()
 
-  def run_experiment_test(self):
-    log("Running experiment: `test`", "start")
-    self.display.start_fullscreen()
+  def run_experiment(self, command):
+    primary_command = command.split(" ")[0]
+    arguments = command.split(" ")[1:]
 
-  def run_experiment(self, command_name):
-    if command_name == "run_experiment_test":
-      self.run_experiment_test()
+    if primary_command == "run_experiment":
+      # Run the experiment from the command line
+      experiment = Task(arguments[0])
+      experiment.run()
 
 DEVICE = Device()
 
@@ -270,9 +275,13 @@ async def handle_message(websocket):
   try:
     async for message in websocket:
       log(f"Received message: {message}", "info")
-      if message in TEST_COMMANDS:
+
+      # Parse the message
+      primary_command = message.split(" ")[0]
+
+      if primary_command in TEST_COMMANDS:
         DEVICE.run_test(message)
-      elif message in EXPERIMENT_COMMANDS:
+      elif primary_command in EXPERIMENT_COMMANDS:
         DEVICE.run_experiment(message)
       else:
         log(f"Unknown command: {message}", "error")

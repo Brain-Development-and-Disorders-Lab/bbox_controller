@@ -98,10 +98,6 @@ class DisplayController:
     self.display_left.show()
     self.display_right.show()
 
-  def start_fullscreen(self):
-    self.experiment = Task()
-    self.experiment.run()
-
 class DummyDisplay:
   def __init__(self, width, height):
     self.width = width

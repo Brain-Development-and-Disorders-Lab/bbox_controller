@@ -45,7 +45,7 @@ TEST_COMMANDS = [
 
 # Experiment commands
 EXPERIMENT_COMMANDS = [
-    "run_experiment_test",
+    "run_experiment",
 ]
 
 TEST_STATES = {
@@ -222,32 +222,30 @@ class ControlPanel(tk.Frame):
         )
         self.right_actuator_label.pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
 
-        # Commands
+        # Experiment
         tk.Label(
             self.master,
-            text="Commands",
+            text="Experiment",
             font="Arial 12"
         ).grid(row=4, column=2, padx=PADDING, pady=PADDING)
 
         # Setup frame for buttons
-        commands_button_frame = tk.Frame(self.master)
-        commands_button_frame.grid(row=5, column=2, padx=PADDING, pady=PADDING, sticky="n")
+        experiment_button_frame = tk.Frame(self.master)
+        experiment_button_frame.grid(row=5, column=2, padx=PADDING, pady=PADDING, sticky="n")
 
-        self.release_water_button = tk.Button(
-            commands_button_frame,
-            text="Release Water",
-            font="Arial 10",
-            command=lambda: self.execute_command("release_water"),
-            state=tk.DISABLED
-        )
-        self.release_water_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+        # Animal ID input
+        self.animal_id_var = tk.StringVar(self.master, "")
+        self.animal_id_var.trace_add("write", self.on_animal_id_change)
+        tk.Label(experiment_button_frame, text="Animal ID:").pack(side=tk.LEFT)
+        self.animal_id_input = tk.Entry(experiment_button_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
+        self.animal_id_input.pack(side=tk.LEFT)
 
         # Run experiment button
         self.run_experiment_button = tk.Button(
-            commands_button_frame,
+            experiment_button_frame,
             text="Run Experiment",
             font="Arial 10",
-            command=lambda: self.execute_command("run_experiment_test"),
+            command=lambda: self.execute_command("run_experiment"),
             state=tk.DISABLED
         )
         self.run_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
@@ -426,6 +424,15 @@ class ControlPanel(tk.Frame):
             # Enable experiment buttons
             self.run_experiment_button.config(state=tk.NORMAL)
 
+    def on_animal_id_change(self, *args):
+        """
+        Enables the run experiment button only if animal_id_input is not empty.
+        """
+        if self.animal_id_var.get().strip():
+            self.run_experiment_button.config(state=tk.NORMAL)
+        else:
+            self.run_experiment_button.config(state=tk.DISABLED)
+
     def parse_message(self, message):
         """
         Parses a message from the device.
@@ -458,11 +465,8 @@ class ControlPanel(tk.Frame):
         self.mini_display_one_button.config(state=tk.NORMAL)
         self.mini_display_two_button.config(state=tk.NORMAL)
 
-        # Release water button
-        self.release_water_button.config(state=tk.NORMAL)
-
-        # Run experiment button
-        self.run_experiment_button.config(state=tk.NORMAL)
+        # Animal ID input
+        self.animal_id_input.config(state=tk.NORMAL)
 
         # Disconnect button
         self.disconnect_button.config(state=tk.NORMAL)

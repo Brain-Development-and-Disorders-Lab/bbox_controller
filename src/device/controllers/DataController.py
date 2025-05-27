@@ -29,7 +29,7 @@ class DataController:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     self.filename = f"{self.data_dir}/{animal_id}_{timestamp}.json"
 
-  def add_screen_data(self, screen_name, data):
+  def add_trial_data(self, screen_name, data):
     """Add data for a specific screen"""
     if screen_name not in self.data["screens"]:
       self.data["screens"][screen_name] = []

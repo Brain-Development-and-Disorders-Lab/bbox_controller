@@ -2,12 +2,11 @@ import json
 import multiprocessing
 
 # Controllers
-from controllers.IOController import IOController
 from controllers.DataController import DataController
 
-# Screens
-from screens.StartScreen import StartScreen
-from screens.WaitScreen import WaitScreen
+# Trials
+from trials.Trial_Stage_1 import TrialStage1
+from trials.Trial_ITI import TrialITI
 
 # Other imports
 from util import log
@@ -35,21 +34,21 @@ def run_task_process(animal_id, config_path):
   )
   screen.fill((0, 0, 0))
 
-  # Setup screens
-  screens = [
-    StartScreen(0, 0),
-    WaitScreen(0, 0)
+  # Setup trials
+  trials = [
+    TrialStage1(0, 0),
+    TrialITI(0, 0),
   ]
   font = pygame.font.SysFont("Arial", 64)
-  for s in screens:
-    s.screen = screen
-    s.font = font
-    s.width = screen_info.current_w
-    s.height = screen_info.current_h
+  for trial in trials:
+    trial.screen = screen
+    trial.font = font
+    trial.width = screen_info.current_w
+    trial.height = screen_info.current_h
 
   # Run first screen
-  current_screen = screens.pop(0)
-  current_screen.on_enter()
+  current_trial = trials.pop(0)
+  current_trial.on_enter()
 
   running = True
   try:
@@ -57,25 +56,25 @@ def run_task_process(animal_id, config_path):
       events = pygame.event.get()
 
       # Handle screen events
-      if not current_screen.update(events):
+      if not current_trial.update(events):
         # Screen is complete, run next screen
-        current_screen.on_exit()
+        current_trial.on_exit()
 
         # Save screen data before moving to next screen
-        screen_data = current_screen.get_data()
-        if screen_data:
-          data.add_screen_data(current_screen.title, screen_data)
+        trial_data = current_trial.get_data()
+        if trial_data:
+          data.add_trial_data(current_trial.title, trial_data)
 
-        log("Finished screen: " + current_screen.title, "info")
+        log("Finished trial: " + current_trial.title, "info")
 
-        if len(screens) > 0:
-          current_screen = screens.pop(0)
-          current_screen.on_enter()
+        if len(trials) > 0:
+          current_trial = trials.pop(0)
+          current_trial.on_enter()
         else:
           running = False
 
       # Render
-      current_screen.render()
+      current_trial.render()
       pygame.display.flip()
 
       # Cap frame rate

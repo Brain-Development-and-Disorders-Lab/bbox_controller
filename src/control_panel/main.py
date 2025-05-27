@@ -15,6 +15,7 @@ import atexit
 import queue
 import websocket
 import time
+import os
 
 # Variables
 PADDING = 2
@@ -665,9 +666,19 @@ class ControlPanel(tk.Frame):
 
 def main():
     root = tk.Tk()
+    root.title("Behavior Box: Control Panel")
     root.resizable(False, False)
+
+    # Set window icon
+    try:
+        icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.png")
+        icon = tk.PhotoImage(file=icon_path)
+        root.iconphoto(True, icon)
+    except Exception as e:
+        pass
+
     view = ControlPanel(root)
-    view.master.title("Control Panel")
+    view.master.title("Behavior Box: Control Panel")
     view.mainloop()
 
 if __name__ == "__main__":

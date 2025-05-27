@@ -46,6 +46,7 @@ TEST_COMMANDS = [
 # Experiment commands
 EXPERIMENT_COMMANDS = [
     "run_experiment",
+    "stop_experiment"
 ]
 
 TEST_STATES = {
@@ -243,12 +244,22 @@ class ControlPanel(tk.Frame):
         # Run experiment button
         self.run_experiment_button = tk.Button(
             experiment_button_frame,
-            text="Run Experiment",
+            text="Run",
             font="Arial 10",
             command=lambda: self.execute_command("run_experiment " + self.animal_id_var.get()),
             state=tk.DISABLED
         )
         self.run_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+
+        # Stop experiment button
+        self.stop_experiment_button = tk.Button(
+            experiment_button_frame,
+            text="Stop",
+            font="Arial 10",
+            command=lambda: self.execute_command("stop_experiment"),
+            state=tk.DISABLED
+        )
+        self.stop_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
 
         # Console
         tk.Label(
@@ -420,9 +431,11 @@ class ControlPanel(tk.Frame):
         # Disable experiment buttons
         if disabled:
             self.run_experiment_button.config(state=tk.DISABLED)
+            self.stop_experiment_button.config(state=tk.NORMAL)
         else:
             # Enable experiment buttons
             self.run_experiment_button.config(state=tk.NORMAL)
+            self.stop_experiment_button.config(state=tk.DISABLED)
 
     def on_animal_id_change(self, *args):
         """
@@ -496,6 +509,9 @@ class ControlPanel(tk.Frame):
 
         # Run experiment button
         self.run_experiment_button.config(state=tk.DISABLED)
+
+        # Stop experiment button
+        self.stop_experiment_button.config(state=tk.DISABLED)
 
         # Connect button
         self.connect_button.config(state=tk.NORMAL)

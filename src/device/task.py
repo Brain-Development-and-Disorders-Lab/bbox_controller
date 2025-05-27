@@ -6,6 +6,7 @@ from controllers.IOController import IOController
 
 # Screens
 from screens.StartScreen import StartScreen
+from screens.WaitScreen import WaitScreen
 
 # Other imports
 from util import log
@@ -30,7 +31,10 @@ def run_task_process(animal_id, config_path):
   screen.fill((0, 0, 0))
 
   # Setup screens
-  screens = [StartScreen(0, 0)]
+  screens = [
+    StartScreen(0, 0),
+    WaitScreen(0, 0)
+  ]
   font = pygame.font.SysFont("Arial", 64)
   for s in screens:
     s.screen = screen
@@ -39,7 +43,7 @@ def run_task_process(animal_id, config_path):
     s.height = screen_info.current_h
 
   # Run first screen
-  current_screen = screens.pop()
+  current_screen = screens.pop(0)
   current_screen.on_enter()
 
   running = True
@@ -54,7 +58,7 @@ def run_task_process(animal_id, config_path):
         log("Finished screen: " + current_screen.title, "info")
 
         if len(screens) > 0:
-          current_screen = screens.pop()
+          current_screen = screens.pop(0)
           current_screen.on_enter()
         else:
           running = False

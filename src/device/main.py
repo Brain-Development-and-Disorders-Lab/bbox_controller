@@ -241,7 +241,7 @@ class Device:
         # Import and instantiate the task
         self.current_task = Task(arguments[0])
         self.current_task.run()
-        log(f"Started task", "success")
+        log("Started task", "success")
       except Exception as e:
         log(f"Failed to start task: {str(e)}", "error")
 

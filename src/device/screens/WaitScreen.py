@@ -21,6 +21,7 @@ class WaitScreen(BaseScreen):
         if event.key == pygame.K_ESCAPE:
           return False
         if event.key == pygame.K_SPACE:
+          self.add_data("wait_screen_pressed", True)
           return False
 
     return True

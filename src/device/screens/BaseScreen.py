@@ -3,14 +3,14 @@ Base interface for all experiment screens.
 Each screen should implement update() and render() methods.
 """
 
-import pygame
-
 class BaseScreen:
   def __init__(self, width, height):
     self.width = width
     self.height = height
     self.screen = None
     self.font = None
+    self.title = "base_screen"
+    self.data = {}
 
   def update(self, events):
     """
@@ -39,3 +39,11 @@ class BaseScreen:
     Called when screen is being exited
     """
     pass
+
+  def add_data(self, key, value):
+    """Add data to the screen's internal storage"""
+    self.data[key] = value
+
+  def get_data(self):
+    """Get all data collected by this screen"""
+    return self.data

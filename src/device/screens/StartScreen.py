@@ -17,6 +17,7 @@ class StartScreen(BaseScreen):
   def update(self, events):
     # Check if 2 seconds have passed
     if pygame.time.get_ticks() - self.start_time > 2000:
+      self.add_data("waited_2_seconds", True)
       return False
 
     # Handle any events

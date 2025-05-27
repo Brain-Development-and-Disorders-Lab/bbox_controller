@@ -9,9 +9,6 @@ License: MIT
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-# Import experiments
-from task import Task
-
 try:
   from board import SCL, SDA
   import busio
@@ -97,10 +94,6 @@ class DisplayController:
     self.display_right.fill(0)
     self.display_left.show()
     self.display_right.show()
-
-  def start_fullscreen(self):
-    self.experiment = Task()
-    self.experiment.run()
 
 class DummyDisplay:
   def __init__(self, width, height):

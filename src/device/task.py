@@ -1,101 +1,116 @@
 import json
-import time
+import multiprocessing
 
 # Controllers
 from controllers.IOController import IOController
+from controllers.DataController import DataController
 
-class Task():
+# Screens
+from screens.StartScreen import StartScreen
+from screens.WaitScreen import WaitScreen
+
+# Other imports
+from util import log
+
+def run_task_process(animal_id, config_path):
+  """Function that runs in the separate process"""
+  import pygame
+
+  # Initialize data controller
+  data = DataController(animal_id)
+
+  # Initialize pygame in the new process
+  pygame.init()
+
+  # Load config
+  with open(config_path) as config_file:
+    variables = json.load(config_file)["task"]
+    data.add_task_data({"config": variables})
+
+  # Setup screen
+  screen_info = pygame.display.Info()
+  screen = pygame.display.set_mode(
+    (screen_info.current_w, screen_info.current_h),
+    pygame.FULLSCREEN
+  )
+  screen.fill((0, 0, 0))
+
+  # Setup screens
+  screens = [
+    StartScreen(0, 0),
+    WaitScreen(0, 0)
+  ]
+  font = pygame.font.SysFont("Arial", 64)
+  for s in screens:
+    s.screen = screen
+    s.font = font
+    s.width = screen_info.current_w
+    s.height = screen_info.current_h
+
+  # Run first screen
+  current_screen = screens.pop(0)
+  current_screen.on_enter()
+
+  running = True
+  try:
+    while running:
+      events = pygame.event.get()
+
+      # Handle screen events
+      if not current_screen.update(events):
+        # Screen is complete, run next screen
+        current_screen.on_exit()
+
+        # Save screen data before moving to next screen
+        screen_data = current_screen.get_data()
+        if screen_data:
+          data.add_screen_data(current_screen.title, screen_data)
+
+        log("Finished screen: " + current_screen.title, "info")
+
+        if len(screens) > 0:
+          current_screen = screens.pop(0)
+          current_screen.on_enter()
+        else:
+          running = False
+
+      # Render
+      current_screen.render()
+      pygame.display.flip()
+
+      # Cap frame rate
+      pygame.time.wait(16)
+
+  finally:
+    pygame.quit()
+    log("Experiment finished", "info")
+    data.save()
+
+class Task:
   def __init__(self, animal_id=None):
-    """
-    Initializes the example task.
-    """
-    self.io = IOController()
-    self.trials = []
-
-    # Load the configuration file
-    with open("config.json") as config_file:
-        self.variables = json.load(config_file)["task"]
-
+    """Initialize the task"""
+    self.animal_id = animal_id
     if animal_id is None:
       raise ValueError("`animal_id` is required")
 
-  def check_inputs(self):
-    """
-    Checks the inputs from the IOController.
-    """
-    input_states = self.io.get_input_states()
-    print(input_states)
+    self.process = None
+    self.config_path = "config.json"  # Could be passed as parameter
 
   def run(self):
-    """
-    Runs the example task.
-    """
-    import pygame
+    """Start the task in a new process"""
+    if self.process and self.process.is_alive():
+      return
 
-    # Check if pygame is already initialized
-    if pygame.get_init():
-      pygame.quit()
+    # Create and start the process
+    self.process = multiprocessing.Process(
+      target=run_task_process,
+      args=(self.animal_id, self.config_path)
+    )
+    self.process.start()
 
-    # Initialize Pygame
-    pygame.init()
-
-    # Get the screen info
-    screen_info = pygame.display.Info()
-
-    # Set up fullscreen display
-    screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h), pygame.FULLSCREEN)
-
-    # Fill screen with black
-    screen.fill((0, 0, 0))
-
-    # Set up the font
-    font_size = 72  # Large font size
-    try:
-      font = pygame.font.SysFont("Arial", font_size)
-    except:
-      font = pygame.font.Font(None, font_size)  # Fallback to default font
-
-    # Create the text surface
-    text = font.render("Test Experiment", True, (255, 255, 255))
-
-    # Get the text rectangle and center it
-    text_rect = text.get_rect(center=(screen_info.current_w/2, screen_info.current_h/2))
-
-    # Draw the text
-    screen.blit(text, text_rect)
-    pygame.display.flip()
-
-    # Get start time
-    start_time = time.time()
-    running = True
-
-    try:
-      while running:
-        # Handle events
-        for event in pygame.event.get():
-          if event.type == pygame.QUIT:
-            running = False
-          elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-              running = False
-
-        # Check if 30 seconds have passed
-        if time.time() - start_time >= 30:
-          running = False
-
-        # Check inputs
-        input_states = self.io.get_input_states()
-        if input_states["right_lever"]:
-          running = False
-
-        pygame.time.delay(10)
-
-    finally:
-      # Ensure cleanup happens even if there's an error
-      pygame.display.quit()
-      pygame.quit()
-
-if __name__ == "__main__":
-  # Run the experiment from the command line
-  experiment = Task("test_animal_0")
-  experiment.run()
+  def stop(self):
+    """Stop the task process"""
+    if self.process and self.process.is_alive():
+      self.process.terminate()
+      self.process.join(timeout=1.0)
+      self.process = None

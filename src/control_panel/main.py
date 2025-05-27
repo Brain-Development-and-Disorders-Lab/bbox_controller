@@ -45,7 +45,8 @@ TEST_COMMANDS = [
 
 # Experiment commands
 EXPERIMENT_COMMANDS = [
-    "run_experiment_test",
+    "run_experiment",
+    "stop_experiment"
 ]
 
 TEST_STATES = {
@@ -222,35 +223,43 @@ class ControlPanel(tk.Frame):
         )
         self.right_actuator_label.pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
 
-        # Commands
+        # Experiment
         tk.Label(
             self.master,
-            text="Commands",
+            text="Experiment",
             font="Arial 12"
         ).grid(row=4, column=2, padx=PADDING, pady=PADDING)
 
         # Setup frame for buttons
-        commands_button_frame = tk.Frame(self.master)
-        commands_button_frame.grid(row=5, column=2, padx=PADDING, pady=PADDING, sticky="n")
+        experiment_button_frame = tk.Frame(self.master)
+        experiment_button_frame.grid(row=5, column=2, padx=PADDING, pady=PADDING, sticky="n")
 
-        self.release_water_button = tk.Button(
-            commands_button_frame,
-            text="Release Water",
-            font="Arial 10",
-            command=lambda: self.execute_command("release_water"),
-            state=tk.DISABLED
-        )
-        self.release_water_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+        # Animal ID input
+        self.animal_id_var = tk.StringVar(self.master, "")
+        self.animal_id_var.trace_add("write", self.on_animal_id_change)
+        tk.Label(experiment_button_frame, text="Animal ID:").pack(side=tk.LEFT)
+        self.animal_id_input = tk.Entry(experiment_button_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
+        self.animal_id_input.pack(side=tk.LEFT)
 
         # Run experiment button
         self.run_experiment_button = tk.Button(
-            commands_button_frame,
-            text="Run Experiment",
+            experiment_button_frame,
+            text="Run",
             font="Arial 10",
-            command=lambda: self.execute_command("run_experiment_test"),
+            command=lambda: self.execute_command("run_experiment " + self.animal_id_var.get()),
             state=tk.DISABLED
         )
         self.run_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+
+        # Stop experiment button
+        self.stop_experiment_button = tk.Button(
+            experiment_button_frame,
+            text="Stop",
+            font="Arial 10",
+            command=lambda: self.execute_command("stop_experiment"),
+            state=tk.DISABLED
+        )
+        self.stop_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
 
         # Console
         tk.Label(
@@ -422,9 +431,20 @@ class ControlPanel(tk.Frame):
         # Disable experiment buttons
         if disabled:
             self.run_experiment_button.config(state=tk.DISABLED)
+            self.stop_experiment_button.config(state=tk.NORMAL)
         else:
             # Enable experiment buttons
             self.run_experiment_button.config(state=tk.NORMAL)
+            self.stop_experiment_button.config(state=tk.DISABLED)
+
+    def on_animal_id_change(self, *args):
+        """
+        Enables the run experiment button only if animal_id_input is not empty.
+        """
+        if self.animal_id_var.get().strip():
+            self.run_experiment_button.config(state=tk.NORMAL)
+        else:
+            self.run_experiment_button.config(state=tk.DISABLED)
 
     def parse_message(self, message):
         """
@@ -458,11 +478,8 @@ class ControlPanel(tk.Frame):
         self.mini_display_one_button.config(state=tk.NORMAL)
         self.mini_display_two_button.config(state=tk.NORMAL)
 
-        # Release water button
-        self.release_water_button.config(state=tk.NORMAL)
-
-        # Run experiment button
-        self.run_experiment_button.config(state=tk.NORMAL)
+        # Animal ID input
+        self.animal_id_input.config(state=tk.NORMAL)
 
         # Disconnect button
         self.disconnect_button.config(state=tk.NORMAL)
@@ -492,6 +509,9 @@ class ControlPanel(tk.Frame):
 
         # Run experiment button
         self.run_experiment_button.config(state=tk.DISABLED)
+
+        # Stop experiment button
+        self.stop_experiment_button.config(state=tk.DISABLED)
 
         # Connect button
         self.connect_button.config(state=tk.NORMAL)
@@ -558,23 +578,27 @@ class ControlPanel(tk.Frame):
         if hasattr(self, "ws_thread") and self.ws_thread is not None:
             self.ws_thread.join()
 
-    def execute_command(self, command_name):
+    def execute_command(self, command):
         """
         Executes a command on the device.
 
         Parameters:
-        command_name (str): The name of the command to execute.
+        command (str): The entire command to execute.
         """
+        # Split the command and extract the primary instruction from any arguments
+        command_groups = command.split(" ")
+        primary_command = command_groups[0]
+
         # Send the command to the device
-        if command_name in TEST_COMMANDS:
-            self.send_command(command_name)
-            self.update_test_state(command_name, TEST_STATES["RUNNING"])
+        if primary_command in TEST_COMMANDS:
+            self.send_command(command)
+            self.update_test_state(command, TEST_STATES["RUNNING"])
             self.set_test_buttons_disabled(True)
-        elif command_name in EXPERIMENT_COMMANDS:
-            self.send_command(command_name)
+        elif primary_command in EXPERIMENT_COMMANDS:
+            self.send_command(command)
             self.set_experiment_buttons_disabled(True)
         else:
-            self.log(f"Invalid command: {command_name}", "error")
+            self.log(f"Invalid command: {command}", "error")
 
     def connect_to_device(self):
         """

@@ -23,6 +23,7 @@ TEST_COMMANDS = [
 # Experiment commands
 EXPERIMENT_COMMANDS = [
   "run_experiment",
+  "stop_experiment"
 ]
 
 TEST_STATES = {
@@ -75,6 +76,9 @@ class Device:
       "nose_poke": False,
       "water_port": False,
     }
+
+    # Task
+    self.current_task = None
 
   def get_io_input_state(self):
     return self.io.get_input_states()
@@ -228,10 +232,25 @@ class Device:
     primary_command = command.split(" ")[0]
     arguments = command.split(" ")[1:]
 
+    if self.current_task and self.current_task.process.is_alive():
+      log("Task already running", "warning")
+      return
+
     if primary_command == "run_experiment":
-      # Run the experiment from the command line
-      experiment = Task(arguments[0])
-      experiment.run()
+      try:
+        # Import and instantiate the task
+        self.current_task = Task(arguments[0])
+        self.current_task.run()
+        log(f"Started task", "success")
+      except Exception as e:
+        log(f"Failed to start task: {str(e)}", "error")
+
+  def stop_experiment(self):
+    """Stop the current experiment"""
+    if self.current_task:
+      self.current_task.stop()
+      self.current_task = None
+      log("Stopped current task", "info")
 
 DEVICE = Device()
 

@@ -19,7 +19,8 @@ import time
 import os
 
 # Variables
-PADDING = 1
+PADDING = 10
+SECTION_PADDING = 10
 TOTAL_WIDTH = 1200 + (PADDING * 6)
 PANEL_WIDTH = 1200
 PANEL_HEIGHT = 720
@@ -69,6 +70,12 @@ class ControlPanel(tk.Frame):
         # Connection state
         self.is_connected = False
 
+        # UI variables
+        self.ip_address_var = tk.StringVar(self.master, "localhost")
+        self.port_var = tk.StringVar(self.master, "8765")
+        self.animal_id_var = tk.StringVar(self.master, "")
+        self.animal_id_var.trace_add("write", self.on_animal_id_change)
+
         # Test state
         self.test_state = {
             "test_water_delivery": {
@@ -100,104 +107,214 @@ class ControlPanel(tk.Frame):
         # Handle exiting
         atexit.register(self.on_exit)
 
+    def create_state_indicator(self, parent, label_text, var):
+        """
+        Creates a state indicator with a label and colored circle.
+
+        Parameters:
+        parent: The parent widget
+        label_text (str): The text to display
+        var (tk.BooleanVar): The variable to track
+        """
+        frame = tk.Frame(parent, bg="#f0f0f0", padx=5, pady=3)  # Light gray background
+        frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
+        frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
+
+        label = tk.Label(
+            frame,
+            text=label_text,
+            font=("Arial", 11, "bold"),
+            bg="#f0f0f0",
+            anchor="w"
+        )
+        label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+
+        # State indicator (circle)
+        indicator = tk.Canvas(frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
+        indicator.grid(row=0, column=1, sticky="e")
+
+        # Function to update indicator
+        def update_indicator(*args):
+            state = var.get()
+            color = "green" if state else "red"
+            indicator.delete("all")
+            indicator.create_oval(2, 2, 13, 13, fill=color, outline="")
+
+        # Initial state and trace
+        var.trace_add("write", update_indicator)
+        update_indicator()
+
+        return frame
+
+    def create_test_row(self, parent, label_text, command_name):
+        """
+        Creates a test row with a label, indicator, and test button.
+
+        Parameters:
+        parent: The parent widget
+        label_text (str): The text to display
+        command_name (str): The command to execute when the test button is clicked
+        """
+        # Container frame for the entire row
+        container_frame = tk.Frame(parent)
+        container_frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
+
+        # Colored background frame for label and indicator
+        colored_frame = tk.Frame(container_frame, bg="#f0f0f0", padx=5, pady=3)
+        colored_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        colored_frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
+
+        label = tk.Label(
+            colored_frame,
+            text=label_text.replace("Test ", ""),
+            font=("Arial", 11, "bold"),
+            bg="#f0f0f0",
+            anchor="w"
+        )
+        label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+
+        # State indicator (circle)
+        indicator = tk.Canvas(colored_frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
+        indicator.grid(row=0, column=1, sticky="e")
+
+        # Test button in the container frame
+        button = tk.Button(
+            container_frame,
+            text="Test",
+            font="Arial 10",
+            command=lambda: self.execute_command(command_name),
+            state=tk.DISABLED
+        )
+        button.pack(side=tk.RIGHT, padx=(5, 0))
+
+        # Function to update indicator
+        def update_indicator(*args):
+            state = self.test_state[command_name]["state"]
+            if state == TEST_STATES["FAILED"]:
+                color = "red"
+            elif state == TEST_STATES["PASSED"]:
+                color = "green"
+            elif state == TEST_STATES["RUNNING"]:
+                color = "yellow"
+            else:  # NOT_TESTED
+                color = "blue"
+            indicator.delete("all")
+            indicator.create_oval(2, 2, 13, 13, fill=color, outline="")
+
+        # Store the update function and indicator for later use
+        self.test_indicators[command_name] = {
+            "indicator": indicator,
+            "update": update_indicator,
+            "button": button
+        }
+
+        # Initial state
+        update_indicator()
+
+        return container_frame
+
     def create_layout(self):
         """
         Creates the layout of the control panel.
         """
-        # Configure styles
-        style = ttk.Style()
-        style.configure("Start.TButton", background="#4CAF50", foreground="white")
-        style.configure("Stop.TButton", background="#f44336", foreground="white")
-        style.map("Start.TButton",
-            background=[("active", "#45a049"), ("disabled", "#cccccc")],
-            foreground=[("disabled", "#666666")]
-        )
-        style.map("Stop.TButton",
-            background=[("active", "#da190b"), ("disabled", "#cccccc")],
-            foreground=[("disabled", "#666666")]
-        )
+        # Initialize test indicators dictionary
+        self.test_indicators = {}
 
         # Configure the grid
-        self.master.grid_columnconfigure(0, weight=0)
-        self.master.grid_columnconfigure(1, weight=0)
-        self.master.grid_columnconfigure(2, weight=1)  # Make middle column expandable
-        self.master.grid_columnconfigure(3, weight=0)
+        self.master.grid_columnconfigure(0, weight=1) # Left column (status)
+        self.master.grid_columnconfigure(1, weight=1) # Right column (experiment)
 
         # Set the UI to resize with the window
         self.master.grid_propagate(True)
 
-        # UI components for IP address and port
-        self.ip_address_var = tk.StringVar(self.master, "localhost")
-        self.port_var = tk.StringVar(self.master, "8765")
+        # Create a main container frame with padding
+        main_frame = tk.Frame(self.master, padx=PADDING, pady=PADDING)
+        main_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
-        # Frame for IP and Port inputs - reduce horizontal padding between columns
-        connection_frame = tk.Frame(self.master)
-        connection_frame.grid(row=1, column=0, padx=PADDING, pady=PADDING, columnspan=3, sticky="ew")
+        # Connection section with border
+        connection_frame = tk.LabelFrame(main_frame, text="Connection", padx=SECTION_PADDING, pady=SECTION_PADDING)
+        connection_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, PADDING))
 
-        tk.Label(connection_frame, text="IP Address:").pack(side=tk.LEFT)
-        tk.Entry(connection_frame, textvariable=self.ip_address_var).pack(side=tk.LEFT)
-
-        tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT)
-        tk.Entry(connection_frame, textvariable=self.port_var).pack(side=tk.LEFT)
-
+        # Connection controls
+        tk.Label(connection_frame, text="IP Address:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Entry(connection_frame, textvariable=self.ip_address_var, width=15).pack(side=tk.LEFT, padx=(0, 15))
+        tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Entry(connection_frame, textvariable=self.port_var, width=6).pack(side=tk.LEFT, padx=(0, 15))
         self.connect_button = tk.Button(connection_frame, text="Connect", command=self.connect_to_device)
-        self.connect_button.pack(side=tk.LEFT)
+        self.connect_button.pack(side=tk.LEFT, padx=(0, 5))
         self.disconnect_button = tk.Button(connection_frame, text="Disconnect", command=self.disconnect_from_device, state=tk.DISABLED)
         self.disconnect_button.pack(side=tk.LEFT)
 
-        # Large display
-        tk.Label(
-            self.master,
-            text="Displays",
-            font="Arial 12",
-            width=COLUMN_WIDTH
-        ).grid(row=2, column=0, columnspan=2, padx=PADDING, pady=PADDING)
+        # Main content area
+        content_frame = tk.Frame(main_frame)
+        content_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-        # Create a frame for the display to better control its size
-        display_frame = tk.Frame(self.master)
-        display_frame.grid(row=3, column=0, columnspan=2, rowspan=3, padx=PADDING, pady=PADDING, sticky="n")
+        # Left column - Status Information
+        status_frame = tk.Frame(content_frame)
+        status_frame.grid(row=0, column=0, sticky="n", padx=(0, PADDING))
 
-        # Calculate dimensions for 16:9 aspect ratio
-        display_width = PANEL_WIDTH / 5 - 50
-        display_height = display_width * (9/16)  # Maintain 16:9 aspect ratio
+        # Display Status section
+        displays_frame = tk.LabelFrame(status_frame, text="Display Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
+        displays_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
 
-        # Make the display canvas with proper aspect ratio
+        # Display canvas with proper aspect ratio
+        display_width = PANEL_WIDTH / 3 - 50
+        display_height = display_width * (9/16) # Maintain 16:9 aspect ratio
         display_canvas = tk.Canvas(
-            display_frame,
+            displays_frame,
             width=display_width,
             height=display_height,
             bg="black"
         )
-        display_canvas.pack(pady=10)  # Add some padding to center it vertically
+        display_canvas.pack(pady=10)
 
-        # Manage Experiment (middle column)
-        tk.Label(
-            self.master,
-            text="Manage Experiment",
-            font="Arial 12"
-        ).grid(row=2, column=2, padx=PADDING, pady=PADDING)
+        # Input Status section
+        input_status_frame = tk.LabelFrame(status_frame, text="Input Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
+        input_status_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
 
-        # Setup frame for experiment buttons - reduce vertical padding
-        experiment_button_frame = tk.Frame(self.master)
-        experiment_button_frame.grid(row=3, column=2, padx=PADDING, pady=(PADDING, 0), sticky="nsew")
-        experiment_button_frame.grid_columnconfigure(0, weight=1)  # Make the frame expand horizontally
+        # Create input indicators
+        self.create_state_indicator(input_status_frame, "Left Actuator", self.input_label_states["left_lever"])
+        self.create_state_indicator(input_status_frame, "Right Actuator", self.input_label_states["right_lever"])
 
-        # Create a frame for the animal ID input
-        animal_id_frame = tk.Frame(experiment_button_frame)
-        animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))  # Added bottom padding
+        # Test Status section
+        test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
+        test_status_frame.pack(side=tk.TOP, fill=tk.X)
 
-        # Animal ID input - reduce vertical padding
-        self.animal_id_var = tk.StringVar(self.master, "")
-        self.animal_id_var.trace_add("write", self.on_animal_id_change)
+        # Create test rows
+        self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery")
+        self.create_test_row(test_status_frame, "Test Actuators", "test_actuators")
+        self.create_test_row(test_status_frame, "Test IR", "test_ir")
+
+        # Reset button
+        self.reset_tests_button = tk.Button(
+            test_status_frame,
+            text="Reset",
+            font="Arial 10",
+            command=self.reset_tests,
+            state=tk.DISABLED
+        )
+        self.reset_tests_button.pack(side=tk.RIGHT, padx=1, pady=(5, 0))
+
+        # Right column - Experiment Management
+        experiment_frame = tk.Frame(content_frame)
+        experiment_frame.grid(row=0, column=1, sticky="nsew", rowspan=2)
+
+        # Experiment Management section
+        experiment_management_frame = tk.LabelFrame(experiment_frame, text="Experiment Management", padx=SECTION_PADDING, pady=SECTION_PADDING)
+        experiment_management_frame.pack(side=tk.TOP, fill=tk.X)
+
+        # Animal ID input frame
+        animal_id_frame = tk.Frame(experiment_management_frame)
+        animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+
         tk.Label(animal_id_frame, text="Animal ID:").pack(side=tk.LEFT, pady=0)
         self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
-        self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)  # Make input expand
+        self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)
 
-        # Create a frame for the experiment buttons to keep them horizontal
-        experiment_buttons_frame = tk.Frame(experiment_button_frame)
+        # Experiment buttons frame
+        experiment_buttons_frame = tk.Frame(experiment_management_frame)
         experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
 
-        # Start experiment button
         self.start_experiment_button = tk.Button(
             experiment_buttons_frame,
             text="Start",
@@ -207,7 +324,6 @@ class ControlPanel(tk.Frame):
         )
         self.start_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
 
-        # Stop experiment button
         self.stop_experiment_button = tk.Button(
             experiment_buttons_frame,
             text="Stop",
@@ -217,19 +333,13 @@ class ControlPanel(tk.Frame):
         )
         self.stop_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
 
-        # Console (middle column, below Manage Experiment) - make it fill width
-        tk.Label(
-            self.master,
-            text="Console",
-            font="Arial 12"
-        ).grid(row=4, column=2, padx=PADDING, pady=(PADDING, 0), sticky="ew")
+        # Console section
+        console_frame = tk.LabelFrame(experiment_frame, text="Console", padx=SECTION_PADDING, pady=SECTION_PADDING)
+        console_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        console_frame.grid_columnconfigure(0, weight=1)
+        console_frame.grid_rowconfigure(0, weight=1)
 
-        # Create a frame for the console to control its width
-        console_frame = tk.Frame(self.master)
-        console_frame.grid(row=5, column=2, padx=PADDING, pady=(0, PADDING), sticky="nsew")
-        console_frame.grid_columnconfigure(0, weight=1)  # Make console expand horizontally
-
-        self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, height=10, bg="black", fg="white")
+        self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="white")
         self.console.grid(row=0, column=0, sticky="nsew")
         self.console.config(state=tk.DISABLED)
 
@@ -239,152 +349,6 @@ class ControlPanel(tk.Frame):
         self.console.tag_config("success", foreground="green")
         self.console.tag_config("info", foreground="white")
         self.log("Console initialized")
-
-        # Input Status (right column)
-        tk.Label(
-            self.master,
-            text="Input Status",
-            font="Arial 12",
-            width=COLUMN_WIDTH
-        ).grid(row=2, column=3, padx=PADDING, pady=PADDING)
-
-        # Setup frame for input labels with reduced padding
-        input_labels_frame = tk.Frame(self.master)
-        input_labels_frame.grid(row=3, column=3, padx=PADDING, pady=(PADDING, 0), sticky="nsew")
-        input_labels_frame.grid_columnconfigure(0, weight=1)  # Make the frame expand horizontally
-
-        # Create styled input state indicators
-        def create_state_indicator(parent, label_text, var):
-            frame = tk.Frame(parent, bg="#f0f0f0", padx=5, pady=3)  # Light gray background
-            frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
-            frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
-
-            # Label with bold font
-            label = tk.Label(
-                frame,
-                text=label_text,
-                font=("Arial", 10, "bold"),
-                bg="#f0f0f0",
-                anchor="w"
-            )
-            label.grid(row=0, column=0, sticky="w", padx=(0, 5))
-
-            # State indicator (circle)
-            indicator = tk.Canvas(frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
-            indicator.grid(row=0, column=1, sticky="e")
-
-            # Function to update indicator
-            def update_indicator(*args):
-                state = var.get()
-                color = "green" if state else "red"
-                indicator.delete("all")
-                indicator.create_oval(2, 2, 13, 13, fill=color, outline="")
-
-            # Initial state and trace
-            var.trace_add("write", update_indicator)
-            update_indicator()
-
-            return frame
-
-        # Create state indicators for each input
-        self.input_label_states = {
-            "left_lever": tk.BooleanVar(self.master, False),
-            "right_lever": tk.BooleanVar(self.master, False),
-        }
-
-        create_state_indicator(input_labels_frame, "Left Actuator", self.input_label_states["left_lever"])
-        create_state_indicator(input_labels_frame, "Right Actuator", self.input_label_states["right_lever"])
-
-        # Test Status (right column, below Input Status)
-        tk.Label(
-            self.master,
-            text="Test Status",
-            font="Arial 12"
-        ).grid(row=4, column=3, padx=PADDING, pady=(PADDING, 0))
-
-        # Setup frame for test buttons
-        test_buttons_frame = tk.Frame(self.master)
-        test_buttons_frame.grid(row=5, column=3, padx=PADDING, pady=(0, PADDING), sticky="nsew")
-        test_buttons_frame.grid_columnconfigure(0, weight=1)  # Make the frame expand horizontally
-
-        # Initialize test indicators dictionary
-        self.test_indicators = {}
-
-        # Create a frame for each test row
-        def create_test_row(parent, label_text, command_name):
-            # Container frame for the entire row
-            container_frame = tk.Frame(parent)
-            container_frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
-
-            # Colored background frame for label and indicator
-            colored_frame = tk.Frame(container_frame, bg="#f0f0f0", padx=5, pady=3)
-            colored_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            colored_frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
-
-            # Label with bold font (without "Test")
-            label = tk.Label(
-                colored_frame,
-                text=label_text.replace("Test ", ""),
-                font=("Arial", 10, "bold"),
-                bg="#f0f0f0",
-                anchor="w"
-            )
-            label.grid(row=0, column=0, sticky="w", padx=(0, 5))
-
-            # State indicator (circle)
-            indicator = tk.Canvas(colored_frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
-            indicator.grid(row=0, column=1, sticky="e")
-
-            # Test button in the container frame
-            button = tk.Button(
-                container_frame,
-                text="Test",
-                font="Arial 10",
-                command=lambda: self.execute_command(command_name),
-                state=tk.DISABLED
-            )
-            button.pack(side=tk.RIGHT, padx=(5, 0))
-
-            # Function to update indicator
-            def update_indicator(*args):
-                state = self.test_state[command_name]["state"]
-                if state == TEST_STATES["FAILED"]:
-                    color = "red"
-                elif state == TEST_STATES["PASSED"]:
-                    color = "green"
-                elif state == TEST_STATES["RUNNING"]:
-                    color = "yellow"
-                else:  # NOT_TESTED
-                    color = "blue"
-                indicator.delete("all")
-                indicator.create_oval(2, 2, 13, 13, fill=color, outline="")
-
-            # Store the update function and indicator for later use
-            self.test_indicators[command_name] = {
-                "indicator": indicator,
-                "update": update_indicator,
-                "button": button
-            }
-
-            # Initial state
-            update_indicator()
-
-            return container_frame
-
-        # Create test rows
-        create_test_row(test_buttons_frame, "Test Water Delivery", "test_water_delivery")
-        create_test_row(test_buttons_frame, "Test Actuators", "test_actuators")
-        create_test_row(test_buttons_frame, "Test IR", "test_ir")
-
-        # Add reset button at the bottom of the test buttons frame
-        self.reset_tests_button = tk.Button(
-            test_buttons_frame,
-            text="Reset",
-            font="Arial 10",
-            command=self.reset_tests,
-            state=tk.DISABLED
-        )
-        self.reset_tests_button.pack(side=tk.RIGHT, padx=1, pady=(5, 0))
 
         # Store references to test buttons for later use
         self.test_water_delivery_button = self.test_indicators["test_water_delivery"]["button"]

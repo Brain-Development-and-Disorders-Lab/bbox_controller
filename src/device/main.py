@@ -3,7 +3,8 @@ import threading
 import time
 import websockets
 import json
-import queue  # Import the queue module
+import queue
+import multiprocessing
 
 # Controllers
 from controllers.IOController import IOController
@@ -79,6 +80,37 @@ class Device:
 
     # Task
     self.current_task = None
+    self.task_message_queue = None
+
+    # Start task message listener thread
+    self.task_message_thread = None
+    self.task_message_running = False
+
+  def _start_task_message_listener(self):
+    """Start a thread to listen for messages from the task process"""
+    def message_listener():
+      while self.task_message_running:
+        try:
+          if self.task_message_queue and not self.task_message_queue.empty():
+            message = self.task_message_queue.get_nowait()
+            # Add the message to the global message queue for the websocket
+            message_queue.put(message)
+        except queue.Empty:
+          time.sleep(0.01)  # Small sleep to prevent busy waiting
+        except Exception as e:
+          log(f"Error in task message listener: {str(e)}", "error")
+
+    self.task_message_running = True
+    self.task_message_thread = threading.Thread(target=message_listener)
+    self.task_message_thread.daemon = True  # Thread will exit when main program exits
+    self.task_message_thread.start()
+
+  def _stop_task_message_listener(self):
+    """Stop the task message listener thread"""
+    self.task_message_running = False
+    if self.task_message_thread:
+      self.task_message_thread.join(timeout=1.0)
+      self.task_message_thread = None
 
   def get_io_input_state(self):
     return self.io.get_input_states()
@@ -238,18 +270,31 @@ class Device:
 
     if primary_command == "run_experiment":
       try:
-        # Import and instantiate the task
-        self.current_task = Task(arguments[0])
+        # Create a new message queue for this task
+        self.task_message_queue = multiprocessing.Queue()
+
+        # Start the message listener
+        self._start_task_message_listener()
+
+        # Import and instantiate the task with the message queue
+        self.current_task = Task(arguments[0], self.task_message_queue)
         self.current_task.run()
         log("Started task", "success")
       except Exception as e:
         log(f"Failed to start task: {str(e)}", "error")
+        self._stop_task_message_listener()
+        self.task_message_queue = None
 
   def stop_experiment(self):
     """Stop the current experiment"""
     if self.current_task:
       self.current_task.stop()
       self.current_task = None
+
+      # Stop the message listener and cleanup
+      self._stop_task_message_listener()
+      self.task_message_queue = None
+
       log("Stopped current task", "info")
 
 DEVICE = Device()

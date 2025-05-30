@@ -10,7 +10,7 @@ from trials import Stage1, Interval
 # Other imports
 from util import log
 
-def run_task_process(animal_id, config_path):
+def run_task_process(animal_id, config_path, message_queue):
   """Function that runs in the separate process"""
   import pygame
 
@@ -49,6 +49,15 @@ def run_task_process(animal_id, config_path):
   current_trial = trials.pop(0)
   current_trial.on_enter()
 
+  # Send initial message that task has started
+  message_queue.put({
+    "type": "task_status",
+    "data": {
+      "status": "started",
+      "trial": current_trial.title
+    }
+  })
+
   running = True
   try:
     while running:
@@ -66,11 +75,35 @@ def run_task_process(animal_id, config_path):
 
         log("Finished trial: " + current_trial.title, "info")
 
+        # Send message about trial completion
+        message_queue.put({
+          "type": "trial_complete",
+          "data": {
+            "trial": current_trial.title,
+            "data": trial_data
+          }
+        })
+
         if len(trials) > 0:
           current_trial = trials.pop(0)
           current_trial.on_enter()
+
+          # Send message about new trial starting
+          message_queue.put({
+            "type": "trial_start",
+            "data": {
+              "trial": current_trial.title
+            }
+          })
         else:
           running = False
+          # Send message that task is complete
+          message_queue.put({
+            "type": "task_status",
+            "data": {
+              "status": "completed"
+            }
+          })
 
       # Render
       current_trial.render()
@@ -85,7 +118,7 @@ def run_task_process(animal_id, config_path):
     data.save()
 
 class Task:
-  def __init__(self, animal_id=None):
+  def __init__(self, animal_id=None, message_queue=None):
     """Initialize the task"""
     self.animal_id = animal_id
     if animal_id is None:
@@ -93,6 +126,7 @@ class Task:
 
     self.process = None
     self.config_path = "config.json"  # Could be passed as parameter
+    self.message_queue = message_queue
 
   def run(self):
     """Start the task in a new process"""
@@ -102,13 +136,22 @@ class Task:
     # Create and start the process
     self.process = multiprocessing.Process(
       target=run_task_process,
-      args=(self.animal_id, self.config_path)
+      args=(self.animal_id, self.config_path, self.message_queue)
     )
     self.process.start()
 
   def stop(self):
     """Stop the task process"""
     if self.process and self.process.is_alive():
+      # Send message that task is being stopped
+      if self.message_queue:
+        self.message_queue.put({
+          "type": "task_status",
+          "data": {
+            "status": "stopped"
+          }
+        })
+
       self.process.terminate()
       self.process.join(timeout=1.0)
       self.process = None

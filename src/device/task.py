@@ -5,8 +5,7 @@ import multiprocessing
 from controllers.DataController import DataController
 
 # Trials
-from trials.Trial_Stage_1 import TrialStage1
-from trials.Trial_ITI import TrialITI
+from trials import Stage1, Interval
 
 # Other imports
 from util import log
@@ -36,8 +35,8 @@ def run_task_process(animal_id, config_path):
 
   # Setup trials
   trials = [
-    TrialStage1(0, 0),
-    TrialITI(0, 0),
+    Stage1(0, 0),
+    Interval(0, 0),
   ]
   font = pygame.font.SysFont("Arial", 64)
   for trial in trials:

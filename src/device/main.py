@@ -11,7 +11,7 @@ from controllers.IOController import IOController
 from controllers.DisplayController import DisplayController
 
 # Other imports
-from device.experiment import Experiment
+from experiment import Experiment
 from util import log
 
 # Test commands

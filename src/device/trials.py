@@ -179,7 +179,7 @@ class Stage1(Base):
 
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
-      self.nose_port_entry = self.get_io().get_input_states()["nose_poke"]
+      self.nose_port_entry = not self.get_io().get_input_states()["nose_poke"]
       if self.nose_port_entry:
         self.events.append({
           "type": "nose_port_entry",

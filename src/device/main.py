@@ -115,14 +115,15 @@ class Device:
   def get_io_input_state(self):
     return self.io.get_input_states()
 
-  def test_water_delivery_task(self):
+  async def test_water_delivery_task(self):
     try:
       self.io.set_water_port(True)
-      time.sleep(2)
+      await asyncio.sleep(2)  # Non-blocking sleep
       self.io.set_water_port(False)
-    except:
-      log("Could not activate water delivery", "error")
+    except Exception as e:
       self.test_state["test_water_delivery"]["state"] = TEST_STATES["FAILED"]
+      message_queue.put({"type": "test_state", "data": self.test_state})
+      log(f"Could not activate water delivery: {str(e)}", "error")
 
     if self.test_state["test_water_delivery"]["state"] == TEST_STATES["RUNNING"]:
       self.test_state["test_water_delivery"]["state"] = TEST_STATES["PASSED"]
@@ -133,9 +134,8 @@ class Device:
     log("Testing water delivery", "start")
     self.test_state["test_water_delivery"]["state"] = TEST_STATES["RUNNING"]
 
-    # Run the test in a separate thread
-    water_delivery_test_thread = threading.Thread(target=self.test_water_delivery_task)
-    water_delivery_test_thread.start()
+    # Run the test in the event loop instead of a separate thread
+    asyncio.create_task(self.test_water_delivery_task())
 
   def test_actuators_task(self):
     # Step 2: Test that the left actuator can be moved to 1.0
@@ -232,6 +232,7 @@ class Device:
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
         log("Timed out while waiting for IR input", "error")
         self.test_state["test_ir"]["state"] = TEST_STATES["FAILED"]
+        message_queue.put({"type": "test_state", "data": self.test_state})
         return
 
     if input_state["nose_poke"] != False:

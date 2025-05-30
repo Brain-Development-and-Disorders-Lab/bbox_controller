@@ -46,7 +46,7 @@ TEST_COMMANDS = [
 
 # Experiment commands
 EXPERIMENT_COMMANDS = [
-    "run_experiment",
+    "start_experiment",
     "stop_experiment"
 ]
 
@@ -123,9 +123,6 @@ class ControlPanel(tk.Frame):
 
         # Set the UI to resize with the window
         self.master.grid_propagate(True)
-
-        # Heading
-        tk.Label(self.master, text="Behavior Box - Control Panel", font="Arial 18").grid(row=0, column=0, padx=5, pady=5, columnspan=6, sticky="ew")
 
         # UI components for IP address and port
         self.ip_address_var = tk.StringVar(self.master, "localhost")
@@ -227,7 +224,7 @@ class ControlPanel(tk.Frame):
         # Experiment
         tk.Label(
             self.master,
-            text="Experiment",
+            text="Manage Experiment",
             font="Arial 12"
         ).grid(row=4, column=2, padx=PADDING, pady=PADDING)
 
@@ -242,25 +239,29 @@ class ControlPanel(tk.Frame):
         self.animal_id_input = tk.Entry(experiment_button_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
         self.animal_id_input.pack(side=tk.LEFT)
 
-        # Run experiment button
-        self.run_experiment_button = tk.Button(
-            experiment_button_frame,
-            text="Run",
+        # Create a frame for the experiment buttons to keep them horizontal
+        experiment_buttons_frame = tk.Frame(experiment_button_frame)
+        experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+
+        # Start experiment button
+        self.start_experiment_button = tk.Button(
+            experiment_buttons_frame,
+            text="Start",
             font="Arial 10",
-            command=lambda: self.execute_command("run_experiment " + self.animal_id_var.get()),
+            command=lambda: self.execute_command("start_experiment " + self.animal_id_var.get()),
             state=tk.DISABLED
         )
-        self.run_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+        self.start_experiment_button.pack(side=tk.LEFT, padx=2)
 
         # Stop experiment button
         self.stop_experiment_button = tk.Button(
-            experiment_button_frame,
+            experiment_buttons_frame,
             text="Stop",
             font="Arial 10",
             command=lambda: self.execute_command("stop_experiment"),
             state=tk.DISABLED
         )
-        self.stop_experiment_button.pack(side=tk.TOP, padx=2, pady=2, anchor="w")
+        self.stop_experiment_button.pack(side=tk.LEFT, padx=2)
 
         # Console
         tk.Label(
@@ -437,27 +438,28 @@ class ControlPanel(tk.Frame):
     def set_experiment_buttons_disabled(self, disabled):
         """
         Disables or enables the experiment buttons.
+        When Start is enabled, Stop is disabled and vice versa.
 
         Parameters:
-        disabled (bool): Whether to disable the experiment buttons.
+        disabled (bool): Whether to disable the Start button and enable the Stop button.
         """
-        # Disable experiment buttons
         if disabled:
-            self.run_experiment_button.config(state=tk.DISABLED)
+            # Disable Start button and enable Stop button
+            self.start_experiment_button.config(state=tk.DISABLED)
             self.stop_experiment_button.config(state=tk.NORMAL)
         else:
-            # Enable experiment buttons
-            self.run_experiment_button.config(state=tk.NORMAL)
+            # Enable Start button and disable Stop button
+            self.start_experiment_button.config(state=tk.NORMAL)
             self.stop_experiment_button.config(state=tk.DISABLED)
 
     def on_animal_id_change(self, *args):
         """
-        Enables the run experiment button only if animal_id_input is not empty.
+        Enables the start experiment button only if animal_id_input is not empty.
         """
         if self.animal_id_var.get().strip():
-            self.run_experiment_button.config(state=tk.NORMAL)
+            self.start_experiment_button.config(state=tk.NORMAL)
         else:
-            self.run_experiment_button.config(state=tk.DISABLED)
+            self.start_experiment_button.config(state=tk.DISABLED)
 
     def parse_message(self, message):
         """
@@ -501,13 +503,15 @@ class ControlPanel(tk.Frame):
     def on_disconnect(self):
         """
         Resets the state of the control panel and disables all buttons.
+        Called when the connection is lost or manually disconnected.
         """
         self.reset_state()
 
         self.is_connected = False
 
-        # Enable all buttons
+        # Enable connect button and disable disconnect button
         self.connect_button.config(state=tk.NORMAL)
+        self.disconnect_button.config(state=tk.DISABLED)
 
         # Test buttons
         self.test_water_delivery_button.config(state=tk.DISABLED)
@@ -519,21 +523,14 @@ class ControlPanel(tk.Frame):
         self.mini_display_one_button.config(state=tk.DISABLED)
         self.mini_display_two_button.config(state=tk.DISABLED)
 
-        # Release water button
-        self.release_water_button.config(state=tk.DISABLED)
+        # Animal ID input
+        self.animal_id_input.config(state=tk.DISABLED)
 
-        # Run experiment button
-        self.run_experiment_button.config(state=tk.DISABLED)
-
-        # Stop experiment button
+        # Experiment buttons
+        self.start_experiment_button.config(state=tk.DISABLED)
         self.stop_experiment_button.config(state=tk.DISABLED)
 
-        # Connect button
-        self.connect_button.config(state=tk.NORMAL)
-
-        # Disconnect button
-        self.disconnect_button.config(state=tk.DISABLED)
-        self.log("Disconnected from the device", "success")
+        self.log("Disconnected from the device", "info")
 
     def on_message(self, ws, message):
         """
@@ -555,7 +552,11 @@ class ControlPanel(tk.Frame):
                         self.test_state[test_name]["state"] = test_data["state"]
                 self.update_test_state_indicators()
             elif received_message["type"] == "task_status":
-                self.log(f"Task status: {received_message['data']['status']}", "info")
+                status = received_message["data"]["status"]
+                self.log(f"Task status: {status}", "info")
+                # Update experiment buttons based on task status
+                if status == "completed":
+                    self.set_experiment_buttons_disabled(False)
             elif received_message["type"] == "trial_start":
                 self.log(f"Trial start: {received_message['data']['trial']}", "info")
             elif received_message["type"] == "trial_complete":
@@ -573,6 +574,9 @@ class ControlPanel(tk.Frame):
         """
         self.log(f"WebSocket error: {error}", "error")
 
+        # Disconnect from the device
+        self.on_disconnect()
+
     def on_close(self, ws):
         """
         Handles the closing of the WebSocket connection.
@@ -582,7 +586,7 @@ class ControlPanel(tk.Frame):
         """
         self.log("Connection closed", "info")
 
-        # Perform opposite of on_connect
+        # Disconnect from the device
         self.on_disconnect()
 
     def send_command(self, command):

@@ -11,7 +11,7 @@ from controllers.IOController import IOController
 from controllers.DisplayController import DisplayController
 
 # Other imports
-from task import Task
+from device.experiment import Experiment
 from util import log
 
 # Test commands
@@ -23,7 +23,7 @@ TEST_COMMANDS = [
 
 # Experiment commands
 EXPERIMENT_COMMANDS = [
-  "run_experiment",
+  "start_experiment",
   "stop_experiment"
 ]
 
@@ -78,44 +78,44 @@ class Device:
       "water_port": False,
     }
 
-    # Task
-    self.current_task = None
-    self.task_message_queue = None
+    # Experiment
+    self.current_experiment = None
+    self.experiment_message_queue = None
 
-    # Start task message listener thread
-    self.task_message_thread = None
-    self.task_message_running = False
+    # Start experiment message listener thread
+    self.experiment_message_thread = None
+    self.experiment_message_running = False
 
-  def _start_task_message_listener(self):
-    """Start a thread to listen for messages from the task process"""
+  def _start_experiment_message_listener(self):
+    """Start a thread to listen for messages from the experiment process"""
     def message_listener():
-      while self.task_message_running:
+      while self.experiment_message_running:
         try:
-          if self.task_message_queue and not self.task_message_queue.empty():
-            message = self.task_message_queue.get_nowait()
+          if self.experiment_message_queue and not self.experiment_message_queue.empty():
+            message = self.experiment_message_queue.get_nowait()
             # Add the message to the global message queue for the websocket
             message_queue.put(message)
         except queue.Empty:
           time.sleep(0.01)  # Small sleep to prevent busy waiting
         except Exception as e:
-          log(f"Error in task message listener: {str(e)}", "error")
+          log(f"Error in experiment message listener: {str(e)}", "error")
 
-    self.task_message_running = True
-    self.task_message_thread = threading.Thread(target=message_listener)
-    self.task_message_thread.daemon = True  # Thread will exit when main program exits
-    self.task_message_thread.start()
+    self.experiment_message_running = True
+    self.experiment_message_thread = threading.Thread(target=message_listener)
+    self.experiment_message_thread.daemon = True  # Thread will exit when main program exits
+    self.experiment_message_thread.start()
 
-  def _stop_task_message_listener(self):
-    """Stop the task message listener thread"""
-    self.task_message_running = False
-    if self.task_message_thread:
-      self.task_message_thread.join(timeout=1.0)
-      self.task_message_thread = None
+  def _stop_experiment_message_listener(self):
+    """Stop the experiment message listener thread"""
+    self.experiment_message_running = False
+    if self.experiment_message_thread:
+      self.experiment_message_thread.join(timeout=1.0)
+      self.experiment_message_thread = None
 
   def get_io_input_state(self):
     return self.io.get_input_states()
 
-  async def test_water_delivery_task(self):
+  async def _test_water_delivery(self):
     try:
       self.io.set_water_port(True)
       await asyncio.sleep(2)  # Non-blocking sleep
@@ -135,9 +135,9 @@ class Device:
     self.test_state["test_water_delivery"]["state"] = TEST_STATES["RUNNING"]
 
     # Run the test in the event loop instead of a separate thread
-    asyncio.create_task(self.test_water_delivery_task())
+    asyncio.create_task(self._test_water_delivery())
 
-  def test_actuators_task(self):
+  def _test_actuators(self):
     # Step 2: Test that the left actuator can be moved to 1.0
     log("Testing left actuator", "start")
     log("Waiting for left actuator input...", "info")
@@ -214,10 +214,10 @@ class Device:
     log("Actuators defaulted to `False`", "success")
 
     # Run the test in a separate thread
-    actuator_test_thread = threading.Thread(target=self.test_actuators_task)
+    actuator_test_thread = threading.Thread(target=self._test_actuators)
     actuator_test_thread.start()
 
-  def test_ir_task(self):
+  def _test_ir(self):
     # Step 1: Test that the IR is broken
     log("Waiting for IR input...", "info")
     running_input_test = True
@@ -251,7 +251,7 @@ class Device:
     log("Testing IR", "start")
     self.test_state["test_ir"]["state"] = TEST_STATES["RUNNING"]
     # Run the test in a separate thread
-    ir_test_thread = threading.Thread(target=self.test_ir_task)
+    ir_test_thread = threading.Thread(target=self._test_ir)
     ir_test_thread.start()
 
   def run_test(self, command):
@@ -266,38 +266,38 @@ class Device:
     primary_command = command.split(" ")[0]
     arguments = command.split(" ")[1:]
 
-    if self.current_task and self.current_task.process.is_alive():
-      log("Task already running", "warning")
+    if self.current_experiment and self.current_experiment.process.is_alive():
+      log("Experiment already running", "warning")
       return
 
-    if primary_command == "run_experiment":
+    if primary_command == "start_experiment":
       try:
         # Create a new message queue for this task
-        self.task_message_queue = multiprocessing.Queue()
+        self.experiment_message_queue = multiprocessing.Queue()
 
         # Start the message listener
-        self._start_task_message_listener()
+        self._start_experiment_message_listener()
 
         # Import and instantiate the task with the message queue
-        self.current_task = Task(arguments[0], self.task_message_queue)
-        self.current_task.run()
-        log("Started task", "success")
+        self.current_experiment = Experiment(arguments[0], self.experiment_message_queue)
+        self.current_experiment.run()
+        log("Started experiment", "success")
       except Exception as e:
-        log(f"Failed to start task: {str(e)}", "error")
-        self._stop_task_message_listener()
-        self.task_message_queue = None
+        log(f"Failed to start experiment: {str(e)}", "error")
+        self._stop_experiment_message_listener()
+        self.experiment_message_queue = None
 
   def stop_experiment(self):
     """Stop the current experiment"""
-    if self.current_task:
-      self.current_task.stop()
-      self.current_task = None
+    if self.current_experiment:
+      self.current_experiment.stop()
+      self.current_experiment = None
 
       # Stop the message listener and cleanup
-      self._stop_task_message_listener()
-      self.task_message_queue = None
+      self._stop_experiment_message_listener()
+      self.experiment_message_queue = None
 
-      log("Stopped current task", "info")
+      log("Stopped current experiment", "info")
 
 DEVICE = Device()
 

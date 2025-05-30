@@ -10,7 +10,7 @@ from trials import Stage1, Interval
 # Other imports
 from util import log
 
-def run_task_process(animal_id, config_path, message_queue):
+def run_experiment_process(animal_id, config_path, message_queue):
   """Function that runs in the separate process"""
   import pygame
 
@@ -117,9 +117,9 @@ def run_task_process(animal_id, config_path, message_queue):
     log("Experiment finished", "info")
     data.save()
 
-class Task:
+class Experiment:
   def __init__(self, animal_id=None, message_queue=None):
-    """Initialize the task"""
+    """Initialize the experiment"""
     self.animal_id = animal_id
     if animal_id is None:
       raise ValueError("`animal_id` is required")
@@ -129,24 +129,24 @@ class Task:
     self.message_queue = message_queue
 
   def run(self):
-    """Start the task in a new process"""
+    """Start the experiment in a new process"""
     if self.process and self.process.is_alive():
       return
 
     # Create and start the process
     self.process = multiprocessing.Process(
-      target=run_task_process,
+      target=run_experiment_process,
       args=(self.animal_id, self.config_path, self.message_queue)
     )
     self.process.start()
 
   def stop(self):
-    """Stop the task process"""
+    """Stop the experiment process"""
     if self.process and self.process.is_alive():
-      # Send message that task is being stopped
+      # Send message that experiment is being stopped
       if self.message_queue:
         self.message_queue.put({
-          "type": "task_status",
+          "type": "experiment_status",
           "data": {
             "status": "stopped"
           }

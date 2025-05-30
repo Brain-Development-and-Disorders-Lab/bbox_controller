@@ -9,6 +9,7 @@ License: MIT
 # GUI imports
 import json
 import tkinter as tk
+from tkinter import ttk
 import datetime
 import threading
 import atexit
@@ -18,7 +19,7 @@ import time
 import os
 
 # Variables
-PADDING = 2
+PADDING = 1
 TOTAL_WIDTH = 1200 + (PADDING * 6)
 PANEL_WIDTH = 1200
 PANEL_HEIGHT = 720
@@ -68,18 +69,6 @@ class ControlPanel(tk.Frame):
         # Connection state
         self.is_connected = False
 
-        # Setup state
-        self.display_state = {
-            "mini_display_1": {
-                "state": False,
-                "button_text": tk.StringVar(self.master, "Enable"),
-            },
-            "mini_display_2": {
-                "state": False,
-                "button_text": tk.StringVar(self.master, "Enable"),
-            },
-        }
-
         # Test state
         self.test_state = {
             "test_water_delivery": {
@@ -101,8 +90,8 @@ class ControlPanel(tk.Frame):
         }
 
         self.input_label_states = {
-            "left_lever": tk.StringVar(self.master, "Left Actuator: False"),
-            "right_lever": tk.StringVar(self.master, "Right Actuator: False"),
+            "left_lever": tk.BooleanVar(self.master, False),
+            "right_lever": tk.BooleanVar(self.master, False),
         }
 
         # Create the layout
@@ -115,10 +104,23 @@ class ControlPanel(tk.Frame):
         """
         Creates the layout of the control panel.
         """
+        # Configure styles
+        style = ttk.Style()
+        style.configure("Start.TButton", background="#4CAF50", foreground="white")
+        style.configure("Stop.TButton", background="#f44336", foreground="white")
+        style.map("Start.TButton",
+            background=[("active", "#45a049"), ("disabled", "#cccccc")],
+            foreground=[("disabled", "#666666")]
+        )
+        style.map("Stop.TButton",
+            background=[("active", "#da190b"), ("disabled", "#cccccc")],
+            foreground=[("disabled", "#666666")]
+        )
+
         # Configure the grid
         self.master.grid_columnconfigure(0, weight=0)
         self.master.grid_columnconfigure(1, weight=0)
-        self.master.grid_columnconfigure(2, weight=0)
+        self.master.grid_columnconfigure(2, weight=1)  # Make middle column expandable
         self.master.grid_columnconfigure(3, weight=0)
 
         # Set the UI to resize with the window
@@ -128,7 +130,7 @@ class ControlPanel(tk.Frame):
         self.ip_address_var = tk.StringVar(self.master, "localhost")
         self.port_var = tk.StringVar(self.master, "8765")
 
-        # Frame for IP and Port inputs
+        # Frame for IP and Port inputs - reduce horizontal padding between columns
         connection_frame = tk.Frame(self.master)
         connection_frame.grid(row=1, column=0, padx=PADDING, pady=PADDING, columnspan=3, sticky="ew")
 
@@ -150,98 +152,50 @@ class ControlPanel(tk.Frame):
             font="Arial 12",
             width=COLUMN_WIDTH
         ).grid(row=2, column=0, columnspan=2, padx=PADDING, pady=PADDING)
-        tk.Canvas(
-            self.master,
-            width=PANEL_WIDTH / 5 - 50,
-            height=(PANEL_WIDTH / 5 - 50) * 0.75,
+
+        # Create a frame for the display to better control its size
+        display_frame = tk.Frame(self.master)
+        display_frame.grid(row=3, column=0, columnspan=2, rowspan=3, padx=PADDING, pady=PADDING, sticky="n")
+
+        # Calculate dimensions for 16:9 aspect ratio
+        display_width = PANEL_WIDTH / 5 - 50
+        display_height = display_width * (9/16)  # Maintain 16:9 aspect ratio
+
+        # Make the display canvas with proper aspect ratio
+        display_canvas = tk.Canvas(
+            display_frame,
+            width=display_width,
+            height=display_height,
             bg="black"
-        ).grid(row=3, column=0, columnspan=2, padx=PADDING, pady=PADDING)
-
-        # Mini displays
-        tk.Label(
-            self.master,
-            text="Mini Displays",
-            font="Arial 12",
-        ).grid(row=4, column=0, columnspan=2, padx=PADDING, pady=PADDING)
-        tk.Canvas(
-            self.master,
-            width=100,
-            height=60,
-            bg="black"
-        ).grid(row=5, column=0, padx=PADDING, pady=PADDING, sticky="w")
-        self.mini_display_one_button = tk.Button(
-            self.master,
-            textvariable=self.display_state["mini_display_1"]["button_text"],
-            font="Arial 10",
-            command=lambda: self.execute_command("toggle_display:mini_display_1"),
-            state=tk.DISABLED
         )
-        self.mini_display_one_button.grid(row=5, column=1, padx=PADDING, pady=PADDING, sticky="w")
-        tk.Canvas(
-            self.master,
-            width=100,
-            height=60,
-            bg="black"
-        ).grid(row=6, column=0, padx=PADDING, pady=PADDING, sticky="w")
-        self.mini_display_two_button = tk.Button(
-            self.master,
-            textvariable=self.display_state["mini_display_2"]["button_text"],
-            font="Arial 10",
-            command=lambda: self.execute_command("toggle_display:mini_display_2"),
-            state=tk.DISABLED
-        )
-        self.mini_display_two_button.grid(row=6, column=1, padx=PADDING, pady=PADDING, sticky="w")
+        display_canvas.pack(pady=10)  # Add some padding to center it vertically
 
-        # Inputs
-        tk.Label(
-            self.master,
-            text="Input States",
-            font="Arial 12",
-            width=COLUMN_WIDTH
-        ).grid(row=2, column=2, padx=PADDING, pady=PADDING)
-
-        # Setup frame for input labels
-        input_labels_frame = tk.Frame(self.master)
-        input_labels_frame.grid(row=3, column=2, padx=PADDING, pady=PADDING, sticky="n")
-
-        left_actuator_label_frame = tk.Frame(input_labels_frame)
-        left_actuator_label_frame.pack(side=tk.TOP, fill=tk.X)
-        self.left_actuator_label = tk.Label(
-            left_actuator_label_frame,
-            textvariable=self.input_label_states["left_lever"],
-            font="Arial 10"
-        )
-        self.left_actuator_label.pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
-        right_actuator_label_frame = tk.Frame(input_labels_frame)
-        right_actuator_label_frame.pack(side=tk.TOP, fill=tk.X)
-        self.right_actuator_label = tk.Label(
-            right_actuator_label_frame,
-            textvariable=self.input_label_states["right_lever"],
-            font="Arial 10"
-        )
-        self.right_actuator_label.pack(side=tk.LEFT, padx=1, pady=2, anchor=tk.W)
-
-        # Experiment
+        # Manage Experiment (middle column)
         tk.Label(
             self.master,
             text="Manage Experiment",
             font="Arial 12"
-        ).grid(row=4, column=2, padx=PADDING, pady=PADDING)
+        ).grid(row=2, column=2, padx=PADDING, pady=PADDING)
 
-        # Setup frame for buttons
+        # Setup frame for experiment buttons - reduce vertical padding
         experiment_button_frame = tk.Frame(self.master)
-        experiment_button_frame.grid(row=5, column=2, padx=PADDING, pady=PADDING, sticky="n")
+        experiment_button_frame.grid(row=3, column=2, padx=PADDING, pady=(PADDING, 0), sticky="nsew")
+        experiment_button_frame.grid_columnconfigure(0, weight=1)  # Make the frame expand horizontally
 
-        # Animal ID input
+        # Create a frame for the animal ID input
+        animal_id_frame = tk.Frame(experiment_button_frame)
+        animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))  # Added bottom padding
+
+        # Animal ID input - reduce vertical padding
         self.animal_id_var = tk.StringVar(self.master, "")
         self.animal_id_var.trace_add("write", self.on_animal_id_change)
-        tk.Label(experiment_button_frame, text="Animal ID:").pack(side=tk.LEFT)
-        self.animal_id_input = tk.Entry(experiment_button_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
-        self.animal_id_input.pack(side=tk.LEFT)
+        tk.Label(animal_id_frame, text="Animal ID:").pack(side=tk.LEFT, pady=0)
+        self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
+        self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)  # Make input expand
 
         # Create a frame for the experiment buttons to keep them horizontal
         experiment_buttons_frame = tk.Frame(experiment_button_frame)
-        experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+        experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
 
         # Start experiment button
         self.start_experiment_button = tk.Button(
@@ -251,7 +205,7 @@ class ControlPanel(tk.Frame):
             command=lambda: self.execute_command("start_experiment " + self.animal_id_var.get()),
             state=tk.DISABLED
         )
-        self.start_experiment_button.pack(side=tk.LEFT, padx=2)
+        self.start_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
 
         # Stop experiment button
         self.stop_experiment_button = tk.Button(
@@ -261,16 +215,22 @@ class ControlPanel(tk.Frame):
             command=lambda: self.execute_command("stop_experiment"),
             state=tk.DISABLED
         )
-        self.stop_experiment_button.pack(side=tk.LEFT, padx=2)
+        self.stop_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
 
-        # Console
+        # Console (middle column, below Manage Experiment) - make it fill width
         tk.Label(
             self.master,
             text="Console",
             font="Arial 12"
-        ).grid(row=2, column=3, padx=PADDING, pady=PADDING)
-        self.console = tk.Text(self.master, font="Arial 10", wrap=tk.NONE, height=10, width=50, bg="black", fg="white")
-        self.console.grid(row=3, column=3, padx=PADDING, pady=PADDING, sticky="n")
+        ).grid(row=4, column=2, padx=PADDING, pady=(PADDING, 0), sticky="ew")
+
+        # Create a frame for the console to control its width
+        console_frame = tk.Frame(self.master)
+        console_frame.grid(row=5, column=2, padx=PADDING, pady=(0, PADDING), sticky="nsew")
+        console_frame.grid_columnconfigure(0, weight=1)  # Make console expand horizontally
+
+        self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, height=10, bg="black", fg="white")
+        self.console.grid(row=0, column=0, sticky="nsew")
         self.console.config(state=tk.DISABLED)
 
         # Add tags for the console message levels
@@ -280,74 +240,156 @@ class ControlPanel(tk.Frame):
         self.console.tag_config("info", foreground="white")
         self.log("Console initialized")
 
-        # Tests
+        # Input Status (right column)
         tk.Label(
             self.master,
-            text="Test Functions",
+            text="Input Status",
+            font="Arial 12",
+            width=COLUMN_WIDTH
+        ).grid(row=2, column=3, padx=PADDING, pady=PADDING)
+
+        # Setup frame for input labels with reduced padding
+        input_labels_frame = tk.Frame(self.master)
+        input_labels_frame.grid(row=3, column=3, padx=PADDING, pady=(PADDING, 0), sticky="nsew")
+        input_labels_frame.grid_columnconfigure(0, weight=1)  # Make the frame expand horizontally
+
+        # Create styled input state indicators
+        def create_state_indicator(parent, label_text, var):
+            frame = tk.Frame(parent, bg="#f0f0f0", padx=5, pady=3)  # Light gray background
+            frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
+            frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
+
+            # Label with bold font
+            label = tk.Label(
+                frame,
+                text=label_text,
+                font=("Arial", 10, "bold"),
+                bg="#f0f0f0",
+                anchor="w"
+            )
+            label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+
+            # State indicator (circle)
+            indicator = tk.Canvas(frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
+            indicator.grid(row=0, column=1, sticky="e")
+
+            # Function to update indicator
+            def update_indicator(*args):
+                state = var.get()
+                color = "green" if state else "red"
+                indicator.delete("all")
+                indicator.create_oval(2, 2, 13, 13, fill=color, outline="")
+
+            # Initial state and trace
+            var.trace_add("write", update_indicator)
+            update_indicator()
+
+            return frame
+
+        # Create state indicators for each input
+        self.input_label_states = {
+            "left_lever": tk.BooleanVar(self.master, False),
+            "right_lever": tk.BooleanVar(self.master, False),
+        }
+
+        create_state_indicator(input_labels_frame, "Left Actuator", self.input_label_states["left_lever"])
+        create_state_indicator(input_labels_frame, "Right Actuator", self.input_label_states["right_lever"])
+
+        # Test Status (right column, below Input Status)
+        tk.Label(
+            self.master,
+            text="Test Status",
             font="Arial 12"
-        ).grid(row=4, column=3, padx=PADDING, pady=PADDING)
+        ).grid(row=4, column=3, padx=PADDING, pady=(PADDING, 0))
 
-        # Setup frame for buttons
+        # Setup frame for test buttons
         test_buttons_frame = tk.Frame(self.master)
-        test_buttons_frame.grid(row=5, column=3, padx=PADDING, pady=PADDING, sticky="n")
+        test_buttons_frame.grid(row=5, column=3, padx=PADDING, pady=(0, PADDING), sticky="nsew")
+        test_buttons_frame.grid_columnconfigure(0, weight=1)  # Make the frame expand horizontally
 
-        # Add reset tests button at the top of the test buttons frame
+        # Initialize test indicators dictionary
+        self.test_indicators = {}
+
+        # Create a frame for each test row
+        def create_test_row(parent, label_text, command_name):
+            # Container frame for the entire row
+            container_frame = tk.Frame(parent)
+            container_frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
+
+            # Colored background frame for label and indicator
+            colored_frame = tk.Frame(container_frame, bg="#f0f0f0", padx=5, pady=3)
+            colored_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            colored_frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
+
+            # Label with bold font (without "Test")
+            label = tk.Label(
+                colored_frame,
+                text=label_text.replace("Test ", ""),
+                font=("Arial", 10, "bold"),
+                bg="#f0f0f0",
+                anchor="w"
+            )
+            label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+
+            # State indicator (circle)
+            indicator = tk.Canvas(colored_frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
+            indicator.grid(row=0, column=1, sticky="e")
+
+            # Test button in the container frame
+            button = tk.Button(
+                container_frame,
+                text="Test",
+                font="Arial 10",
+                command=lambda: self.execute_command(command_name),
+                state=tk.DISABLED
+            )
+            button.pack(side=tk.RIGHT, padx=(5, 0))
+
+            # Function to update indicator
+            def update_indicator(*args):
+                state = self.test_state[command_name]["state"]
+                if state == TEST_STATES["FAILED"]:
+                    color = "red"
+                elif state == TEST_STATES["PASSED"]:
+                    color = "green"
+                elif state == TEST_STATES["RUNNING"]:
+                    color = "yellow"
+                else:  # NOT_TESTED
+                    color = "blue"
+                indicator.delete("all")
+                indicator.create_oval(2, 2, 13, 13, fill=color, outline="")
+
+            # Store the update function and indicator for later use
+            self.test_indicators[command_name] = {
+                "indicator": indicator,
+                "update": update_indicator,
+                "button": button
+            }
+
+            # Initial state
+            update_indicator()
+
+            return container_frame
+
+        # Create test rows
+        create_test_row(test_buttons_frame, "Test Water Delivery", "test_water_delivery")
+        create_test_row(test_buttons_frame, "Test Actuators", "test_actuators")
+        create_test_row(test_buttons_frame, "Test IR", "test_ir")
+
+        # Add reset button at the bottom of the test buttons frame
         self.reset_tests_button = tk.Button(
             test_buttons_frame,
-            text="Reset Tests",
+            text="Reset",
             font="Arial 10",
             command=self.reset_tests,
             state=tk.DISABLED
         )
-        self.reset_tests_button.pack(side=tk.TOP, fill=tk.X, padx=1, pady=(0, 5))
+        self.reset_tests_button.pack(side=tk.RIGHT, padx=1, pady=(5, 0))
 
-        # Setup test water delivery button and indicator
-        test_water_delivery_pair_frame = tk.Frame(test_buttons_frame)
-        test_water_delivery_pair_frame.pack(side=tk.TOP, fill=tk.X)
-
-        self.test_water_delivery_indicator = tk.Canvas(test_water_delivery_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
-        self.test_water_delivery_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
-        self.test_water_delivery_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_water_delivery_button = tk.Button(
-            test_water_delivery_pair_frame,
-            text="Test Water Delivery",
-            font="Arial 10",
-            command=lambda: self.execute_command("test_water_delivery"),
-            state=tk.DISABLED
-        )
-        self.test_water_delivery_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
-
-        # Setup test actuators button and indicator
-        test_actuators_pair_frame = tk.Frame(test_buttons_frame)
-        test_actuators_pair_frame.pack(side=tk.TOP, fill=tk.X)
-
-        self.test_actuators_indicator = tk.Canvas(test_actuators_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
-        self.test_actuators_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
-        self.test_actuators_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_actuators_button = tk.Button(
-            test_actuators_pair_frame,
-            text="Test Actuators",
-            font="Arial 10",
-            command=lambda: self.execute_command("test_actuators"),
-            state=tk.DISABLED
-        )
-        self.test_actuators_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
-
-        # Setup test IR button and indicator
-        test_ir_pair_frame = tk.Frame(test_buttons_frame)
-        test_ir_pair_frame.pack(side=tk.TOP, fill=tk.X)
-
-        self.test_ir_indicator = tk.Canvas(test_ir_pair_frame, width=20, height=20, bg=self.master.cget("bg"), highlightthickness=0)
-        self.test_ir_indicator.pack(side=tk.RIGHT, padx=1, pady=2, anchor="center")
-        self.test_ir_indicator.create_oval(2, 2, 15, 15, fill="blue")
-        self.test_ir_button = tk.Button(
-            test_ir_pair_frame,
-            text="Test IR",
-            font="Arial 10",
-            command=lambda: self.execute_command("test_ir"),
-            state=tk.DISABLED
-        )
-        self.test_ir_button.pack(side=tk.LEFT, padx=1, pady=2, anchor="center")
+        # Store references to test buttons for later use
+        self.test_water_delivery_button = self.test_indicators["test_water_delivery"]["button"]
+        self.test_actuators_button = self.test_indicators["test_actuators"]["button"]
+        self.test_ir_button = self.test_indicators["test_ir"]["button"]
 
     def log(self, message, state="info"):
         """
@@ -364,22 +406,12 @@ class ControlPanel(tk.Frame):
         self.console.config(state=tk.DISABLED)
         self.console.see(tk.END)
 
-    def toggle_display(self, display_name):
-        """
-        Toggles the state of a display.
-
-        Parameters:
-        display_name (str): The name of the display to toggle.
-        """
-        self.display_state[display_name]["state"] = not self.display_state[display_name]["state"]
-        self.display_state[display_name]["button_text"].set("Disable" if self.display_state[display_name]["state"] else "Enable")
-
     def update_state_labels(self):
         """
         Updates the state labels for the input states.
         """
-        self.input_label_states["left_lever"].set(f"Left Actuator: {self.input_states['left_lever']}")
-        self.input_label_states["right_lever"].set(f"Right Actuator: {self.input_states['right_lever']}")
+        self.input_label_states["left_lever"].set(self.input_states["left_lever"])
+        self.input_label_states["right_lever"].set(self.input_states["right_lever"])
 
     def update_test_state(self, command_name, state):
         """
@@ -396,26 +428,9 @@ class ControlPanel(tk.Frame):
         """
         Updates the state indicators for the test states.
         """
-        for command_name, command_state in self.test_state.items():
-            # Determine which indicator to update
-            if command_name == "test_water_delivery":
-                indicator = self.test_water_delivery_indicator
-            elif command_name == "test_actuators":
-                indicator = self.test_actuators_indicator
-            elif command_name == "test_ir":
-                indicator = self.test_ir_indicator
-
-            # Update the indicator
-            if command_state["state"] == TEST_STATES["FAILED"]:
-                indicator.create_oval(2, 2, 15, 15, fill="red")
-                self.set_test_buttons_disabled(False)
-            elif command_state["state"] == TEST_STATES["PASSED"]:
-                indicator.create_oval(2, 2, 15, 15, fill="green")
-                self.set_test_buttons_disabled(False)
-            elif command_state["state"] == TEST_STATES["RUNNING"]:
-                indicator.create_oval(2, 2, 15, 15, fill="yellow")
-            elif command_state["state"] == TEST_STATES["NOT_TESTED"]:
-                indicator.create_oval(2, 2, 15, 15, fill="blue")
+        for command_name in self.test_state:
+            if command_name in self.test_indicators:
+                self.test_indicators[command_name]["update"]()
 
     def set_test_buttons_disabled(self, disabled):
         """
@@ -490,10 +505,6 @@ class ControlPanel(tk.Frame):
         self.test_ir_button.config(state=tk.NORMAL)
         self.reset_tests_button.config(state=tk.NORMAL)  # Enable reset button
 
-        # Display buttons
-        self.mini_display_one_button.config(state=tk.NORMAL)
-        self.mini_display_two_button.config(state=tk.NORMAL)
-
         # Animal ID input
         self.animal_id_input.config(state=tk.NORMAL)
 
@@ -518,10 +529,6 @@ class ControlPanel(tk.Frame):
         self.test_actuators_button.config(state=tk.DISABLED)
         self.test_ir_button.config(state=tk.DISABLED)
         self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
-
-        # Display buttons
-        self.mini_display_one_button.config(state=tk.DISABLED)
-        self.mini_display_two_button.config(state=tk.DISABLED)
 
         # Animal ID input
         self.animal_id_input.config(state=tk.DISABLED)
@@ -550,6 +557,9 @@ class ControlPanel(tk.Frame):
                 for test_name, test_data in received_message["data"].items():
                     if test_name in self.test_state:
                         self.test_state[test_name]["state"] = test_data["state"]
+                        # If any tests have completed, re-enable the test buttons
+                        if test_data["state"] in [TEST_STATES["PASSED"], TEST_STATES["FAILED"]]:
+                            self.set_test_buttons_disabled(False)
                 self.update_test_state_indicators()
             elif received_message["type"] == "task_status":
                 status = received_message["data"]["status"]

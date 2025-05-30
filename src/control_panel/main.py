@@ -537,8 +537,14 @@ class ControlPanel(tk.Frame):
             elif received_message["type"] == "test_state":
                 self.test_state = received_message["data"]
                 self.update_test_state_indicators()
+            elif received_message["type"] == "task_status":
+                self.log(f"Task status: {received_message['data']['status']}", "info")
+            elif received_message["type"] == "trial_start":
+                self.log(f"Trial start: {received_message['data']['trial']}", "info")
+            elif received_message["type"] == "trial_complete":
+                self.log(f"Trial complete: {received_message['data']['trial']}", "success")
             else:
-                self.log(f"Received message: {received_message}", "info")
+                self.log(f"Received unhandled message: {received_message}", "warning")
 
     def on_error(self, ws, error):
         """

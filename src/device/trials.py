@@ -28,6 +28,10 @@ class Base:
     self.display = DisplayController()
     self.io = IOController()
 
+    # Create a small font for simulation banner
+    if SIMULATION_MODE:
+      self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
+
   def update(self, events):
     """
     Update trial state based on events and time
@@ -111,6 +115,14 @@ class Interval(Base):
     # Clear screen
     self.screen.fill((0, 0, 0))
 
+    # Add simulation mode banner if in simulation mode
+    if SIMULATION_MODE and self.simulation_font:
+      banner_text = f"[SIMULATION - {self.title}]"
+      text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
+      # Center the text horizontally
+      text_rect = text_surface.get_rect(center=(self.width // 2, 20))
+      self.screen.blit(text_surface, text_rect)
+
 class Stage1(Base):
   """
   Trial Stage 1: Nose port entry and lever press
@@ -132,7 +144,6 @@ class Stage1(Base):
     self.visual_cue = False
     self.nose_port_entry = False
     self.lever_press = False
-    self.trial_end = False
 
     # Trial events
     self.events = []
@@ -151,41 +162,51 @@ class Stage1(Base):
     self.add_data("events", self.events)
 
   def update(self, events):
+    # Condition for trial end
+    if self.nose_port_entry and self.delivered_water:
+      return False
+
     # Handle any PyGame events
     for event in events:
       if event.type == pygame.KEYDOWN:
         if event.key == pygame.K_ESCAPE:
-          return False
-        if event.key == pygame.K_SPACE:
           log("Trial canceled", "info")
           self.add_data("trial_canceled", True)
           return False
+        if event.key == pygame.K_SPACE and SIMULATION_MODE:
+          log("Simulated nose port entry", "success")
+          self.nose_port_entry = True
 
-    # Handle any IO events
-    self.nose_port_entry = self.get_io().get_input_states()["nose_poke"]
-    if self.nose_port_entry:
-      self.events.append({
-        "type": "nose_port_entry",
-        "timestamp": pygame.time.get_ticks()
-      })
-      log("Nose port entry", "info")
-    self.lever_press = self.get_io().get_input_states()["left_lever"] or self.get_io().get_input_states()["right_lever"]
-    if self.get_io().get_input_states()["left_lever"] == True:
-      self.events.append({
-        "type": "left_lever_press",
-        "timestamp": pygame.time.get_ticks()
-      })
-      log("Left lever press", "info")
-    if self.get_io().get_input_states()["right_lever"] == True:
-      self.events.append({
-        "type": "right_lever_press",
-        "timestamp": pygame.time.get_ticks()
-      })
-      log("Right lever press", "info")
+    # Handle any IO events if not in simulation mode
+    if not SIMULATION_MODE:
+      self.nose_port_entry = self.get_io().get_input_states()["nose_poke"]
+      if self.nose_port_entry:
+        self.events.append({
+          "type": "nose_port_entry",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Nose port entry", "info")
+      self.lever_press = self.get_io().get_input_states()["left_lever"] or self.get_io().get_input_states()["right_lever"]
+      if self.get_io().get_input_states()["left_lever"] == True:
+        self.events.append({
+          "type": "left_lever_press",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Left lever press", "info")
+      if self.get_io().get_input_states()["right_lever"] == True:
+        self.events.append({
+          "type": "right_lever_press",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Right lever press", "info")
 
+    # Continue if no inputs or events
     return True
 
   def render(self):
+    # Clear screen
+    self.screen.fill((0, 0, 0))
+
     # Deliver water if trial has started
     if self.delivered_water == False and pygame.time.get_ticks() - self.start_time > 500:
       self.get_io().set_water_port(True)
@@ -205,4 +226,12 @@ class Stage1(Base):
       else:
         self.display.clear_displays()
 
-    # Update nose port light
+    # TODO: Update nose port light
+
+    # Add simulation mode banner if in simulation mode
+    if SIMULATION_MODE and self.simulation_font:
+      banner_text = f"[SIMULATION - {self.title}]"
+      text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
+      # Center the text horizontally
+      text_rect = text_surface.get_rect(center=(self.width // 2, 20))
+      self.screen.blit(text_surface, text_rect)

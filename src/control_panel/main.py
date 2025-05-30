@@ -290,6 +290,16 @@ class ControlPanel(tk.Frame):
         test_buttons_frame = tk.Frame(self.master)
         test_buttons_frame.grid(row=5, column=3, padx=PADDING, pady=PADDING, sticky="n")
 
+        # Add reset tests button at the top of the test buttons frame
+        self.reset_tests_button = tk.Button(
+            test_buttons_frame,
+            text="Reset Tests",
+            font="Arial 10",
+            command=self.reset_tests,
+            state=tk.DISABLED
+        )
+        self.reset_tests_button.pack(side=tk.TOP, fill=tk.X, padx=1, pady=(0, 5))
+
         # Setup test water delivery button and indicator
         test_water_delivery_pair_frame = tk.Frame(test_buttons_frame)
         test_water_delivery_pair_frame.pack(side=tk.TOP, fill=tk.X)
@@ -403,6 +413,8 @@ class ControlPanel(tk.Frame):
                 self.set_test_buttons_disabled(False)
             elif command_state["state"] == TEST_STATES["RUNNING"]:
                 indicator.create_oval(2, 2, 15, 15, fill="yellow")
+            elif command_state["state"] == TEST_STATES["NOT_TESTED"]:
+                indicator.create_oval(2, 2, 15, 15, fill="blue")
 
     def set_test_buttons_disabled(self, disabled):
         """
@@ -474,6 +486,7 @@ class ControlPanel(tk.Frame):
         self.test_water_delivery_button.config(state=tk.NORMAL)
         self.test_actuators_button.config(state=tk.NORMAL)
         self.test_ir_button.config(state=tk.NORMAL)
+        self.reset_tests_button.config(state=tk.NORMAL)  # Enable reset button
 
         # Display buttons
         self.mini_display_one_button.config(state=tk.NORMAL)
@@ -500,6 +513,7 @@ class ControlPanel(tk.Frame):
         self.test_water_delivery_button.config(state=tk.DISABLED)
         self.test_actuators_button.config(state=tk.DISABLED)
         self.test_ir_button.config(state=tk.DISABLED)
+        self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
 
         # Display buttons
         self.mini_display_one_button.config(state=tk.DISABLED)
@@ -535,7 +549,10 @@ class ControlPanel(tk.Frame):
                 self.input_states = received_message["data"]
                 self.update_state_labels()
             elif received_message["type"] == "test_state":
-                self.test_state = received_message["data"]
+                # Update only the specific test states that changed
+                for test_name, test_data in received_message["data"].items():
+                    if test_name in self.test_state:
+                        self.test_state[test_name]["state"] = test_data["state"]
                 self.update_test_state_indicators()
             elif received_message["type"] == "task_status":
                 self.log(f"Task status: {received_message['data']['status']}", "info")
@@ -638,20 +655,25 @@ class ControlPanel(tk.Frame):
         """
         Disconnects from the device.
         """
+        # Disable disconnect button immediately to prevent multiple clicks
+        self.disconnect_button.config(state=tk.DISABLED)
+
+        # Disable animal ID input
+        self.animal_id_input.config(state=tk.DISABLED)
+
+        # Reset tests before disconnecting
+        self.reset_tests()
+
         # Invoke the close method, which will trigger the on_close method
         self.ws.close()
 
-    def reset_state(self):
+        self.log("Disconnected from the device", "success")
+
+    def reset_tests(self):
         """
-        Resets the state of the control panel.
+        Resets all test states and indicators to their initial state.
         """
-        self.is_connected = False
-        self.input_states = {
-            "left_lever": False,
-            "right_lever": False,
-            "nose_poke": False,
-            "water_port": False,
-        }
+        # Reset test states
         self.test_state = {
             "test_water_delivery": {
                 "state": TEST_STATES["NOT_TESTED"],
@@ -666,6 +688,24 @@ class ControlPanel(tk.Frame):
 
         # Reset the status icons
         self.update_test_state_indicators()
+
+        # Enable test buttons if connected
+        if self.is_connected:
+            self.set_test_buttons_disabled(False)
+
+    def reset_state(self):
+        """
+        Resets the state of the control panel.
+        """
+        self.is_connected = False
+        self.input_states = {
+            "left_lever": False,
+            "right_lever": False,
+            "nose_poke": False,
+            "water_port": False,
+        }
+
+        self.reset_tests()
 
     def run_websocket(self):
         self.ws.run_forever()

@@ -2,14 +2,15 @@
 Trial base class and all following trials.
 """
 
+import random
 import pygame
+import json
+from util import log
 
 # Controllers
 from controllers.DisplayController import DisplayController, SIMULATION_MODE
 from controllers.IOController import IOController
 
-# Other imports
-from util import log
 
 class Base:
   """
@@ -27,6 +28,9 @@ class Base:
     # Controllers
     self.display = DisplayController()
     self.io = IOController()
+
+    # Config
+    self.config = json.load(open("config.json", "r"))
 
     if SIMULATION_MODE:
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
@@ -144,6 +148,9 @@ class Stage1(Base):
     self.nose_port_entry = False
     self.lever_press = False
 
+    # Trial parameters
+    self.cue_side = random.choice(["left", "right"])
+
     # Trial events
     self.events = []
 
@@ -151,10 +158,13 @@ class Stage1(Base):
     self.start_time = pygame.time.get_ticks()
 
     # Setup trial
+    # Activate the nose port light
     self.nose_port_light = True
+
+    # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
       self.display.clear_displays()
-      self.display.draw_test_pattern()
+      self.display.draw_test_pattern(self.cue_side)
     log("Trial started", "info")
 
   def on_exit(self):
@@ -202,34 +212,54 @@ class Stage1(Base):
     # Continue if no inputs or events
     return True
 
-  def render(self):
-    # Clear screen
-    self.screen.fill((0, 0, 0))
-
+  def _update_water_delivery(self):
     # Deliver water if trial has started
-    if self.delivered_water == False and pygame.time.get_ticks() - self.start_time > 500:
+    if self.delivered_water == False and pygame.time.get_ticks() - self.start_time > self.config["task"]["valve_open"]:
       self.get_io().set_water_port(True)
     elif self.delivered_water == False:
       log("Water delivered", "success")
       self.delivered_water = True
       self.get_io().set_water_port(False)
 
+  def _update_nose_port_entry(self):
     if self.nose_port_entry:
       self.visual_cue = False
       self.nose_port_light = False
 
+  def _update_visual_cue(self):
     # Update visual state
     if not SIMULATION_MODE:
       if self.visual_cue:
-        self.display.draw_test_pattern() # Note: This is the test pattern
+        self.display.draw_test_pattern(self.cue_side) # Note: This is the test pattern
       else:
         self.display.clear_displays()
 
-    # TODO: Update nose port light
+  def _update_nose_port_light(self):
+    # Update nose port light
+    if not SIMULATION_MODE:
+      pass
 
+  def _pre_render_tasks(self):
+    # Clear screen
+    self.screen.fill((0, 0, 0))
+
+  def _post_render_tasks(self):
     # Add simulation mode banner if in simulation mode
     if SIMULATION_MODE and self.simulation_font:
       banner_text = f"[SIMULATION - {self.title}]"
       text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))
       self.screen.blit(text_surface, text_rect)
+
+  def render(self):
+    # Run pre-render tasks
+    self._pre_render_tasks()
+
+    # Run update tasks
+    self._update_water_delivery()
+    self._update_nose_port_entry()
+    self._update_visual_cue()
+    self._update_nose_port_light()
+
+    # Run post-render tasks
+    self._post_render_tasks()

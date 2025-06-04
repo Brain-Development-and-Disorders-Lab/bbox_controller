@@ -20,6 +20,7 @@ class IOController:
     self.PIN_LEVER_LEFT = 24
     self.PIN_NOSE_POKE = 17
     self.PIN_WATER = 25
+    self.PIN_NOSE_LIGHT = 27 # TODO: Change to what is setup in the hardware
 
     if not SIMULATION_MODE:
       try:
@@ -28,8 +29,9 @@ class IOController:
         self.lever_left = Button(self.PIN_LEVER_LEFT)
         self.nose_poke = Button(self.PIN_NOSE_POKE)
 
-        # Setup water port output
+        # Setup water port and nose light outputs
         self.water_port = DigitalOutputDevice(self.PIN_WATER, initial_value=False)
+        self.nose_light = DigitalOutputDevice(self.PIN_NOSE_LIGHT, initial_value=False)
 
         self._simulated_inputs = False
         print("GPIO inputs and outputs initialized successfully")
@@ -48,7 +50,8 @@ class IOController:
       "right_lever": False,
       "left_lever": False,
       "nose_poke": False,
-      "water_port": False
+      "water_port": False,
+      "nose_light": False
     }
 
   def _init_simulation(self):
@@ -61,7 +64,8 @@ class IOController:
         "right_lever": self.lever_right.is_pressed,
         "left_lever": self.lever_left.is_pressed,
         "nose_poke": self.nose_poke.is_pressed,
-        "water_port": self.water_port.value
+        "water_port": self.water_port.value,
+        "nose_light": self.nose_light.value  # Include nose light state in input states
       }
     else:
       return self._simulated_states
@@ -72,6 +76,13 @@ class IOController:
       self.water_port.value = state
     else:
       self._simulated_states["water_port"] = state
+
+  def set_nose_light(self, state):
+    """Control nose port light LED state"""
+    if not hasattr(self, "_simulated_inputs") or not self._simulated_inputs:
+      self.nose_light.value = state
+    else:
+      self._simulated_states["nose_light"] = state
 
   def __del__(self):
     """Cleanup GPIO on object destruction"""

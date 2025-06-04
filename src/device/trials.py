@@ -140,10 +140,12 @@ class Stage1(Base):
     super().__init__(width, height)
     self.title = "trial_stage_1"
     self.start_time = None
+    self.water_start_time = None
 
     # Trial state
     self.nose_port_light = False
     self.delivered_water = False
+    self.water_delivery_complete = False
     self.visual_cue = False
     self.nose_port_entry = False
     self.lever_press = False
@@ -156,10 +158,12 @@ class Stage1(Base):
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
+    self.water_start_time = pygame.time.get_ticks() # Start water delivery immediately
 
     # Setup trial
     # Activate the nose port light
     self.nose_port_light = True
+    self.visual_cue = True
 
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
@@ -172,7 +176,7 @@ class Stage1(Base):
 
   def update(self, events):
     # Condition for trial end
-    if self.nose_port_entry and self.delivered_water:
+    if self.nose_port_entry and self.water_delivery_complete:
       return False
 
     # Handle any PyGame events
@@ -188,21 +192,30 @@ class Stage1(Base):
 
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
-      self.nose_port_entry = not self.get_io().get_input_states()["nose_poke"]
-      if self.nose_port_entry:
+      # Track nose port state changes
+      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
+
+      # Detect nose port entry
+      if current_nose_state and not self.nose_port_entry:
+        self.nose_port_entry = True
         self.events.append({
           "type": "nose_port_entry",
           "timestamp": pygame.time.get_ticks()
         })
         log("Nose port entry", "info")
-      self.lever_press = self.get_io().get_input_states()["left_lever"] or self.get_io().get_input_states()["right_lever"]
-      if self.get_io().get_input_states()["left_lever"] == True:
+
+      # Track lever presses
+      left_lever = self.get_io().get_input_states()["left_lever"]
+      right_lever = self.get_io().get_input_states()["right_lever"]
+
+      if left_lever:
         self.events.append({
           "type": "left_lever_press",
           "timestamp": pygame.time.get_ticks()
         })
         log("Left lever press", "info")
-      if self.get_io().get_input_states()["right_lever"] == True:
+
+      if right_lever:
         self.events.append({
           "type": "right_lever_press",
           "timestamp": pygame.time.get_ticks()
@@ -213,13 +226,28 @@ class Stage1(Base):
     return True
 
   def _update_water_delivery(self):
-    # Deliver water if trial has started
-    if self.delivered_water == False and pygame.time.get_ticks() - self.start_time > self.config["task"]["valve_open"]:
+    current_time = pygame.time.get_ticks()
+
+    # Start water delivery at trial start
+    if not self.delivered_water:
       self.get_io().set_water_port(True)
-    elif self.delivered_water == False:
-      log("Water delivered", "success")
       self.delivered_water = True
-      self.get_io().set_water_port(False)
+      log("Water delivery started", "success")
+      self.events.append({
+        "type": "water_delivery_start",
+        "timestamp": current_time
+      })
+
+    # Check if water delivery duration has elapsed
+    elif self.delivered_water and not self.water_delivery_complete:
+      if current_time - self.water_start_time >= self.config["task"]["valve_open"]:
+        self.get_io().set_water_port(False)
+        self.water_delivery_complete = True
+        log("Water delivery complete", "success")
+        self.events.append({
+          "type": "water_delivery_complete",
+          "timestamp": current_time
+        })
 
   def _update_nose_port_entry(self):
     if self.nose_port_entry:
@@ -230,7 +258,190 @@ class Stage1(Base):
     # Update visual state
     if not SIMULATION_MODE:
       if self.visual_cue:
-        self.display.draw_test_pattern(self.cue_side) # Note: This is the test pattern
+        self.display.draw_test_pattern(self.cue_side)
+      else:
+        self.display.clear_displays()
+
+  def _update_nose_port_light(self):
+    # Update nose port light
+    if not SIMULATION_MODE:
+      pass
+
+  def _pre_render_tasks(self):
+    # Clear screen
+    self.screen.fill((0, 0, 0))
+
+  def _post_render_tasks(self):
+    # Add simulation mode banner if in simulation mode
+    if SIMULATION_MODE and self.simulation_font:
+      banner_text = f"[SIMULATION - {self.title}]"
+      text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
+      text_rect = text_surface.get_rect(center=(self.width // 2, 20))
+      self.screen.blit(text_surface, text_rect)
+
+  def render(self):
+    # Run pre-render tasks
+    self._pre_render_tasks()
+
+    # Run update tasks
+    self._update_water_delivery()
+    self._update_nose_port_entry()
+    self._update_visual_cue()
+    self._update_nose_port_light()
+
+    # Run post-render tasks
+    self._post_render_tasks()
+
+class Stage2(Base):
+  """
+  Trial Stage 2: Nose port entry or lever press for reward
+  Description: At the beginning of each trial, lit up the nose port light and randomly display
+    the visual cue on one of the side screens. Either port entry or lever press will trigger
+    reward water delivery. Turn off the visual cue and nose port light upon mouse enters the
+    nose port. Start the ITI counting after the mouse exits the nose port.
+  """
+  def __init__(self, width, height):
+    super().__init__(width, height)
+    self.title = "trial_stage_2"
+    self.start_time = None
+    self.water_start_time = None
+
+    # Trial state
+    self.nose_port_light = False
+    self.delivered_water = False
+    self.water_delivery_complete = False
+    self.visual_cue = False
+    self.nose_port_entry = False
+    self.nose_port_exit = False
+    self.lever_press = False
+    self.reward_triggered = False
+
+    # Trial parameters
+    self.cue_side = random.choice(["left", "right"])
+
+    # Trial events
+    self.events = []
+
+  def on_enter(self):
+    self.start_time = pygame.time.get_ticks()
+
+    # Setup trial
+    # Activate the nose port light
+    self.nose_port_light = True
+    self.visual_cue = True
+
+    # Clear the displays and randomly select the display to show the visual cue
+    if not SIMULATION_MODE:
+      self.display.clear_displays()
+      self.display.draw_test_pattern(self.cue_side)
+    log("Trial started", "info")
+
+  def on_exit(self):
+    self.add_data("events", self.events)
+
+  def update(self, events):
+    # Condition for trial end
+    if self.water_delivery_complete and self.nose_port_exit:
+      return False
+
+    # Handle any PyGame events
+    for event in events:
+      if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_ESCAPE:
+          log("Trial canceled", "info")
+          self.add_data("trial_canceled", True)
+          return False
+        if event.key == pygame.K_SPACE and SIMULATION_MODE:
+          if not self.nose_port_entry:
+            log("Simulated nose port entry", "success")
+            self.nose_port_entry = True
+            self.reward_triggered = True
+          elif not self.nose_port_exit:
+            log("Simulated nose port exit", "success")
+            self.nose_port_exit = True
+
+    # Handle any IO events if not in simulation mode
+    if not SIMULATION_MODE:
+      # Track nose port state changes
+      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
+
+      # Detect nose port entry
+      if current_nose_state and not self.nose_port_entry:
+        self.nose_port_entry = True
+        self.reward_triggered = True
+        self.events.append({
+          "type": "nose_port_entry",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Nose port entry", "info")
+
+      # Detect nose port exit
+      elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+        self.nose_port_exit = True
+        self.events.append({
+          "type": "nose_port_exit",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Nose port exit", "info")
+
+      # Track lever presses
+      left_lever = self.get_io().get_input_states()["left_lever"]
+      right_lever = self.get_io().get_input_states()["right_lever"]
+
+      if left_lever and not self.reward_triggered:
+        self.reward_triggered = True
+        self.events.append({
+          "type": "left_lever_press",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Left lever press", "info")
+
+      if right_lever and not self.reward_triggered:
+        self.reward_triggered = True
+        self.events.append({
+          "type": "right_lever_press",
+          "timestamp": pygame.time.get_ticks()
+        })
+        log("Right lever press", "info")
+
+    # Continue if no inputs or events
+    return True
+
+  def _update_water_delivery(self):
+    current_time = pygame.time.get_ticks()
+
+    # Start water delivery when reward is triggered
+    if self.reward_triggered and not self.delivered_water:
+      self.get_io().set_water_port(True)
+      self.delivered_water = True
+      self.water_start_time = current_time
+      log("Water delivery started", "success")
+      self.events.append({
+        "type": "water_delivery_start",
+        "timestamp": current_time
+      })
+
+    # Check if water delivery duration has elapsed
+    elif self.delivered_water and not self.water_delivery_complete:
+      if current_time - self.water_start_time >= self.config["task"]["valve_open"]:
+        self.get_io().set_water_port(False)
+        self.water_delivery_complete = True
+        log("Water delivery complete", "success")
+        self.events.append({
+          "type": "water_delivery_complete",
+          "timestamp": current_time
+        })
+
+  def _update_nose_port_entry(self):
+    if self.nose_port_entry:
+      self.visual_cue = False
+      self.nose_port_light = False
+
+  def _update_visual_cue(self):
+    # Update visual state
+    if not SIMULATION_MODE:
+      if self.visual_cue:
+        self.display.draw_test_pattern(self.cue_side)
       else:
         self.display.clear_displays()
 

@@ -305,6 +305,7 @@ class Stage2(Base):
     self.title = "trial_stage_2"
     self.start_time = None
     self.water_start_time = None
+    self.lever_press_start_time = None
 
     # Trial state
     self.nose_port_light = False
@@ -315,6 +316,7 @@ class Stage2(Base):
     self.nose_port_exit = False
     self.lever_press = False
     self.reward_triggered = False
+    self.is_lever_pressed = False
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -340,6 +342,8 @@ class Stage2(Base):
     self.add_data("events", self.events)
 
   def update(self, events):
+    current_time = pygame.time.get_ticks()
+
     # Condition for trial end
     if self.water_delivery_complete and self.nose_port_exit:
       return False
@@ -371,7 +375,7 @@ class Stage2(Base):
         self.reward_triggered = True
         self.events.append({
           "type": "nose_port_entry",
-          "timestamp": pygame.time.get_ticks()
+          "timestamp": current_time
         })
         log("Nose port entry", "info")
 
@@ -380,29 +384,44 @@ class Stage2(Base):
         self.nose_port_exit = True
         self.events.append({
           "type": "nose_port_exit",
-          "timestamp": pygame.time.get_ticks()
+          "timestamp": current_time
         })
         log("Nose port exit", "info")
 
-      # Track lever presses
+      # Track lever presses with minimum duration
       left_lever = self.get_io().get_input_states()["left_lever"]
       right_lever = self.get_io().get_input_states()["right_lever"]
 
-      if left_lever and not self.reward_triggered:
-        self.reward_triggered = True
-        self.events.append({
-          "type": "left_lever_press",
-          "timestamp": pygame.time.get_ticks()
-        })
-        log("Left lever press", "info")
-
-      if right_lever and not self.reward_triggered:
-        self.reward_triggered = True
-        self.events.append({
-          "type": "right_lever_press",
-          "timestamp": pygame.time.get_ticks()
-        })
-        log("Right lever press", "info")
+      if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
+        # Check for lever press start
+        self.is_lever_pressed = True
+        self.lever_press_start_time = current_time
+        if left_lever:
+          log("Left lever press started", "info")
+        if right_lever:
+          log("Right lever press started", "info")
+      elif self.is_lever_pressed and not (left_lever or right_lever):
+        # Check for lever release or minimum duration
+        self.is_lever_pressed = False
+        self.lever_press_start_time = None
+        log("Lever press released before minimum duration", "info")
+      elif self.is_lever_pressed and not self.reward_triggered:
+        if current_time - self.lever_press_start_time >= self.config["task"]["hold_minimum"]:
+          self.reward_triggered = True
+          if left_lever:
+            self.events.append({
+              "type": "left_lever_press",
+              "timestamp": current_time,
+              "duration": current_time - self.lever_press_start_time
+            })
+            log("Left lever press completed", "info")
+          if right_lever:
+            self.events.append({
+              "type": "right_lever_press",
+              "timestamp": current_time,
+              "duration": current_time - self.lever_press_start_time
+            })
+            log("Right lever press completed", "info")
 
     # Continue if no inputs or events
     return True
@@ -491,6 +510,7 @@ class Stage3(Base):
     self.start_time = None
     self.water_start_time = None
     self.cue_start_time = None
+    self.lever_press_start_time = None
 
     # Trial state
     self.nose_port_light = False
@@ -502,6 +522,7 @@ class Stage3(Base):
     self.lever_press = False
     self.reward_triggered = False
     self.is_error_trial = False
+    self.is_lever_pressed = False
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -584,25 +605,41 @@ class Stage3(Base):
         })
         log("Nose port exit", "info")
 
-      # Track lever presses
+      # Track lever presses with minimum duration
       left_lever = self.get_io().get_input_states()["left_lever"]
       right_lever = self.get_io().get_input_states()["right_lever"]
 
-      if (left_lever or right_lever) and self.nose_port_entry and not self.reward_triggered:
-        self.reward_triggered = True
-        self.visual_cue = False  # Turn off visual cue on lever press
+      if (left_lever or right_lever) and not self.is_lever_pressed and self.nose_port_entry and not self.reward_triggered:
+        # Check for lever press start
+        self.is_lever_pressed = True
+        self.lever_press_start_time = current_time
         if left_lever:
-          self.events.append({
-            "type": "left_lever_press",
-            "timestamp": current_time
-          })
-          log("Left lever press", "info")
+          log("Left lever press started", "info")
         if right_lever:
-          self.events.append({
-            "type": "right_lever_press",
-            "timestamp": current_time
-          })
-          log("Right lever press", "info")
+          log("Right lever press started", "info")
+      elif self.is_lever_pressed and not (left_lever or right_lever):
+        # Check for lever release or minimum duration
+        self.is_lever_pressed = False
+        self.lever_press_start_time = None
+        log("Lever press released before minimum duration", "info")
+      elif self.is_lever_pressed and not self.reward_triggered:
+        if current_time - self.lever_press_start_time >= self.config["task"]["hold_minimum"]:
+          self.reward_triggered = True
+          self.visual_cue = False
+          if left_lever:
+            self.events.append({
+              "type": "left_lever_press",
+              "timestamp": current_time,
+              "duration": current_time - self.lever_press_start_time
+            })
+            log("Left lever press completed", "info")
+          if right_lever:
+            self.events.append({
+              "type": "right_lever_press",
+              "timestamp": current_time,
+              "duration": current_time - self.lever_press_start_time
+            })
+            log("Right lever press completed", "info")
 
     # Check if cue duration has elapsed without lever press
     if self.nose_port_entry and not self.reward_triggered and self.cue_start_time:

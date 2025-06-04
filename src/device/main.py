@@ -96,13 +96,13 @@ class Device:
             # Add the message to the global message queue for the websocket
             message_queue.put(message)
         except queue.Empty:
-          time.sleep(0.01)  # Small sleep to prevent busy waiting
+          time.sleep(0.01) # Prevent busy waiting
         except Exception as e:
           log(f"Error in experiment message listener: {str(e)}", "error")
 
     self.experiment_message_running = True
     self.experiment_message_thread = threading.Thread(target=message_listener)
-    self.experiment_message_thread.daemon = True  # Thread will exit when main program exits
+    self.experiment_message_thread.daemon = True
     self.experiment_message_thread.start()
 
   def _stop_experiment_message_listener(self):
@@ -118,7 +118,7 @@ class Device:
   async def _test_water_delivery(self):
     try:
       self.io.set_water_port(True)
-      await asyncio.sleep(2)  # Non-blocking sleep
+      await asyncio.sleep(2) # Non-blocking sleep
       self.io.set_water_port(False)
     except Exception as e:
       self.test_state["test_water_delivery"]["state"] = TEST_STATES["FAILED"]
@@ -133,8 +133,6 @@ class Device:
   def test_water_delivery(self):
     log("Testing water delivery", "start")
     self.test_state["test_water_delivery"]["state"] = TEST_STATES["RUNNING"]
-
-    # Run the test in the event loop instead of a separate thread
     asyncio.create_task(self._test_water_delivery())
 
   def _test_actuators(self):
@@ -190,9 +188,9 @@ class Device:
 
     # Set test to passed
     if self.test_state["test_actuators"]["state"] == TEST_STATES["RUNNING"]:
-          self.test_state["test_actuators"]["state"] = TEST_STATES["PASSED"]
-          message_queue.put({"type": "test_state", "data": self.test_state})
-          log("Actuators test passed", "success")
+      self.test_state["test_actuators"]["state"] = TEST_STATES["PASSED"]
+      message_queue.put({"type": "test_state", "data": self.test_state})
+      log("Actuators test passed", "success")
 
   def test_actuators(self):
     log("Testing actuators", "start")

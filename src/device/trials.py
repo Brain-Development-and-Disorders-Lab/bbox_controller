@@ -28,7 +28,6 @@ class Base:
     self.display = DisplayController()
     self.io = IOController()
 
-    # Create a small font for simulation banner
     if SIMULATION_MODE:
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
 
@@ -222,7 +221,7 @@ class Stage1(Base):
     # Update visual state
     if not SIMULATION_MODE:
       if self.visual_cue:
-        self.display.draw_test_pattern()
+        self.display.draw_test_pattern() # Note: This is the test pattern
       else:
         self.display.clear_displays()
 
@@ -232,6 +231,5 @@ class Stage1(Base):
     if SIMULATION_MODE and self.simulation_font:
       banner_text = f"[SIMULATION - {self.title}]"
       text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
-      # Center the text horizontally
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))
       self.screen.blit(text_surface, text_rect)

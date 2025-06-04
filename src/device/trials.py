@@ -30,7 +30,7 @@ class Base:
     self.io = IOController()
 
     # Config
-    self.config = json.load(open("config.json", "r"))
+    self.config = json.load(open("config.json", "r"))["task"]
 
     if SIMULATION_MODE:
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
@@ -240,7 +240,7 @@ class Stage1(Base):
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
-      if current_time - self.water_start_time >= self.config["task"]["valve_open"]:
+      if current_time - self.water_start_time >= self.config["valve_open"]:
         self.get_io().set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
@@ -406,7 +406,7 @@ class Stage2(Base):
         self.lever_press_start_time = None
         log("Lever press released before minimum duration", "info")
       elif self.is_lever_pressed and not self.reward_triggered:
-        if current_time - self.lever_press_start_time >= self.config["task"]["hold_minimum"]:
+        if current_time - self.lever_press_start_time >= self.config["hold_minimum"]:
           self.reward_triggered = True
           if left_lever:
             self.events.append({
@@ -442,7 +442,7 @@ class Stage2(Base):
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
-      if current_time - self.water_start_time >= self.config["task"]["valve_open"]:
+      if current_time - self.water_start_time >= self.config["valve_open"]:
         self.get_io().set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
@@ -527,8 +527,8 @@ class Stage3(Base):
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
     self.cue_duration = random.randint(
-      self.config["task"]["min_cue_duration"],
-      self.config["task"]["max_cue_duration"]
+      self.config["cue_minimum"],
+      self.config["cue_maximum"]
     )
 
     # Trial events
@@ -623,7 +623,7 @@ class Stage3(Base):
         self.lever_press_start_time = None
         log("Lever press released before minimum duration", "info")
       elif self.is_lever_pressed and not self.reward_triggered:
-        if current_time - self.lever_press_start_time >= self.config["task"]["hold_minimum"]:
+        if current_time - self.lever_press_start_time >= self.config["hold_minimum"]:
           self.reward_triggered = True
           self.visual_cue = False
           if left_lever:
@@ -670,7 +670,7 @@ class Stage3(Base):
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
-      if current_time - self.water_start_time >= self.config["task"]["valve_open"]:
+      if current_time - self.water_start_time >= self.config["valve_open"]:
         self.get_io().set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")

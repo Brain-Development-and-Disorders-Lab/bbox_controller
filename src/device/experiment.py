@@ -35,11 +35,11 @@ def run_experiment_process(animal_id, config_path, message_queue):
 
   # Setup trials
   trials = [
-    Stage1(0, 0),
-    Interval(0, 0),
-    Stage2(0, 0),
-    Interval(0, 0),
-    Stage3(0, 0),
+    Stage1(),
+    Interval(),
+    Stage2(),
+    Interval(),
+    Stage3(),
   ]
   font = pygame.font.SysFont("Arial", 64)
   for trial in trials:
@@ -47,6 +47,7 @@ def run_experiment_process(animal_id, config_path, message_queue):
     trial.font = font
     trial.width = screen_info.current_w
     trial.height = screen_info.current_h
+    trial.message_queue = message_queue
 
   # Run first screen
   current_trial = trials.pop(0)

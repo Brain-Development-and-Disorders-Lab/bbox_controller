@@ -80,7 +80,8 @@ class Device:
 
     # Experiment
     self.current_experiment = None
-    self.experiment_message_queue = None
+    self.experiment_log_queue = None
+    self.experiment_io_queue = None
 
     # Start experiment message listener thread
     self.experiment_message_thread = None
@@ -270,6 +271,27 @@ class Device:
     elif command == "test_ir":
       self.test_ir()
 
+  def _start_io_state_broadcast(self):
+    """Start a thread to broadcast IO state to experiment"""
+    def broadcast_loop():
+      while self.experiment_message_running:
+        try:
+          # Get current IO state
+          io_state = self.io.get_input_states()
+
+          # Send to experiment process
+          if self.experiment_io_queue:
+            self.experiment_io_queue.put(io_state)
+
+          # Sleep for 10ms
+          time.sleep(0.01)
+        except Exception as e:
+          log(f"Error in IO state broadcast: {str(e)}", "error")
+
+    self.io_broadcast_thread = threading.Thread(target=broadcast_loop)
+    self.io_broadcast_thread.daemon = True
+    self.io_broadcast_thread.start()
+
   def run_experiment(self, command):
     primary_command = command.split(" ")[0]
     arguments = command.split(" ")[1:]
@@ -282,13 +304,17 @@ class Device:
     if primary_command == "start_experiment":
       try:
         # Create a new message queue for this task
-        self.experiment_message_queue = multiprocessing.Queue()
+        self.experiment_log_queue = multiprocessing.Queue() # Queue for recieving log messages from the experiment process
+        self.experiment_io_queue = multiprocessing.Queue() # Queue for sending IO state to the experiment process
 
         # Start the message listener
         self._start_experiment_message_listener()
 
+        # Start IO state broadcast thread
+        self._start_io_state_broadcast()
+
         # Import and instantiate the task with the message queue
-        self.current_experiment = Experiment(arguments[0], self.experiment_message_queue)
+        self.current_experiment = Experiment(arguments[0], self.experiment_log_queue, self.experiment_io_queue)
         self.current_experiment.run()
         log("Started experiment", "success")
         message_queue.put({"type": "device_log", "data": {"message": "Started experiment", "state": "success"}})
@@ -296,7 +322,8 @@ class Device:
         log(f"Failed to start experiment: {str(e)}", "error")
         message_queue.put({"type": "device_log", "data": {"message": f"Failed to start experiment: {str(e)}", "state": "error"}})
         self._stop_experiment_message_listener()
-        self.experiment_message_queue = None
+        self.experiment_log_queue = None
+        self.experiment_io_queue = None
 
   def stop_experiment(self):
     """Stop the current experiment"""
@@ -306,7 +333,8 @@ class Device:
 
       # Stop the message listener and cleanup
       self._stop_experiment_message_listener()
-      self.experiment_message_queue = None
+      self.experiment_log_queue = None
+      self.experiment_io_queue = None
 
       log("Stopped current experiment", "info")
       message_queue.put({"type": "device_log", "data": {"message": "Stopped current experiment", "state": "info"}})

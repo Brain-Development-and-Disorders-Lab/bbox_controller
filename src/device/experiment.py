@@ -10,7 +10,7 @@ from trials import Interval, Stage1, Stage2, Stage3
 # Other imports
 from util import log
 
-def run_experiment_process(animal_id, config_path, message_queue):
+def run_experiment_process(animal_id, config_path, log_queue, io_queue):
   """Function that runs in the separate process"""
   import pygame
 
@@ -47,14 +47,15 @@ def run_experiment_process(animal_id, config_path, message_queue):
     trial.font = font
     trial.width = screen_info.current_w
     trial.height = screen_info.current_h
-    trial.message_queue = message_queue
+    trial.log_queue = log_queue
+    trial.io_queue = io_queue
 
   # Run first screen
   current_trial = trials.pop(0)
   current_trial.on_enter()
 
   # Send initial message that task has started
-  message_queue.put({
+  log_queue.put({
     "type": "task_status",
     "data": {
       "status": "started",
@@ -80,7 +81,7 @@ def run_experiment_process(animal_id, config_path, message_queue):
         log("Finished trial: " + current_trial.title, "info")
 
         # Send message about trial completion
-        message_queue.put({
+        log_queue.put({
           "type": "trial_complete",
           "data": {
             "trial": current_trial.title,
@@ -93,7 +94,7 @@ def run_experiment_process(animal_id, config_path, message_queue):
           current_trial.on_enter()
 
           # Send message about new trial starting
-          message_queue.put({
+          log_queue.put({
             "type": "trial_start",
             "data": {
               "trial": current_trial.title
@@ -102,7 +103,7 @@ def run_experiment_process(animal_id, config_path, message_queue):
         else:
           running = False
           # Send message that task is complete
-          message_queue.put({
+          log_queue.put({
             "type": "task_status",
             "data": {
               "status": "completed"
@@ -122,7 +123,7 @@ def run_experiment_process(animal_id, config_path, message_queue):
     data.save()
 
 class Experiment:
-  def __init__(self, animal_id=None, message_queue=None):
+  def __init__(self, animal_id=None, log_queue=None, io_queue=None):
     """Initialize the experiment"""
     self.animal_id = animal_id
     if animal_id is None:
@@ -130,7 +131,10 @@ class Experiment:
 
     self.process = None
     self.config_path = "config.json"  # Could be passed as parameter
-    self.message_queue = message_queue
+
+    # Queues for communication with the main process
+    self.log_queue = log_queue
+    self.io_queue = io_queue
 
   def run(self):
     """Start the experiment in a new process"""
@@ -140,7 +144,7 @@ class Experiment:
     # Create and start the process
     self.process = multiprocessing.Process(
       target=run_experiment_process,
-      args=(self.animal_id, self.config_path, self.message_queue)
+      args=(self.animal_id, self.config_path, self.log_queue, self.io_queue)
     )
     self.process.start()
 
@@ -148,8 +152,8 @@ class Experiment:
     """Stop the experiment process"""
     if self.process and self.process.is_alive():
       # Send message that experiment is being stopped
-      if self.message_queue:
-        self.message_queue.put({
+      if self.log_queue:
+        self.log_queue.put({
           "type": "experiment_status",
           "data": {
             "status": "stopped"

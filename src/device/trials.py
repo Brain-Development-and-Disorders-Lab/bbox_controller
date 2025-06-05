@@ -5,6 +5,7 @@ Trial base class and all following trials.
 import random
 import pygame
 import json
+import queue
 from util import log
 
 # Controllers
@@ -23,12 +24,19 @@ class Base:
     self.screen = None
     self.font = None
     self.title = "base_screen"
+
+    # All trial data
     self.data = {}
-    self.message_queue = None
+
+    # Queues for communication with the main process
+    self.log_queue = None
+    self.io_queue = None
+
+    # Current IO state
+    self.io_state = None
 
     # Controllers
     self.display = DisplayController()
-    self.io = IOController()
 
     # Config
     self.config = json.load(open("config.json", "r"))["task"]
@@ -76,18 +84,22 @@ class Base:
     """Get the display controller"""
     return self.display
 
-  def get_io(self):
-    """Get the IO controller"""
-    return self.io
-
-  def get_input(self):
-    """Get the input from the IO controller"""
-    return self.io.get_input()
+  def get_io_state(self):
+    """Get current input states"""
+    if self.io_state is None:
+        # Default state if no updates received yet
+        return {
+            "right_lever": False,
+            "left_lever": False,
+            "nose_poke": False,
+            "water_port": False,
+        }
+    return self.io_state
 
   def log(self, message, state="info"):
     """Log a message to the message queue"""
-    if self.message_queue is not None:
-      self.message_queue.put({
+    if self.log_queue is not None:
+      self.log_queue.put({
         "type": "device_log",
         "data": {"message": message, "state": state}
       })
@@ -191,6 +203,14 @@ class Stage1(Base):
       self.log("Nose port entry complete after water delivery", "success")
       return False
 
+    # Update the IO state
+    if self.io_queue:
+      try:
+        while not self.io_queue.empty():
+          self.io_state = self.io_queue.get_nowait()
+      except queue.Empty:
+          pass
+
     # Handle any PyGame events
     for event in events:
       if event.type == pygame.KEYDOWN:
@@ -205,7 +225,7 @@ class Stage1(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = self.get_io_state()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state == False and self.nose_port_entry == False:
@@ -217,8 +237,8 @@ class Stage1(Base):
         self.log("Nose port entry detected", "info")
 
       # Track lever presses
-      left_lever = self.get_io().get_input_states()["left_lever"]
-      right_lever = self.get_io().get_input_states()["right_lever"]
+      left_lever = self.get_io_state()["left_lever"]
+      right_lever = self.get_io_state()["right_lever"]
 
       if left_lever:
         self.events.append({
@@ -242,7 +262,7 @@ class Stage1(Base):
 
     # Start water delivery at trial start
     if not self.delivered_water:
-      self.get_io().set_water_port(True)
+      # self.io_state["water_port"] = True
       self.delivered_water = True
       self.log("Water delivery started", "success")
       self.events.append({
@@ -253,7 +273,7 @@ class Stage1(Base):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config["valve_open"]:
-        self.get_io().set_water_port(False)
+        # self.io_state["water_port"] = False
         self.water_delivery_complete = True
         self.log("Water delivery complete", "success")
         self.events.append({
@@ -382,7 +402,7 @@ class Stage2(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = self.get_io_state()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -404,8 +424,8 @@ class Stage2(Base):
         self.log("Nose port exit", "info")
 
       # Track lever presses with minimum duration
-      left_lever = self.get_io().get_input_states()["left_lever"]
-      right_lever = self.get_io().get_input_states()["right_lever"]
+      left_lever = self.get_io_state()["left_lever"]
+      right_lever = self.get_io_state()["right_lever"]
 
       if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
         # Check for lever press start
@@ -446,7 +466,7 @@ class Stage2(Base):
 
     # Start water delivery when reward is triggered
     if self.reward_triggered and not self.delivered_water:
-      self.get_io().set_water_port(True)
+      # self.get_io().set_water_port(True)
       self.delivered_water = True
       self.water_start_time = current_time
       self.log("Water delivery started", "success")
@@ -458,7 +478,7 @@ class Stage2(Base):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config["valve_open"]:
-        self.get_io().set_water_port(False)
+        # self.get_io().set_water_port(False)
         self.water_delivery_complete = True
         self.log("Water delivery complete", "success")
         self.events.append({
@@ -571,7 +591,7 @@ class Stage3(Base):
     current_time = pygame.time.get_ticks()
 
     # Handle error trial condition - premature nose withdrawal
-    if self.nose_port_entry and not self.nose_port_exit and not self.get_io().get_input_states()["nose_poke"]:
+    if self.nose_port_entry and not self.nose_port_exit and not self.get_io_state()["nose_poke"]:
       self.is_error_trial = True
       self.log("Error: Premature nose withdrawal", "error")
       return False
@@ -600,7 +620,7 @@ class Stage3(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = self.get_io_state()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -622,8 +642,8 @@ class Stage3(Base):
         self.log("Nose port exit", "info")
 
       # Track lever presses with minimum duration
-      left_lever = self.get_io().get_input_states()["left_lever"]
-      right_lever = self.get_io().get_input_states()["right_lever"]
+      left_lever = self.get_io_state()["left_lever"]
+      right_lever = self.get_io_state()["right_lever"]
 
       if (left_lever or right_lever) and not self.is_lever_pressed and self.nose_port_entry and not self.reward_triggered:
         # Check for lever press start
@@ -675,7 +695,7 @@ class Stage3(Base):
 
     # Start water delivery when reward is triggered
     if self.reward_triggered and not self.delivered_water:
-      self.get_io().set_water_port(True)
+      # self.get_io().set_water_port(True)
       self.delivered_water = True
       self.water_start_time = current_time
       self.log("Water delivery started", "success")
@@ -687,7 +707,7 @@ class Stage3(Base):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config["valve_open"]:
-        self.get_io().set_water_port(False)
+        # self.get_io().set_water_port(False)
         self.water_delivery_complete = True
         self.log("Water delivery complete", "success")
         self.events.append({

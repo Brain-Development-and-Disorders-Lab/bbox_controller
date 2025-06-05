@@ -5,7 +5,8 @@ Trial base class and all following trials.
 import random
 import pygame
 import json
-from controllers.DisplayController import SIMULATION_MODE
+from controllers.DisplayController import DisplayController, SIMULATION_MODE
+from controllers.IOController import IOController
 from logger import log
 
 class Base:
@@ -22,8 +23,8 @@ class Base:
     self.title = "base_screen"
 
     # Controllers
-    self.io = None
-    self.display = None
+    self.io: IOController = None
+    self.display: DisplayController = None
 
     # All trial data
     self.data = {}
@@ -236,7 +237,7 @@ class Stage1(Base):
 
     # Start water delivery at trial start
     if not self.delivered_water:
-      # self.io_state["water_port"] = True
+      self.io.set_water_port(True)
       self.delivered_water = True
       log("Water delivery started", "success")
       self.events.append({
@@ -247,7 +248,7 @@ class Stage1(Base):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config["valve_open"]:
-        # self.io_state["water_port"] = False
+        self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
         self.events.append({
@@ -440,7 +441,7 @@ class Stage2(Base):
 
     # Start water delivery when reward is triggered
     if self.reward_triggered and not self.delivered_water:
-      # self.get_io().set_water_port(True)
+      self.io.set_water_port(True)
       self.delivered_water = True
       self.water_start_time = current_time
       log("Water delivery started", "success")
@@ -452,7 +453,7 @@ class Stage2(Base):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config["valve_open"]:
-        # self.get_io().set_water_port(False)
+        self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
         self.events.append({
@@ -660,6 +661,8 @@ class Stage3(Base):
           "type": "cue_timeout",
           "timestamp": current_time
         })
+        # Trial failure
+        return False
 
     # Continue if no inputs or events
     return True
@@ -681,7 +684,7 @@ class Stage3(Base):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config["valve_open"]:
-        # self.get_io().set_water_port(False)
+        self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
         self.events.append({

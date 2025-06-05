@@ -178,6 +178,8 @@ class Stage1(Base):
     if not SIMULATION_MODE:
       self.display.clear_displays()
       self.display.draw_test_pattern(self.cue_side)
+      self.log("Visual cue displayed on the " + self.cue_side + " side", "success")
+
     self.log("Trial started", "info")
 
   def on_exit(self):
@@ -186,6 +188,7 @@ class Stage1(Base):
   def update(self, events):
     # Condition for trial end
     if self.nose_port_entry and self.water_delivery_complete:
+      self.log("Nose port entry complete after water delivery", "success")
       return False
 
     # Handle any PyGame events
@@ -211,7 +214,7 @@ class Stage1(Base):
           "type": "nose_port_entry",
           "timestamp": pygame.time.get_ticks()
         })
-        self.log("Nose port entry", "info")
+        self.log("Nose port entry detected", "info")
 
       # Track lever presses
       left_lever = self.get_io().get_input_states()["left_lever"]
@@ -345,6 +348,8 @@ class Stage2(Base):
     if not SIMULATION_MODE:
       self.display.clear_displays()
       self.display.draw_test_pattern(self.cue_side)
+      self.log("Visual cue displayed on the " + self.cue_side + " side", "success")
+
     self.log("Trial started", "info")
 
   def on_exit(self):
@@ -355,6 +360,7 @@ class Stage2(Base):
 
     # Condition for trial end
     if self.water_delivery_complete and self.nose_port_exit:
+      self.log("Trial ended after water delivery and nose port exit", "success")
       return False
 
     # Handle any PyGame events
@@ -572,6 +578,7 @@ class Stage3(Base):
 
     # Condition for trial end - when water delivery is complete and nose port is exited
     if self.water_delivery_complete and self.nose_port_exit:
+      self.log("Trial ended after water delivery and nose port exit", "success")
       return False
 
     # Handle any PyGame events

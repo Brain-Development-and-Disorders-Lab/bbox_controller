@@ -148,13 +148,15 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        log("Left actuator did not move to 1.0", "error")
+        log("Left actuator input timed out", "error")
+        message_queue.put({"type": "device_log", "data": {"message": "Left actuator input timed out", "state": "error"}})
         self.test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
         message_queue.put({"type": "test_state", "data": self.test_state})
         return
 
     if input_state["left_lever"] != True:
-      log("Left actuator did not move to `True`", "error")
+      log("Left actuator did not move to 1.0", "error")
+      message_queue.put({"type": "device_log", "data": {"message": "Left actuator did not move to 1.0", "state": "error"}})
       self.test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
       message_queue.put({"type": "test_state", "data": self.test_state})
       return
@@ -173,13 +175,15 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        log("Right actuator did not move to `True`", "error")
+        log("Right actuator input timed out", "error")
+        message_queue.put({"type": "device_log", "data": {"message": "Right actuator input timed out", "state": "error"}})
         self.test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
         message_queue.put({"type": "test_state", "data": self.test_state})
         return
 
     if input_state["right_lever"] != True:
-      log("Right actuator did not move to `True`", "error")
+      log("Right actuator did not move to 1.0", "error")
+      message_queue.put({"type": "device_log", "data": {"message": "Right actuator did not move to 1.0", "state": "error"}})
       self.test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
       message_queue.put({"type": "test_state", "data": self.test_state})
       return
@@ -199,17 +203,20 @@ class Device:
     # Step 1: Test that both actuators default to 0.0
     input_state = self.io.get_input_states()
     if input_state["left_lever"] != False:
-      log("Left actuator did not default to `False`", "error")
+      log("Left actuator did not default to 0.0", "error")
+      message_queue.put({"type": "device_log", "data": {"message": "Left actuator did not default to 0.0", "state": "error"}})
       self.test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
       message_queue.put({"type": "test_state", "data": self.test_state})
       return
 
     if input_state["right_lever"] != False:
-      log("Right actuator did not default to `False`", "error")
+      log("Right actuator did not default to 0.0", "error")
+      message_queue.put({"type": "device_log", "data": {"message": "Right actuator did not default to 0.0", "state": "error"}})
       self.test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
       message_queue.put({"type": "test_state", "data": self.test_state})
       return
-    log("Actuators defaulted to `False`", "success")
+    log("Actuators defaulted to 0.0", "success")
+    message_queue.put({"type": "device_log", "data": {"message": "Actuators defaulted to 0.0", "state": "success"}})
 
     # Run the test in a separate thread
     actuator_test_thread = threading.Thread(target=self._test_actuators)
@@ -218,32 +225,35 @@ class Device:
   def _test_ir(self):
     # Step 1: Test that the IR is broken
     log("Waiting for IR input...", "info")
+    message_queue.put({"type": "device_log", "data": {"message": "Waiting for IR input...", "state": "info"}})
     running_input_test = True
     running_input_test_start_time = time.time()
     while running_input_test:
       input_state = self.io.get_input_states()
-      log(f"IR input state: {input_state['nose_poke']}", "info")
       if input_state["nose_poke"] == False:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
         log("Timed out while waiting for IR input", "error")
+        message_queue.put({"type": "device_log", "data": {"message": "Timed out while waiting for IR input", "state": "error"}})
         self.test_state["test_ir"]["state"] = TEST_STATES["FAILED"]
         message_queue.put({"type": "test_state", "data": self.test_state})
         return
 
     if input_state["nose_poke"] != False:
       log("No IR input detected", "error")
+      message_queue.put({"type": "device_log", "data": {"message": "No IR input detected", "state": "error"}})
       self.test_state["test_ir"]["state"] = TEST_STATES["FAILED"]
       message_queue.put({"type": "test_state", "data": self.test_state})
       return
 
     # Set test to passed
     if self.test_state["test_ir"]["state"] == TEST_STATES["RUNNING"]:
+      log("IR test passed", "success")
+      message_queue.put({"type": "device_log", "data": {"message": "IR test passed", "state": "success"}})
       self.test_state["test_ir"]["state"] = TEST_STATES["PASSED"]
       message_queue.put({"type": "test_state", "data": self.test_state})
-      log("IR test passed", "success")
 
   def test_ir(self):
     log("Testing IR", "start")
@@ -266,6 +276,7 @@ class Device:
 
     if self.current_experiment and self.current_experiment.process.is_alive():
       log("Experiment already running", "warning")
+      message_queue.put({"type": "device_log", "data": {"message": "Experiment already running", "state": "warning"}})
       return
 
     if primary_command == "start_experiment":
@@ -280,8 +291,10 @@ class Device:
         self.current_experiment = Experiment(arguments[0], self.experiment_message_queue)
         self.current_experiment.run()
         log("Started experiment", "success")
+        message_queue.put({"type": "device_log", "data": {"message": "Started experiment", "state": "success"}})
       except Exception as e:
         log(f"Failed to start experiment: {str(e)}", "error")
+        message_queue.put({"type": "device_log", "data": {"message": f"Failed to start experiment: {str(e)}", "state": "error"}})
         self._stop_experiment_message_listener()
         self.experiment_message_queue = None
 
@@ -296,6 +309,7 @@ class Device:
       self.experiment_message_queue = None
 
       log("Stopped current experiment", "info")
+      message_queue.put({"type": "device_log", "data": {"message": "Stopped current experiment", "state": "info"}})
 
 DEVICE = Device()
 

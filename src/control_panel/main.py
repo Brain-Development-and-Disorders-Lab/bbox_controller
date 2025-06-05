@@ -99,10 +99,39 @@ class ControlPanel(tk.Frame):
       self.input_label_states = {
         "left_lever": tk.BooleanVar(self.master, False),
         "right_lever": tk.BooleanVar(self.master, False),
+        "nose_poke": tk.BooleanVar(self.master, False),
       }
+
+      # Configure source-specific colors
+      self.source_colors = {
+        "UI": "#0066CC",      # Blue for UI logs
+        "DEVICE": "#CC6600",  # Orange for device logs
+        "SYSTEM": "#666666"   # Gray for system logs
+      }
+
+      # Track which sources are enabled for logging
+      self.enabled_sources = {
+        "UI": tk.BooleanVar(value=True),
+        "DEVICE": tk.BooleanVar(value=True),
+        "SYSTEM": tk.BooleanVar(value=True)
+      }
+
+      # Store log history for filtering
+      self.log_history = []
 
       # Create the layout
       self.create_layout()
+
+      # Configure log text tags for different states and sources
+      self.console.tag_configure("info", foreground="#E0E0E0")  # Light gray for info
+      self.console.tag_configure("success", foreground="#00FF00")  # Bright green for success
+      self.console.tag_configure("error", foreground="#FF4444")  # Bright red for error
+      self.console.tag_configure("warning", foreground="#FFAA00")  # Bright orange for warning
+      self.console.tag_configure("debug", foreground="#AAAAAA")  # Medium gray for debug
+
+      # Configure source tags
+      for source, color in self.source_colors.items():
+        self.console.tag_configure(f"source_{source}", foreground=color, font=("TkDefaultFont", 9, "bold"))
 
       # Handle exiting
       atexit.register(self.on_exit)
@@ -275,6 +304,7 @@ class ControlPanel(tk.Frame):
     # Create input indicators
     self.create_state_indicator(input_status_frame, "Left Actuator", self.input_label_states["left_lever"])
     self.create_state_indicator(input_status_frame, "Right Actuator", self.input_label_states["right_lever"])
+    self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["nose_poke"])
 
     # Test Status section
     test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -339,36 +369,55 @@ class ControlPanel(tk.Frame):
     console_frame.grid_columnconfigure(0, weight=1)
     console_frame.grid_rowconfigure(0, weight=1)
 
-    self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="white")
+    self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="#E0E0E0")
     self.console.grid(row=0, column=0, sticky="nsew")
     self.console.config(state=tk.DISABLED)
-
-    # Add tags for the console message levels
-    self.console.tag_config("error", foreground="red")
-    self.console.tag_config("warning", foreground="yellow")
-    self.console.tag_config("success", foreground="green")
-    self.console.tag_config("info", foreground="white")
-    self.log("Console initialized")
 
     # Store references to test buttons for later use
     self.test_water_delivery_button = self.test_indicators["test_water_delivery"]["button"]
     self.test_actuators_button = self.test_indicators["test_actuators"]["button"]
     self.test_ir_button = self.test_indicators["test_ir"]["button"]
 
-  def log(self, message, state="info"):
+  def log(self, message, state="info", source="UI"):
     """
     Logs a message to the console with a timestamp.
 
     Parameters:
     message (str): The message to log.
     state (str): The state of the message.
+    source (str): The source of the message.
     """
-    self.console.config(state=tk.NORMAL)
-    message = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{LOG_STATES[state]}] {message}\n"
-    self.console.insert(tk.END, message, state)
-    print(message, end="")
-    self.console.config(state=tk.DISABLED)
-    self.console.see(tk.END)
+    timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+    source_upper = source.upper()
+
+    # Store log entry in history
+    log_entry = {
+      "timestamp": timestamp,
+      "source": source_upper,
+      "state": state,
+      "message": message
+    }
+    self.log_history.append(log_entry)
+
+    # Only display if source is enabled
+    if self.enabled_sources[source_upper].get():
+      self.console.config(state=tk.NORMAL)
+
+      # Insert timestamp
+      self.console.insert(tk.END, f"[{timestamp}] ", "info")
+
+      # Insert source with custom color
+      self.console.insert(tk.END, f"[{source_upper}] ", f"source_{source_upper}")
+
+      # Insert state and message
+      self.console.insert(tk.END, f"[{LOG_STATES[state]}] {message}\n", state)
+
+      # Scroll to end and make read-only
+      self.console.see(tk.END)
+      self.console.config(state=tk.DISABLED)
+
+    # Always print to console for backup
+    print(f"[{timestamp}] [{source_upper}] [{LOG_STATES[state]}] {message}")
 
   def update_state_labels(self):
     """
@@ -376,6 +425,7 @@ class ControlPanel(tk.Frame):
     """
     self.input_label_states["left_lever"].set(self.input_states["left_lever"])
     self.input_label_states["right_lever"].set(self.input_states["right_lever"])
+    self.input_label_states["nose_poke"].set(self.input_states["nose_poke"])
 
   def update_test_state(self, command_name, state):
       """
@@ -535,6 +585,8 @@ class ControlPanel(tk.Frame):
         self.log(f"Trial start: {received_message['data']['trial']}", "info")
       elif received_message["type"] == "trial_complete":
         self.log(f"Trial complete: {received_message['data']['trial']}", "success")
+      elif received_message["type"] == "device_log":
+        self.log(received_message["data"]["message"], received_message["data"]["state"], "device")
       else:
         self.log(f"Received unhandled message: {received_message}", "warning")
 

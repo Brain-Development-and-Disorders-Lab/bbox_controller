@@ -30,10 +30,10 @@ def log(message, state="info"):
         state = "info"  # Default to info if invalid state
 
     timestamp = datetime.datetime.now().strftime('%H:%M:%S')
-    formatted_message = f"[{timestamp}] [{LOG_STATES[state]}] {message}\n"
+    formatted_message = f"[{timestamp}] [{LOG_STATES[state]}] {message}"
 
     # Print to console
-    print(formatted_message, end="")
+    print(formatted_message)
 
     # Send to message queue if available
     if _device_message_queue:

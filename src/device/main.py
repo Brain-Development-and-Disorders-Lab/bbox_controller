@@ -517,7 +517,7 @@ async def send_state_message(websocket):
   """
   while True:
     try:
-      await websocket.send(json.dumps({"type": "input_state", "data": _device.get_io_input_state()}))
+      await websocket.send(json.dumps({"type": "input_state", "data": _device.io.get_input_states()}))
       await asyncio.sleep(0.05)
     except websockets.exceptions.ConnectionClosed:
       log("Control panel connection closed", "warning")

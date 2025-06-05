@@ -193,7 +193,7 @@ class Stage1(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = self.get_io().get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -367,7 +367,7 @@ class Stage2(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = self.get_io().get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -584,7 +584,7 @@ class Stage3(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = self.get_io().get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:

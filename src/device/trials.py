@@ -199,7 +199,7 @@ class Stage1(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io_state()["nose_poke"]
+      current_nose_state = self.get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state == False and self.nose_port_entry == False:
@@ -211,8 +211,8 @@ class Stage1(Base):
         log("Nose port entry detected", "info")
 
       # Track lever presses
-      left_lever = self.get_io_state()["left_lever"]
-      right_lever = self.get_io_state()["right_lever"]
+      left_lever = self.get_input_states()["left_lever"]
+      right_lever = self.get_input_states()["right_lever"]
 
       if left_lever:
         self.events.append({
@@ -376,7 +376,7 @@ class Stage2(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io_state()["nose_poke"]
+      current_nose_state = self.get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -398,8 +398,8 @@ class Stage2(Base):
         log("Nose port exit", "info")
 
       # Track lever presses with minimum duration
-      left_lever = self.get_io_state()["left_lever"]
-      right_lever = self.get_io_state()["right_lever"]
+      left_lever = self.get_input_states()["left_lever"]
+      right_lever = self.get_input_states()["right_lever"]
 
       if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
         # Check for lever press start
@@ -565,7 +565,7 @@ class Stage3(Base):
     current_time = pygame.time.get_ticks()
 
     # Handle error trial condition - premature nose withdrawal
-    if self.nose_port_entry and not self.nose_port_exit and not self.get_io_state()["nose_poke"]:
+    if self.nose_port_entry and not self.nose_port_exit and not self.get_input_states()["nose_poke"]:
       self.is_error_trial = True
       log("Error: Premature nose withdrawal", "error")
       return False
@@ -594,7 +594,7 @@ class Stage3(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io_state()["nose_poke"]
+      current_nose_state = self.get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -616,8 +616,8 @@ class Stage3(Base):
         log("Nose port exit", "info")
 
       # Track lever presses with minimum duration
-      left_lever = self.get_io_state()["left_lever"]
-      right_lever = self.get_io_state()["right_lever"]
+      left_lever = self.get_input_states()["left_lever"]
+      right_lever = self.get_input_states()["right_lever"]
 
       if (left_lever or right_lever) and not self.is_lever_pressed and self.nose_port_entry and not self.reward_triggered:
         # Check for lever press start

@@ -1,6 +1,9 @@
 # MacOS
 .DS_Store
 
+# Device logs and data
+src/device/data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -27,7 +27,7 @@ class IOController:
         # Setup GPIO inputs using gpiozero (pull_up=True by default)
         self.lever_right = Button(self.PIN_LEVER_RIGHT)
         self.lever_left = Button(self.PIN_LEVER_LEFT)
-        self.nose_poke = Button(self.PIN_NOSE_POKE, pull_up=False)
+        self.nose_poke = Button(self.PIN_NOSE_POKE)
 
         # Setup water port and nose light outputs
         self.water_port = DigitalOutputDevice(self.PIN_WATER, initial_value=False)

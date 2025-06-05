@@ -223,7 +223,7 @@ class Device:
     while running_input_test:
       input_state = self.io.get_input_states()
       log(f"IR input state: {input_state['nose_poke']}", "info")
-      if input_state["nose_poke"] == True:
+      if input_state["nose_poke"] == False:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -233,7 +233,7 @@ class Device:
         message_queue.put({"type": "test_state", "data": self.test_state})
         return
 
-    if input_state["nose_poke"] != True:
+    if input_state["nose_poke"] != False:
       log("No IR input detected", "error")
       self.test_state["test_ir"]["state"] = TEST_STATES["FAILED"]
       message_queue.put({"type": "test_state", "data": self.test_state})

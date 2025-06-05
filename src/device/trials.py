@@ -193,7 +193,7 @@ class Stage1(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -367,7 +367,7 @@ class Stage2(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:
@@ -556,7 +556,7 @@ class Stage3(Base):
     current_time = pygame.time.get_ticks()
 
     # Handle error trial condition - premature nose withdrawal
-    if self.nose_port_entry and not self.nose_port_exit and self.get_io().get_input_states()["nose_poke"]:
+    if self.nose_port_entry and not self.nose_port_exit and not self.get_io().get_input_states()["nose_poke"]:
       self.is_error_trial = True
       log("Error: Premature nose withdrawal", "error")
       return False
@@ -584,7 +584,7 @@ class Stage3(Base):
     # Handle any IO events if not in simulation mode
     if not SIMULATION_MODE:
       # Track nose port state changes
-      current_nose_state = self.get_io().get_input_states()["nose_poke"]
+      current_nose_state = not self.get_io().get_input_states()["nose_poke"]
 
       # Detect nose port entry
       if current_nose_state and not self.nose_port_entry:

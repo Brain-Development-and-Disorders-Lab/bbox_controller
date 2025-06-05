@@ -99,6 +99,7 @@ class ControlPanel(tk.Frame):
       self.input_label_states = {
         "left_lever": tk.BooleanVar(self.master, False),
         "right_lever": tk.BooleanVar(self.master, False),
+        "nose_poke": tk.BooleanVar(self.master, False),
       }
 
       # Configure source-specific colors
@@ -303,6 +304,7 @@ class ControlPanel(tk.Frame):
     # Create input indicators
     self.create_state_indicator(input_status_frame, "Left Actuator", self.input_label_states["left_lever"])
     self.create_state_indicator(input_status_frame, "Right Actuator", self.input_label_states["right_lever"])
+    self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["nose_poke"])
 
     # Test Status section
     test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -423,6 +425,7 @@ class ControlPanel(tk.Frame):
     """
     self.input_label_states["left_lever"].set(self.input_states["left_lever"])
     self.input_label_states["right_lever"].set(self.input_states["right_lever"])
+    self.input_label_states["nose_poke"].set(self.input_states["nose_poke"])
 
   def update_test_state(self, command_name, state):
       """

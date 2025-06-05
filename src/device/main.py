@@ -230,8 +230,6 @@ class Device:
     running_input_test_start_time = time.time()
     while running_input_test:
       input_state = self.io.get_input_states()
-      log(f"IR input state: {input_state['nose_poke']}", "info")
-      message_queue.put({"type": "device_log", "data": {"message": f"IR input state: {input_state['nose_poke']}", "state": "info"}})
       if input_state["nose_poke"] == False:
         running_input_test = False
 

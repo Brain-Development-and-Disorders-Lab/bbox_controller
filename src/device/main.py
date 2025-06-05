@@ -77,25 +77,19 @@ class Device:
       "water_port": False,
     }
 
-    # Experiment
-    self._current_experiment = None
-    self._experiment_log_queue = None
-    self._experiment_io_queue = None
-
-    # Start experiment message listener thread
-    self._experiment_message_thread = None
-    self._experiment_message_running = False
-
     # Initialize pygame in the new process
     pygame.init()
 
     # Setup screen
     screen_info = pygame.display.Info()
-    screen = pygame.display.set_mode(
+    self.screen = pygame.display.set_mode(
       (screen_info.current_w, screen_info.current_h),
       pygame.FULLSCREEN
     )
-    screen.fill((0, 0, 0))
+    self.screen.fill((0, 0, 0))
+    self.width = screen_info.current_w
+    self.height = screen_info.current_h
+    self.font = pygame.font.SysFont("Arial", 64)
 
     # Setup trials
     self._current_trial = None
@@ -106,14 +100,141 @@ class Device:
       Interval(),
       Stage3(),
     ]
-    font = pygame.font.SysFont("Arial", 64)
     for trial in self._trials:
-      trial.screen = screen
-      trial.font = font
-      trial.width = screen_info.current_w
-      trial.height = screen_info.current_h
+      trial.screen = self.screen
+      trial.font = self.font
+      trial.width = self.width
+      trial.height = self.height
       trial.io = self._io
       trial.display = self._display
+
+    # Experiment state
+    self._experiment_started = False
+    self._running = True
+
+  def _render_waiting_screen(self):
+    """Render the waiting screen with 'Waiting for start...' text"""
+    self.screen.fill((0, 0, 0))  # Black background
+    text = self.font.render("Waiting for start...", True, (255, 255, 255))
+    text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
+    self.screen.blit(text, text_rect)
+    pygame.display.flip()
+
+  def update(self):
+    """Update device state and handle events"""
+    events = pygame.event.get()
+
+    # Handle quit event
+    for event in events:
+      if event.type == pygame.QUIT:
+        self._running = False
+        return False
+      elif event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_ESCAPE:
+          self._running = False
+          return False
+
+    if not self._experiment_started:
+      # Show waiting screen
+      self._render_waiting_screen()
+    elif self._current_trial:
+      # Update and render current trial
+      if not self._current_trial.update(events):
+        # Trial is complete, move to next trial
+        self._current_trial.on_exit()
+
+        # Save trial data
+        trial_data = self._current_trial.get_data()
+        if trial_data and self._data:
+          self._data.add_trial_data(self._current_trial.title, trial_data)
+
+        log("Finished trial: " + self._current_trial.title, "info")
+
+        # Send message about trial completion
+        _device_message_queue.put({
+          "type": "trial_complete",
+          "data": {
+            "trial": self._current_trial.title,
+            "data": trial_data
+          }
+        })
+
+        if len(self._trials) > 0:
+          self._current_trial = self._trials.pop(0)
+          self._current_trial.on_enter()
+
+          # Send message about new trial starting
+          _device_message_queue.put({
+            "type": "trial_start",
+            "data": {
+              "trial": self._current_trial.title
+            }
+          })
+        else:
+          self._experiment_started = False
+          self._current_trial = None
+
+          # Send message that task is complete
+          _device_message_queue.put({
+            "type": "task_status",
+            "data": {
+              "status": "completed"
+            }
+          })
+
+      # Render current trial
+      self._current_trial.render()
+      pygame.display.flip()
+
+    return True
+
+  def start_experiment(self, animal_id):
+    """Start the experiment with the given animal ID"""
+    if self._experiment_started:
+      log("Experiment already running", "warning")
+      return
+
+    # Initialize data controller with animal ID
+    self._data = DataController(animal_id)
+
+    # Load config
+    with open("config.json") as config_file:
+      variables = json.load(config_file)["task"]
+      self._data.add_task_data({"config": variables})
+
+    # Start first trial
+    self._current_trial = self._trials.pop(0)
+    self._current_trial.on_enter()
+    self._experiment_started = True
+
+    # Send initial message that task has started
+    _device_message_queue.put({
+      "type": "task_status",
+      "data": {
+        "status": "started",
+        "trial": self._current_trial.title
+      }
+    })
+
+    log("Experiment started", "info")
+
+  def stop_experiment(self):
+    """Stop the current experiment"""
+    if not self._experiment_started:
+      log("No experiment running", "warning")
+      return
+
+    self._experiment_started = False
+    self._current_trial = None
+
+    # Save data if available
+    if self._data:
+      if not self._data.save():
+        log("Failed to save data", "error")
+      else:
+        log("Data saved", "success")
+
+    log("Experiment stopped", "info")
 
   async def _test_water_delivery(self):
     try:
@@ -265,10 +386,6 @@ class Device:
     primary_command = command.split(" ")[0]
     arguments = command.split(" ")[1:]
 
-    if self._current_experiment and self._current_experiment.process.is_alive():
-      log("Experiment already running", "warning")
-      return
-
     if primary_command == "start_experiment":
       # Initialize data controller
       self._data = DataController(arguments[0])
@@ -394,39 +511,69 @@ async def send_state_message(websocket):
       log("Control panel connection closed", "warning")
       break
 
-async def handle_message(websocket):
-  """
-  Handles incoming messages from the WebSocket connection.
-  """
-  # Log new connection
-  log("Control panel connected", "info")
-
-  # Start the periodic message sending in the background
-  asyncio.create_task(send_queued_messages(websocket))
-  asyncio.create_task(send_state_message(websocket))
+async def handle_connection(websocket, device: Device):
+  """Handle a single websocket connection"""
   try:
+    # Start message sender task
+    sender_task = asyncio.create_task(send_queued_messages(websocket))
+
+    # Handle incoming messages
     async for message in websocket:
-      log(f"Received message: {message}", "info")
+      try:
+        command = message.strip()
 
-      # Parse the message
-      primary_command = message.split(" ")[0]
+        # Handle the command
+        if command in TEST_COMMANDS:
+          device.run_test(command)
+        elif command.startswith("start_experiment"):
+          # Extract animal_id from command string
+          parts = command.split(" ")
+          animal_id = parts[1] if len(parts) > 1 else ""
+          if animal_id:
+            device.start_experiment(animal_id)
+          else:
+            log("Missing animal ID for start_experiment command", "error")
+        elif command == "stop_experiment":
+          device.stop_experiment()
+        else:
+          log(f"Unknown command: {command}", "error")
+      except Exception as e:
+        log(f"Error handling message: {str(e)}", "error")
 
-      if primary_command in TEST_COMMANDS:
-        _device.run_test(message)
-      elif primary_command in EXPERIMENT_COMMANDS:
-        _device.run_experiment(message)
-      else:
-        log(f"Unknown command: {message}", "error")
+    # Cleanup sender task
+    sender_task.cancel()
+    try:
+      await sender_task
+    except asyncio.CancelledError:
+      pass
   except websockets.exceptions.ConnectionClosed:
-    log("Control panel connection closed during message handling", "warning")
+    pass
 
-async def listen():
-  """
-  Listens for WebSocket connections and handles incoming messages.
-  """
-  async with websockets.serve(handle_message, HOST, PORT):
-    log(f"Listening on port {PORT}", "success")
-    await asyncio.Future()
+async def main_loop(device):
+  """Main loop that runs both pygame and websocket communication"""
+  log("Starting main loop", "info")
+
+  # Create websocket server
+  async with websockets.serve(
+    lambda ws: handle_connection(ws, device),
+    HOST,
+    PORT
+  ):
+    # Main loop
+    while device._running:
+      # Update device state
+      if not device.update():
+        break
+
+      # Process websocket messages
+      await asyncio.sleep(0)  # Allow other tasks to run
+
+      # Cap frame rate
+      await asyncio.sleep(1/60)  # ~60 FPS
+
+  # Cleanup
+  pygame.quit()
+  log("Main loop stopped", "info")
 
 def main():
   global _device, _device_message_queue
@@ -438,9 +585,8 @@ def main():
   # Set the message queue in the logging module
   set_message_queue(_device_message_queue)
 
-  # Start the listener
-  log("Starting listener...", "start")
-  asyncio.run(listen())
+  # Run the main loop
+  asyncio.run(main_loop(_device))
 
 if __name__ == "__main__":
   main()

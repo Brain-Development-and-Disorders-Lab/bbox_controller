@@ -43,8 +43,8 @@ _device_message_queue = None
 class Device:
   def __init__(self):
     # Initialize controllers
-    self._io = IOController()
-    self._display = DisplayController()
+    self.io = IOController()
+    self.display = DisplayController()
     self._data = None
 
     # Setup display state
@@ -105,12 +105,13 @@ class Device:
       trial.font = self.font
       trial.width = self.width
       trial.height = self.height
-      trial.io = self._io
-      trial.display = self._display
+      trial.io = self.io
+      trial.display = self.display
 
     # Experiment state
     self._experiment_started = False
     self._running = True
+    self._websocket_server = None  # Store reference to websocket server
 
   def _render_waiting_screen(self):
     """Render the waiting screen with 'Waiting for start...' text"""
@@ -224,6 +225,7 @@ class Device:
       log("No experiment running", "warning")
       return
 
+    # Stop the current experiment
     self._experiment_started = False
     self._current_trial = None
 
@@ -234,13 +236,21 @@ class Device:
       else:
         log("Data saved", "success")
 
+    # Send message that experiment has stopped
+    _device_message_queue.put({
+      "type": "task_status",
+      "data": {
+        "status": "stopped"
+      }
+    })
+
     log("Experiment stopped", "info")
 
   async def _test_water_delivery(self):
     try:
-      self._io.set_water_port(True)
+      self.io.set_water_port(True)
       await asyncio.sleep(2) # Non-blocking sleep
-      self._io.set_water_port(False)
+      self.io.set_water_port(False)
     except Exception as e:
       self._test_state["test_water_delivery"]["state"] = TEST_STATES["FAILED"]
       _device_message_queue.put({"type": "test_state", "data": self._test_state})
@@ -263,7 +273,7 @@ class Device:
     running_input_test = True
     running_input_test_start_time = time.time()
     while running_input_test:
-      input_state = self._io.get_input_states()
+      input_state = self.io.get_input_states()
       if input_state["left_lever"] == True:
         running_input_test = False
 
@@ -288,7 +298,7 @@ class Device:
     log("Testing right actuator", "start")
     log("Waiting for right actuator input...", "info")
     while running_input_test:
-      input_state = self._io.get_input_states()
+      input_state = self.io.get_input_states()
       if input_state["right_lever"] == True:
         running_input_test = False
 
@@ -318,7 +328,7 @@ class Device:
     self._test_state["test_actuators"]["state"] = TEST_STATES["RUNNING"]
 
     # Step 1: Test that both actuators default to 0.0
-    input_state = self._io.get_input_states()
+    input_state = self.io.get_input_states()
     if input_state["left_lever"] != False:
       self._test_state["test_actuators"]["state"] = TEST_STATES["FAILED"]
       _device_message_queue.put({"type": "test_state", "data": self._test_state})
@@ -343,7 +353,7 @@ class Device:
     running_input_test = True
     running_input_test_start_time = time.time()
     while running_input_test:
-      input_state = self._io.get_input_states()
+      input_state = self.io.get_input_states()
       if input_state["nose_poke"] == False:
         running_input_test = False
 
@@ -471,18 +481,20 @@ class Device:
 
         pygame.quit()
 
-  def stop_experiment(self):
-    """Stop the current experiment"""
-    if self.current_experiment:
-      self.current_experiment.stop()
-      self.current_experiment = None
+  def cleanup(self):
+    """Clean up resources before shutdown"""
+    # Stop any running experiment
+    if self._experiment_started:
+      self.stop_experiment()
 
-      # Stop the message listener and cleanup
-      self._stop_experiment_message_listener()
-      self.experiment_log_queue = None
-      self.experiment_io_queue = None
+    # Close pygame
+    pygame.quit()
 
-      log("Stopped current experiment", "info")
+    # Clean up controllers
+    if hasattr(self, 'io'):
+      del self.io
+    if hasattr(self, 'display'):
+      del self.display
 
 async def send_queued_messages(websocket):
   """
@@ -543,50 +555,98 @@ async def handle_connection(websocket, device: Device):
     # Cleanup sender task
     sender_task.cancel()
     try:
-      await sender_task
-    except asyncio.CancelledError:
+      await asyncio.wait_for(sender_task, timeout=1.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
       pass
   except websockets.exceptions.ConnectionClosed:
     pass
+  finally:
+    await websocket.close()
 
 async def main_loop(device):
   """Main loop that runs both pygame and websocket communication"""
   log("Starting main loop", "info")
 
   # Create websocket server
-  async with websockets.serve(
+  server = await websockets.serve(
     lambda ws: handle_connection(ws, device),
     HOST,
     PORT
-  ):
+  )
+  device._websocket_server = server
+
+  try:
     # Main loop
     while device._running:
       # Update device state
       if not device.update():
+        log("Initiating shutdown...", "info")
         break
 
       # Process websocket messages
       await asyncio.sleep(0)  # Allow other tasks to run
+      await asyncio.sleep(1/60)
+  finally:
+    if device._data:
+      log("Saving data before shutdown...", "info")
+      try:
+        if device._data.save():
+          log("Data saved successfully", "success")
+        else:
+          log("Failed to save data", "error")
+      except Exception as e:
+        log(f"Error while saving data: {str(e)}", "error")
 
-      # Cap frame rate
-      await asyncio.sleep(1/60)  # ~60 FPS
+    # Cleanup
+    if device._websocket_server:
+      active_connections = list(device._websocket_server.websockets)
+      if active_connections:
+        for websocket in active_connections:
+          try:
+            await asyncio.wait_for(websocket.close(), timeout=0.5)
+          except (asyncio.TimeoutError, Exception) as e:
+            log(f"Error closing connection, connection may already be closed", "warning")
 
-  # Cleanup
-  pygame.quit()
-  log("Main loop stopped", "info")
+      # Close the server immediately
+      device._websocket_server.close()
+
+    # Cancel any remaining tasks
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if tasks:
+      log(f"Cancelling {len(tasks)} remaining tasks...", "info")
+      for task in tasks:
+        task.cancel()
+        try:
+          await asyncio.wait_for(task, timeout=0.5)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+          pass
+
+    device.cleanup()
+    log("Main loop stopped", "info")
 
 def main():
   global _device, _device_message_queue
 
-  # Initialize the device
-  _device = Device()
-  _device_message_queue = queue.Queue()
+  try:
+    # Initialize the device
+    _device = Device()
+    _device_message_queue = queue.Queue()
 
-  # Set the message queue in the logging module
-  set_message_queue(_device_message_queue)
+    # Set the message queue in the logging module
+    set_message_queue(_device_message_queue)
 
-  # Run the main loop
-  asyncio.run(main_loop(_device))
+    # Run the main loop
+    asyncio.run(main_loop(_device))
+  except KeyboardInterrupt:
+    log("Keyboard interrupt received", "info")
+  except asyncio.TimeoutError:
+    log("Main loop timed out", "error")
+  except Exception as e:
+    log(f"Error in main loop: {str(e)}", "error")
+  finally:
+    # Ensure cleanup happens even if there's an error
+    if _device:
+      _device.cleanup()
 
 if __name__ == "__main__":
   main()

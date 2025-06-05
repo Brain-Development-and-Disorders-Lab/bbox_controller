@@ -31,7 +31,7 @@ class IOController:
 
         # Setup water port and nose light outputs
         self.water_port = DigitalOutputDevice(self.PIN_WATER, initial_value=False)
-        self.nose_light = DigitalOutputDevice(self.PIN_NOSE_LIGHT, initial_value=False)
+        # self.nose_light = DigitalOutputDevice(self.PIN_NOSE_LIGHT, initial_value=False)
 
         self._simulated_inputs = False
         print("GPIO inputs and outputs initialized successfully")
@@ -65,7 +65,7 @@ class IOController:
         "left_lever": self.lever_left.is_pressed,
         "nose_poke": self.nose_poke.is_pressed,
         "water_port": self.water_port.value,
-        "nose_light": self.nose_light.value  # Include nose light state in input states
+        # "nose_light": self.nose_light.value
       }
     else:
       return self._simulated_states

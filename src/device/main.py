@@ -37,7 +37,7 @@ TEST_STATES = {
 # Variables
 HOST = ""  # Listen on all available interfaces
 PORT = 8765
-INPUT_TEST_TIMEOUT = 10 # seconds
+INPUT_TEST_TIMEOUT = 1000 # seconds
 
 # Create a global message queue
 message_queue = queue.Queue()

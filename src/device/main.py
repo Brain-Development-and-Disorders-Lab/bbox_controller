@@ -526,8 +526,9 @@ async def send_state_message(websocket):
 async def handle_connection(websocket, device: Device):
   """Handle a single websocket connection"""
   try:
-    # Start message sender task
-    sender_task = asyncio.create_task(send_queued_messages(websocket))
+    # Start message sender tasks
+    message_sender_task = asyncio.create_task(send_queued_messages(websocket))
+    state_sender_task = asyncio.create_task(send_state_message(websocket))
 
     # Handle incoming messages
     async for message in websocket:
@@ -552,10 +553,11 @@ async def handle_connection(websocket, device: Device):
       except Exception as e:
         log(f"Error handling message: {str(e)}", "error")
 
-    # Cleanup sender task
-    sender_task.cancel()
+    # Cleanup sender tasks
+    message_sender_task.cancel()
+    state_sender_task.cancel()
     try:
-      await asyncio.wait_for(sender_task, timeout=1.0)
+      await asyncio.wait_for(asyncio.gather(message_sender_task, state_sender_task), timeout=1.0)
     except (asyncio.CancelledError, asyncio.TimeoutError):
       pass
   except websockets.exceptions.ConnectionClosed:

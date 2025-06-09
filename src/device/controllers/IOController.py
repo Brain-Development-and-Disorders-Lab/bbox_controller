@@ -84,6 +84,21 @@ class IOController:
     else:
       self._simulated_states["nose_light"] = state
 
+  def simulate_left_lever(self, state):
+    """Simulate left lever press/release"""
+    if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
+      self._simulated_states["left_lever"] = state
+
+  def simulate_right_lever(self, state):
+    """Simulate right lever press/release"""
+    if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
+      self._simulated_states["right_lever"] = state
+
+  def simulate_nose_poke(self, state):
+    """Simulate nose poke entry/exit"""
+    if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
+      self._simulated_states["nose_poke"] = state
+
   def __del__(self):
     """Cleanup GPIO on object destruction"""
     if not SIMULATION_MODE and not hasattr(self, "_simulated_inputs"):

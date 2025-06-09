@@ -5,11 +5,11 @@ import websockets
 import json
 import queue
 import pygame
-from controllers.IOController import IOController
-from controllers.DisplayController import DisplayController
-from controllers.DataController import DataController
-from trials import Interval, Stage1, Stage2, Stage3
-from logger import log, set_message_queue
+from device.controllers.IOController import IOController
+from device.controllers.DisplayController import DisplayController
+from device.controllers.DataController import DataController
+from device.trials import Interval, Stage1, Stage2, Stage3
+from device.logger import log, set_message_queue
 
 # Test commands
 TEST_COMMANDS = [
@@ -116,9 +116,61 @@ class Device:
   def _render_waiting_screen(self):
     """Render the waiting screen with 'Waiting for start...' text"""
     self.screen.fill((0, 0, 0))  # Black background
+
+    # Main waiting text
     text = self.font.render("Waiting for start...", True, (255, 255, 255))
     text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
     self.screen.blit(text, text_rect)
+
+    # Show simulation controls if in simulation mode
+    if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
+      # Create a smaller font for simulation controls
+      sim_font = pygame.font.SysFont("Arial", 32)
+
+      # Simulation controls text
+      controls_text = [
+        "Simulation Controls:",
+        "1 - Left Lever (press/hold)",
+        "2 - Right Lever (press/hold)",
+        "3 - Nose Poke (press/hold)",
+        "Space - Nose Poke (press/hold)",
+        "ESC - Exit"
+      ]
+
+      # Render each line
+      for i, line in enumerate(controls_text):
+        color = (255, 255, 0) if i == 0 else (200, 200, 200)  # Yellow for header, gray for controls
+        line_surface = sim_font.render(line, True, color)
+        line_rect = line_surface.get_rect(
+          center=(self.width // 2, self.height // 2 + 100 + i * 40)
+        )
+        self.screen.blit(line_surface, line_rect)
+
+      # Show current input states
+      input_states = self.io.get_input_states()
+      state_text = [
+        "Current States:",
+        f"Left Lever: {'PRESSED' if input_states['left_lever'] else 'RELEASED'}",
+        f"Right Lever: {'PRESSED' if input_states['right_lever'] else 'RELEASED'}",
+        f"Nose Poke: {'ACTIVE' if input_states['nose_poke'] else 'INACTIVE'}",
+        f"Water Port: {'ON' if input_states['water_port'] else 'OFF'}"
+      ]
+
+      # Render state text
+      for i, line in enumerate(state_text):
+        if i == 0:
+          color = (0, 255, 255)  # Cyan for header
+        elif 'PRESSED' in line or 'ACTIVE' in line or 'ON' in line:
+          color = (0, 255, 0)  # Green for active states
+        else:
+          color = (255, 100, 100)  # Red for inactive states
+
+        line_surface = sim_font.render(line, True, color)
+        line_rect = line_surface.get_rect(
+          center=(self.width // 2, self.height // 2 + 350 + i * 35)
+        )
+        self.screen.blit(line_surface, line_rect)
+
     pygame.display.flip()
 
   def update(self):
@@ -134,6 +186,27 @@ class Device:
         if event.key == pygame.K_ESCAPE:
           self._running = False
           return False
+        # Simulation mode controls
+        elif hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
+          if event.key == pygame.K_1:  # Left lever press
+            self.io.simulate_left_lever(True)
+          elif event.key == pygame.K_2:  # Right lever press
+            self.io.simulate_right_lever(True)
+          elif event.key == pygame.K_3:  # Nose poke entry
+            self.io.simulate_nose_poke(True)
+          elif event.key == pygame.K_SPACE:  # Nose poke entry (existing)
+            self.io.simulate_nose_poke(True)
+      elif event.type == pygame.KEYUP:
+        # Simulation mode controls - release
+        if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
+          if event.key == pygame.K_1:  # Left lever release
+            self.io.simulate_left_lever(False)
+          elif event.key == pygame.K_2:  # Right lever release
+            self.io.simulate_right_lever(False)
+          elif event.key == pygame.K_3:  # Nose poke exit
+            self.io.simulate_nose_poke(False)
+          elif event.key == pygame.K_SPACE:  # Nose poke exit (existing)
+            self.io.simulate_nose_poke(False)
 
     if not self._experiment_started:
       # Show waiting screen

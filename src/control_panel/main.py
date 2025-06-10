@@ -44,6 +44,7 @@ TEST_COMMANDS = [
   "test_water_delivery",
   "test_actuators",
   "test_ir",
+  "test_nose_light",
 ]
 
 # Experiment commands
@@ -87,6 +88,9 @@ class ControlPanel(tk.Frame):
         "test_ir": {
           "state": TEST_STATES["NOT_TESTED"],
         },
+        "test_nose_light": {
+          "state": TEST_STATES["NOT_TESTED"],
+        },
       }
 
       self.input_states = {
@@ -94,12 +98,14 @@ class ControlPanel(tk.Frame):
         "right_lever": False,
         "nose_poke": False,
         "water_port": False,
+        "nose_light": False,
       }
 
       self.input_label_states = {
         "left_lever": tk.BooleanVar(self.master, False),
         "right_lever": tk.BooleanVar(self.master, False),
         "nose_poke": tk.BooleanVar(self.master, False),
+        "nose_light": tk.BooleanVar(self.master, False),
       }
 
       # Configure source-specific colors
@@ -305,6 +311,7 @@ class ControlPanel(tk.Frame):
     self.create_state_indicator(input_status_frame, "Left Actuator", self.input_label_states["left_lever"])
     self.create_state_indicator(input_status_frame, "Right Actuator", self.input_label_states["right_lever"])
     self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["nose_poke"])
+    self.create_state_indicator(input_status_frame, "Nose Light", self.input_label_states["nose_light"])
 
     # Test Status section
     test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -314,6 +321,7 @@ class ControlPanel(tk.Frame):
     self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery")
     self.create_test_row(test_status_frame, "Test Actuators", "test_actuators")
     self.create_test_row(test_status_frame, "Test IR", "test_ir")
+    self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light")
 
     # Reset button
     self.reset_tests_button = tk.Button(
@@ -377,6 +385,7 @@ class ControlPanel(tk.Frame):
     self.test_water_delivery_button = self.test_indicators["test_water_delivery"]["button"]
     self.test_actuators_button = self.test_indicators["test_actuators"]["button"]
     self.test_ir_button = self.test_indicators["test_ir"]["button"]
+    self.test_nose_light_button = self.test_indicators["test_nose_light"]["button"]
 
   def log(self, message, state="info", source="UI"):
     """
@@ -426,6 +435,7 @@ class ControlPanel(tk.Frame):
     self.input_label_states["left_lever"].set(self.input_states["left_lever"])
     self.input_label_states["right_lever"].set(self.input_states["right_lever"])
     self.input_label_states["nose_poke"].set(self.input_states["nose_poke"])
+    self.input_label_states["nose_light"].set(self.input_states["nose_light"])
 
   def update_test_state(self, command_name, state):
       """
@@ -458,11 +468,13 @@ class ControlPanel(tk.Frame):
       self.test_ir_button.config(state=tk.DISABLED)
       self.test_actuators_button.config(state=tk.DISABLED)
       self.test_water_delivery_button.config(state=tk.DISABLED)
+      self.test_nose_light_button.config(state=tk.DISABLED)
     else:
       # Enable test buttons
       self.test_ir_button.config(state=tk.NORMAL)
       self.test_actuators_button.config(state=tk.NORMAL)
       self.test_water_delivery_button.config(state=tk.NORMAL)
+      self.test_nose_light_button.config(state=tk.NORMAL)
 
   def set_experiment_buttons_disabled(self, disabled):
     """
@@ -517,6 +529,7 @@ class ControlPanel(tk.Frame):
     self.test_water_delivery_button.config(state=tk.NORMAL)
     self.test_actuators_button.config(state=tk.NORMAL)
     self.test_ir_button.config(state=tk.NORMAL)
+    self.test_nose_light_button.config(state=tk.NORMAL)
     self.reset_tests_button.config(state=tk.NORMAL)  # Enable reset button
 
     # Animal ID input
@@ -542,6 +555,7 @@ class ControlPanel(tk.Frame):
     self.test_water_delivery_button.config(state=tk.DISABLED)
     self.test_actuators_button.config(state=tk.DISABLED)
     self.test_ir_button.config(state=tk.DISABLED)
+    self.test_nose_light_button.config(state=tk.DISABLED)
     self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
 
     # Animal ID input
@@ -714,6 +728,9 @@ class ControlPanel(tk.Frame):
       "test_ir": {
         "state": TEST_STATES["NOT_TESTED"],
       },
+      "test_nose_light": {
+        "state": TEST_STATES["NOT_TESTED"],
+      },
     }
 
     # Reset the status icons
@@ -733,6 +750,7 @@ class ControlPanel(tk.Frame):
       "right_lever": False,
       "nose_poke": False,
       "water_port": False,
+      "nose_light": False,
     }
 
     self.reset_tests()

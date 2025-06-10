@@ -16,6 +16,7 @@ TEST_COMMANDS = [
   "test_water_delivery",
   "test_actuators",
   "test_ir",
+  "test_nose_light",
 ]
 
 # Experiment commands
@@ -68,6 +69,9 @@ class Device:
       "test_ir": {
         "state": TEST_STATES["NOT_TESTED"],
       },
+      "test_nose_light": {
+        "state": TEST_STATES["NOT_TESTED"],
+      },
     }
 
     self._input_states = {
@@ -75,6 +79,7 @@ class Device:
       "right_lever": False,
       "nose_poke": False,
       "water_port": False,
+      "nose_light": False,
     }
 
     # Initialize pygame in the new process
@@ -448,6 +453,27 @@ class Device:
     ir_test_thread = threading.Thread(target=self._test_ir)
     ir_test_thread.start()
 
+  async def _test_nose_light(self):
+    try:
+      # Turn on the nose light
+      self.io.set_nose_light(True)
+      await asyncio.sleep(2)  # Keep it on for 2 seconds
+      self.io.set_nose_light(False)
+    except Exception as e:
+      self._test_state["test_nose_light"]["state"] = TEST_STATES["FAILED"]
+      _device_message_queue.put({"type": "test_state", "data": self._test_state})
+      log(f"Could not control nose light: {str(e)}", "error")
+
+    if self._test_state["test_nose_light"]["state"] == TEST_STATES["RUNNING"]:
+      self._test_state["test_nose_light"]["state"] = TEST_STATES["PASSED"]
+      _device_message_queue.put({"type": "test_state", "data": self._test_state})
+      log("Nose light test passed", "success")
+
+  def test_nose_light(self):
+    log("Testing nose light", "start")
+    self._test_state["test_nose_light"]["state"] = TEST_STATES["RUNNING"]
+    asyncio.create_task(self._test_nose_light())
+
   def run_test(self, command):
     if command == "test_water_delivery":
       self.test_water_delivery()
@@ -455,6 +481,8 @@ class Device:
       self.test_actuators()
     elif command == "test_ir":
       self.test_ir()
+    elif command == "test_nose_light":
+      self.test_nose_light()
 
   def run_experiment(self, command):
     primary_command = command.split(" ")[0]

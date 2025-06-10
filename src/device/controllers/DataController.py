@@ -5,7 +5,6 @@ Handles data storage for the experiment
 import json
 import os
 from datetime import datetime
-from util import log
 
 class DataController:
   def __init__(self, animal_id):
@@ -50,7 +49,7 @@ class DataController:
     data["timestamp"] = datetime.now().isoformat()
     self.data["task"].update(data)
 
-  def save(self):
+  def save(self) -> bool:
     """Save the current data to file"""
     try:
       # Update end time
@@ -60,6 +59,6 @@ class DataController:
       with open(self.filename, "w") as f:
         json.dump(self.data, f, indent=2)
 
-      log(f"Data saved to {self.filename}", "success")
+      return True
     except Exception as e:
-      log(f"Failed to save data: {str(e)}", "error")
+      return False

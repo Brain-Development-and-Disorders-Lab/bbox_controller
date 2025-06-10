@@ -225,21 +225,20 @@ class Stage1(Base):
           self.add_data("trial_canceled", True)
           return False
 
-    # Handle IO events (works for both real hardware and simulation)
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
+    log("Nose port state: " + str(current_nose_state) + " | Nose port entry: " + str(self.nose_port_entry) + " | Nose port exit: " + str(self.nose_port_exit), "info")
 
-    # Detect nose port entry
-    if current_nose_state and not self.nose_port_entry:
+    if not current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry
       self.nose_port_entry = True
       self.events.append({
         "type": "nose_port_entry",
         "timestamp": pygame.time.get_ticks()
       })
       log("Nose port entry detected", "info")
-
-    # Detect nose port exit (only after water delivery is complete)
-    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit and self.water_delivery_complete:
+    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit
       self.nose_port_exit = True
       self.events.append({
         "type": "nose_port_exit",

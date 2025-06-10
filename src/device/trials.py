@@ -227,7 +227,6 @@ class Stage1(Base):
 
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
-    log("Nose port state: " + str(current_nose_state) + " | Nose port entry: " + str(self.nose_port_entry) + " | Nose port exit: " + str(self.nose_port_exit), "info")
 
     if not current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
@@ -374,8 +373,8 @@ class Stage2(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    # Detect nose port entry
-    if current_nose_state and not self.nose_port_entry:
+    if not current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry
       self.nose_port_entry = True
       self.reward_triggered = True
       self.events.append({
@@ -383,9 +382,8 @@ class Stage2(Base):
         "timestamp": current_time
       })
       log("Nose port entry", "info")
-
-    # Detect nose port exit (only after reward)
-    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit and self.reward_triggered:
+    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit
       self.nose_port_exit = True
       self.events.append({
         "type": "nose_port_exit",
@@ -578,8 +576,8 @@ class Stage3(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    # Detect nose port entry
-    if current_nose_state and not self.nose_port_entry:
+    if not current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry
       self.nose_port_entry = True
       self.cue_start_time = current_time
       self.events.append({
@@ -587,9 +585,8 @@ class Stage3(Base):
         "timestamp": current_time
       })
       log("Nose port entry", "info")
-
-    # Detect nose port exit (only after reward)
-    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit and self.reward_triggered:
+    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit
       self.nose_port_exit = True
       self.events.append({
         "type": "nose_port_exit",

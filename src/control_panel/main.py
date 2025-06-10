@@ -181,20 +181,21 @@ class ControlPanel(tk.Frame):
 
     return frame
 
-  def create_test_row(self, parent, label_text, command_name):
+  def create_test_row(self, parent, label_text, command_name, has_duration_input=False):
     """
-    Creates a test row with a label, indicator, and test button.
+    Creates a test row with a label, indicator, optional duration input, and test button.
 
     Parameters:
     parent: The parent widget
     label_text (str): The text to display
     command_name (str): The command to execute when the test button is clicked
+    has_duration_input (bool): Whether to include a duration input field
     """
     # Container frame for the entire row
     container_frame = tk.Frame(parent)
     container_frame.pack(side=tk.TOP, fill=tk.X, expand=True, pady=2)
 
-    # Colored background frame for label and indicator
+    # Colored background frame for label, optional duration input, and indicator
     colored_frame = tk.Frame(container_frame, bg="#f0f0f0", padx=5, pady=3)
     colored_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
     colored_frame.grid_columnconfigure(0, weight=1)  # Make the label column expandable
@@ -208,18 +209,39 @@ class ControlPanel(tk.Frame):
     )
     label.grid(row=0, column=0, sticky="w", padx=(0, 5))
 
+    # Duration input (if requested)
+    duration_var = None
+    if has_duration_input:
+      duration_frame = tk.Frame(colored_frame, bg="#f0f0f0")
+      duration_frame.grid(row=0, column=1, sticky="e", padx=(0, 5))
+
+      # Duration label and input
+      tk.Label(duration_frame, text="Duration (ms):", font="Arial 9", bg="#f0f0f0").pack(side=tk.LEFT, padx=(0, 2))
+      duration_var = tk.StringVar(value="2000")  # Default 2000ms
+      duration_entry = tk.Entry(duration_frame, textvariable=duration_var, width=6, font="Arial 9")
+      duration_entry.pack(side=tk.LEFT, padx=(0, 5))
+
     # State indicator (circle)
     indicator = tk.Canvas(colored_frame, width=15, height=15, bg="#f0f0f0", highlightthickness=0)
-    indicator.grid(row=0, column=1, sticky="e")
+    indicator.grid(row=0, column=2 if has_duration_input else 1, sticky="e")
 
     # Test button in the container frame
-    button = tk.Button(
-      container_frame,
-      text="Test",
-      font="Arial 10",
-      command=lambda: self.execute_command(command_name),
-      state=tk.DISABLED
-    )
+    if has_duration_input:
+      button = tk.Button(
+        container_frame,
+        text="Test",
+        font="Arial 10",
+        command=lambda: self.execute_command(f"{command_name} {duration_var.get()}"),
+        state=tk.DISABLED
+      )
+    else:
+      button = tk.Button(
+        container_frame,
+        text="Test",
+        font="Arial 10",
+        command=lambda: self.execute_command(command_name),
+        state=tk.DISABLED
+      )
     button.pack(side=tk.RIGHT, padx=(5, 0))
 
     # Function to update indicator
@@ -242,6 +264,10 @@ class ControlPanel(tk.Frame):
       "update": update_indicator,
       "button": button
     }
+
+    # Store duration input reference if it exists
+    if has_duration_input:
+      self.test_indicators[command_name]["duration_entry"] = duration_entry
 
     # Initial state
     update_indicator()
@@ -318,10 +344,10 @@ class ControlPanel(tk.Frame):
     test_status_frame.pack(side=tk.TOP, fill=tk.X)
 
     # Create test rows
-    self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery")
-    self.create_test_row(test_status_frame, "Test Actuators", "test_actuators")
-    self.create_test_row(test_status_frame, "Test IR", "test_ir")
-    self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light")
+    self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery", True)
+    self.create_test_row(test_status_frame, "Test Actuators", "test_actuators", False)
+    self.create_test_row(test_status_frame, "Test IR", "test_ir", False)
+    self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light", True)
 
     # Reset button
     self.reset_tests_button = tk.Button(
@@ -458,10 +484,10 @@ class ControlPanel(tk.Frame):
 
   def set_test_buttons_disabled(self, disabled):
     """
-    Disables or enables the test buttons.
+    Disables or enables the test buttons and duration inputs.
 
     Parameters:
-    disabled (bool): Whether to disable the test buttons.
+    disabled (bool): Whether to disable the test buttons and duration inputs.
     """
     # Disable test buttons
     if disabled:
@@ -469,12 +495,24 @@ class ControlPanel(tk.Frame):
       self.test_actuators_button.config(state=tk.DISABLED)
       self.test_water_delivery_button.config(state=tk.DISABLED)
       self.test_nose_light_button.config(state=tk.DISABLED)
+
+      # Disable duration inputs
+      if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
+        self.test_indicators["test_water_delivery"]["duration_entry"].config(state=tk.DISABLED)
+      if "test_nose_light" in self.test_indicators and "duration_entry" in self.test_indicators["test_nose_light"]:
+        self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.DISABLED)
     else:
       # Enable test buttons
       self.test_ir_button.config(state=tk.NORMAL)
       self.test_actuators_button.config(state=tk.NORMAL)
       self.test_water_delivery_button.config(state=tk.NORMAL)
       self.test_nose_light_button.config(state=tk.NORMAL)
+
+      # Enable duration inputs
+      if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
+        self.test_indicators["test_water_delivery"]["duration_entry"].config(state=tk.NORMAL)
+      if "test_nose_light" in self.test_indicators and "duration_entry" in self.test_indicators["test_nose_light"]:
+        self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.NORMAL)
 
   def set_experiment_buttons_disabled(self, disabled):
     """
@@ -660,7 +698,14 @@ class ControlPanel(tk.Frame):
     # Send the command to the device
     if primary_command in TEST_COMMANDS:
       self.send_command(command)
-      self.update_test_state(command, TEST_STATES["RUNNING"])
+      self.update_test_state(primary_command, TEST_STATES["RUNNING"])
+      self.set_test_buttons_disabled(True)
+    elif any(command.startswith(test_cmd) for test_cmd in TEST_COMMANDS):
+      # Handle test commands with parameters (e.g., "test_water_delivery 1500")
+      self.send_command(command)
+      # Extract the base command name for state tracking
+      base_command = command.split(" ")[0]
+      self.update_test_state(base_command, TEST_STATES["RUNNING"])
       self.set_test_buttons_disabled(True)
     elif primary_command in EXPERIMENT_COMMANDS:
       self.send_command(command)

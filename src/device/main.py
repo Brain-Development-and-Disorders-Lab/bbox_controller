@@ -315,10 +315,10 @@ class Device:
 
     log("Experiment stopped", "info")
 
-  async def _test_water_delivery(self):
+  async def _test_water_delivery(self, duration_ms=2000):
     try:
       self.io.set_water_port(True)
-      await asyncio.sleep(2) # Non-blocking sleep
+      await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
       self.io.set_water_port(False)
     except Exception as e:
       self._test_state["test_water_delivery"]["state"] = TEST_STATES["FAILED"]
@@ -328,12 +328,12 @@ class Device:
     if self._test_state["test_water_delivery"]["state"] == TEST_STATES["RUNNING"]:
       self._test_state["test_water_delivery"]["state"] = TEST_STATES["PASSED"]
       _device_message_queue.put({"type": "test_state", "data": self._test_state})
-      log("Test water delivery passed", "success")
+      log(f"Test water delivery passed (duration: {duration_ms}ms)", "success")
 
-  def test_water_delivery(self):
-    log("Testing water delivery", "start")
+  def test_water_delivery(self, duration_ms=2000):
+    log(f"Testing water delivery for {duration_ms}ms", "start")
     self._test_state["test_water_delivery"]["state"] = TEST_STATES["RUNNING"]
-    asyncio.create_task(self._test_water_delivery())
+    asyncio.create_task(self._test_water_delivery(duration_ms))
 
   def _test_actuators(self):
     # Step 2: Test that the left actuator can be moved to 1.0
@@ -453,11 +453,11 @@ class Device:
     ir_test_thread = threading.Thread(target=self._test_ir)
     ir_test_thread.start()
 
-  async def _test_nose_light(self):
+  async def _test_nose_light(self, duration_ms=2000):
     try:
       # Turn on the nose light
       self.io.set_nose_light(True)
-      await asyncio.sleep(2)  # Keep it on for 2 seconds
+      await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
       self.io.set_nose_light(False)
     except Exception as e:
       self._test_state["test_nose_light"]["state"] = TEST_STATES["FAILED"]
@@ -467,22 +467,44 @@ class Device:
     if self._test_state["test_nose_light"]["state"] == TEST_STATES["RUNNING"]:
       self._test_state["test_nose_light"]["state"] = TEST_STATES["PASSED"]
       _device_message_queue.put({"type": "test_state", "data": self._test_state})
-      log("Nose light test passed", "success")
+      log(f"Nose light test passed (duration: {duration_ms}ms)", "success")
 
-  def test_nose_light(self):
-    log("Testing nose light", "start")
+  def test_nose_light(self, duration_ms=2000):
+    log(f"Testing nose light for {duration_ms}ms", "start")
     self._test_state["test_nose_light"]["state"] = TEST_STATES["RUNNING"]
-    asyncio.create_task(self._test_nose_light())
+    asyncio.create_task(self._test_nose_light(duration_ms))
 
   def run_test(self, command):
     if command == "test_water_delivery":
       self.test_water_delivery()
+    elif command.startswith("test_water_delivery"):
+      # Parse duration from command: "test_water_delivery <duration_ms>"
+      parts = command.split(" ")
+      if len(parts) > 1:
+        try:
+          duration_ms = int(parts[1])
+          self.test_water_delivery(duration_ms)
+        except ValueError:
+          log(f"Invalid duration for water delivery test: {parts[1]}", "error")
+      else:
+        self.test_water_delivery()  # Use default duration
     elif command == "test_actuators":
       self.test_actuators()
     elif command == "test_ir":
       self.test_ir()
     elif command == "test_nose_light":
       self.test_nose_light()
+    elif command.startswith("test_nose_light"):
+      # Parse duration from command: "test_nose_light <duration_ms>"
+      parts = command.split(" ")
+      if len(parts) > 1:
+        try:
+          duration_ms = int(parts[1])
+          self.test_nose_light(duration_ms)
+        except ValueError:
+          log(f"Invalid duration for nose light test: {parts[1]}", "error")
+      else:
+        self.test_nose_light()  # Use default duration
 
   def run_experiment(self, command):
     primary_command = command.split(" ")[0]
@@ -588,6 +610,12 @@ class Device:
     if hasattr(self, 'display'):
       del self.display
 
+  def reset_test_state(self):
+    """Reset all test states to NOT_TESTED"""
+    for test_name in self._test_state:
+      self._test_state[test_name]["state"] = TEST_STATES["NOT_TESTED"]
+    log("Test states reset to NOT_TESTED", "info")
+
 async def send_queued_messages(websocket):
   """
   Sends messages from the message queue to the control panel.
@@ -630,6 +658,10 @@ async def handle_connection(websocket, device: Device):
         # Handle the command
         if command in TEST_COMMANDS:
           device.run_test(command)
+        elif command.startswith("test_water_delivery"):
+          device.run_test(command)
+        elif command.startswith("test_nose_light"):
+          device.run_test(command)
         elif command.startswith("start_experiment"):
           # Extract animal_id from command string
           parts = command.split(" ")
@@ -655,6 +687,8 @@ async def handle_connection(websocket, device: Device):
   except websockets.exceptions.ConnectionClosed:
     pass
   finally:
+    # Reset test state when control panel disconnects
+    device.reset_test_state()
     await websocket.close()
 
 async def main_loop(device):

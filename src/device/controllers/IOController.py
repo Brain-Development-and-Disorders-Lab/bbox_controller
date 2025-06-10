@@ -20,7 +20,7 @@ class IOController:
     self.PIN_LEVER_LEFT = 24
     self.PIN_NOSE_POKE = 17
     self.PIN_WATER = 25
-    self.PIN_NOSE_LIGHT = 27 # TODO: Change to what is setup in the hardware
+    self.PIN_NOSE_LIGHT = 27
 
     if not SIMULATION_MODE:
       try:
@@ -31,7 +31,7 @@ class IOController:
 
         # Setup water port and nose light outputs
         self.water_port = DigitalOutputDevice(self.PIN_WATER, initial_value=False)
-        # self.nose_light = DigitalOutputDevice(self.PIN_NOSE_LIGHT, initial_value=False)
+        self.nose_light = DigitalOutputDevice(self.PIN_NOSE_LIGHT, initial_value=False)
 
         self._simulated_inputs = False
         print("GPIO inputs and outputs initialized successfully")
@@ -65,7 +65,7 @@ class IOController:
         "left_lever": self.lever_left.is_pressed,
         "nose_poke": self.nose_poke.is_pressed,
         "water_port": self.water_port.value,
-        # "nose_light": self.nose_light.value
+        "nose_light": self.nose_light.value
       }
     else:
       return self._simulated_states
@@ -98,6 +98,11 @@ class IOController:
     """Simulate nose poke entry/exit"""
     if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
       self._simulated_states["nose_poke"] = state
+
+  def simulate_nose_light(self, state):
+    """Simulate nose light state"""
+    if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
+      self._simulated_states["nose_light"] = state
 
   def __del__(self):
     """Cleanup GPIO on object destruction"""

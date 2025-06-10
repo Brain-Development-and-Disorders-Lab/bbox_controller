@@ -84,6 +84,7 @@ class Base:
             "left_lever": False,
             "nose_poke": False,
             "water_port": False,
+            "nose_light": False,
         }
     return self.io.get_input_states()
 
@@ -465,7 +466,7 @@ class Stage2(Base):
   def _update_nose_port_light(self):
     # Update nose port light
     if not SIMULATION_MODE:
-      pass
+      self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen

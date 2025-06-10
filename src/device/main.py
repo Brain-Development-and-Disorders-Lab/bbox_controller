@@ -80,15 +80,28 @@ class Device:
     # Initialize pygame in the new process
     pygame.init()
 
-    # Setup screen
+    # Setup screen - use windowed mode in simulation to avoid minimization issues
     screen_info = pygame.display.Info()
+
+    # Use windowed mode if in simulation mode, fullscreen otherwise
+    is_simulation = hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs
+
+    if is_simulation:
+      # Use a reasonable window size for simulation
+      self.width = 800
+      self.height = 600
+      display_flags = 0
+    else:
+      # Use fullscreen for real hardware
+      self.width = screen_info.current_w
+      self.height = screen_info.current_h
+      display_flags = pygame.FULLSCREEN
+
     self.screen = pygame.display.set_mode(
-      (screen_info.current_w, screen_info.current_h),
-      pygame.FULLSCREEN
+      (self.width, self.height),
+      display_flags
     )
     self.screen.fill((0, 0, 0))
-    self.width = screen_info.current_w
-    self.height = screen_info.current_h
     self.font = pygame.font.SysFont("Arial", 64)
 
     # Setup trials
@@ -125,31 +138,11 @@ class Device:
     # Show simulation controls if in simulation mode
     if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
       # Create a smaller font for simulation controls
-      sim_font = pygame.font.SysFont("Arial", 32)
-
-      # Simulation controls text
-      controls_text = [
-        "Simulation Controls:",
-        "1 - Left Lever (press/hold)",
-        "2 - Right Lever (press/hold)",
-        "3 - Nose Poke (press/hold)",
-        "Space - Nose Poke (press/hold)",
-        "ESC - Exit"
-      ]
-
-      # Render each line
-      for i, line in enumerate(controls_text):
-        color = (255, 255, 0) if i == 0 else (200, 200, 200)  # Yellow for header, gray for controls
-        line_surface = sim_font.render(line, True, color)
-        line_rect = line_surface.get_rect(
-          center=(self.width // 2, self.height // 2 + 100 + i * 40)
-        )
-        self.screen.blit(line_surface, line_rect)
+      sim_font = pygame.font.SysFont("Arial", 20)
 
       # Show current input states
       input_states = self.io.get_input_states()
       state_text = [
-        "Current States:",
         f"Left Lever: {'PRESSED' if input_states['left_lever'] else 'RELEASED'}",
         f"Right Lever: {'PRESSED' if input_states['right_lever'] else 'RELEASED'}",
         f"Nose Poke: {'ACTIVE' if input_states['nose_poke'] else 'INACTIVE'}",
@@ -158,16 +151,14 @@ class Device:
 
       # Render state text
       for i, line in enumerate(state_text):
-        if i == 0:
-          color = (0, 255, 255)  # Cyan for header
-        elif 'PRESSED' in line or 'ACTIVE' in line or 'ON' in line:
+        if 'PRESSED' in line or 'ACTIVE' in line or 'ON' in line:
           color = (0, 255, 0)  # Green for active states
         else:
           color = (255, 100, 100)  # Red for inactive states
 
         line_surface = sim_font.render(line, True, color)
         line_rect = line_surface.get_rect(
-          center=(self.width // 2, self.height // 2 + 350 + i * 35)
+          center=(self.width // 2, self.height // 2 + 100 + i * 25)
         )
         self.screen.blit(line_surface, line_rect)
 

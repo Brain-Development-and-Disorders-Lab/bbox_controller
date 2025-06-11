@@ -131,6 +131,10 @@ class Device:
     self._running = True
     self._websocket_server = None  # Store reference to websocket server
 
+    # Experiment parameters (will be set when experiment starts)
+    self._punishment_duration = 1000
+    self._water_delivery_duration = 2000
+
   def _render_waiting_screen(self):
     """Render the waiting screen with 'Waiting for start...' text"""
     self.screen.fill((0, 0, 0))  # Black background
@@ -258,11 +262,18 @@ class Device:
 
     return True
 
-  def start_experiment(self, animal_id):
-    """Start the experiment with the given animal ID"""
+  def start_experiment(self, animal_id, punishment_duration=1000, water_delivery_duration=2000):
+    """Start the experiment with the given animal ID and duration parameters"""
     if self._experiment_started:
       log("Experiment already running", "warning")
       return
+
+    # Store the experiment parameters
+    self._punishment_duration = punishment_duration
+    self._water_delivery_duration = water_delivery_duration
+
+    # Log the parameters
+    log(f"Starting experiment with animal ID: {animal_id}, punishment duration: {punishment_duration}ms, water delivery duration: {water_delivery_duration}ms", "info")
 
     # Initialize data controller with animal ID
     self._data = DataController(animal_id)
@@ -511,89 +522,35 @@ class Device:
     arguments = command.split(" ")[1:]
 
     if primary_command == "start_experiment":
-      # Initialize data controller
-      self._data = DataController(arguments[0])
+      # Extract parameters from command string: "start_experiment <animal_id> <punishment_duration> <water_delivery_duration>"
+      animal_id = arguments[0] if len(arguments) > 0 else ""
 
-      # Load config
-      with open("config.json") as config_file:
-        variables = json.load(config_file)["task"]
-        self._data.add_task_data({"config": variables})
+      # Parse duration parameters with defaults
+      punishment_duration = 1000  # Default 1000ms
+      water_delivery_duration = 2000  # Default 2000ms
 
-      # Run first screen
-      self._current_trial = self._trials.pop(0)
-      self._current_trial.on_enter()
+      if len(arguments) > 1:
+        try:
+          punishment_duration = int(arguments[1])
+        except ValueError:
+          log(f"Invalid punishment duration: {arguments[1]}, using default 1000ms", "warning")
 
-      # Send initial message that task has started
-      _device_message_queue.put({
-        "type": "task_status",
-        "data": {
-          "status": "started",
-          "trial": self._current_trial.title
-        }
-      })
+      if len(arguments) > 2:
+        try:
+          water_delivery_duration = int(arguments[2])
+        except ValueError:
+          log(f"Invalid water delivery duration: {arguments[2]}, using default 2000ms", "warning")
 
-      running = True
-      try:
-        while running:
-          events = pygame.event.get()
+      if animal_id:
+        # Use the existing start_experiment method which properly integrates with the device flow
+        self.start_experiment(animal_id, punishment_duration, water_delivery_duration)
+      else:
+        log("Missing animal ID for start_experiment command", "error")
 
-          # Handle screen events
-          if not self._current_trial.update(events):
-            # Screen is complete, run next screen
-            self._current_trial.on_exit()
-
-            # Save screen data before moving to next screen
-            trial_data = self._current_trial.get_data()
-            if trial_data:
-              self._data.add_trial_data(self._current_trial.title, trial_data)
-
-            log("Finished trial: " + self._current_trial.title, "info")
-
-            # Send message about trial completion
-            _device_message_queue.put({
-              "type": "trial_complete",
-              "data": {
-                "trial": self._current_trial.title,
-                "data": trial_data
-              }
-            })
-
-            if len(self._trials) > 0:
-              self._current_trial = self._trials.pop(0)
-              self._current_trial.on_enter()
-
-              # Send message about new trial starting
-              _device_message_queue.put({
-                "type": "trial_start",
-                "data": {
-                  "trial": self._current_trial.title
-                }
-              })
-            else:
-              running = False
-              # Send message that task is complete
-              _device_message_queue.put({
-                "type": "task_status",
-                "data": {
-                  "status": "completed"
-                }
-              })
-
-          # Render
-          self._current_trial.render()
-          pygame.display.flip()
-
-          # Cap frame rate
-          pygame.time.wait(16)
-
-      finally:
-        log("Experiment finished", "info")
-        if not self._data.save():
-          log("Failed to save data", "error")
-        else:
-          log("Data saved", "success")
-
-        pygame.quit()
+    elif primary_command == "stop_experiment":
+      self.stop_experiment()
+    else:
+      log(f"Unknown command: {command}", "error")
 
   def cleanup(self):
     """Clean up resources before shutdown"""
@@ -663,13 +620,7 @@ async def handle_connection(websocket, device: Device):
         elif command.startswith("test_nose_light"):
           device.run_test(command)
         elif command.startswith("start_experiment"):
-          # Extract animal_id from command string
-          parts = command.split(" ")
-          animal_id = parts[1] if len(parts) > 1 else ""
-          if animal_id:
-            device.start_experiment(animal_id)
-          else:
-            log("Missing animal ID for start_experiment command", "error")
+          device.run_experiment(command)
         elif command == "stop_experiment":
           device.stop_experiment()
         else:

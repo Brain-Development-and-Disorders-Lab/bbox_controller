@@ -113,9 +113,9 @@ class Device:
     self._current_trial = None
     self._trials = [
       Stage1(),
-      Interval(),
+      Interval(iti_duration=1000),
       Stage2(),
-      Interval(),
+      Interval(iti_duration=1000),
       Stage3(),
     ]
     for trial in self._trials:

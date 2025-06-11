@@ -14,13 +14,17 @@ class Base:
   Base interface for all experiment trials.
   Each trial should implement update() and render() methods.
   """
-  def __init__(self):
+  def __init__(self, *args, **kwargs):
     # Screen properties
     self.screen = None
     self.width = None
     self.height = None
     self.font = None
     self.title = "base_screen"
+
+    # Arguments
+    self.args = args
+    self.kwargs = kwargs
 
     # Controllers
     self.io: IOController = None
@@ -93,11 +97,17 @@ class Interval(Base):
   Stage ITI: Inter-trial interval
   Description: After each trial, the mouse is given an ITI of variable duration.
   """
-  def __init__(self):
-    super().__init__()
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
     self.title = "trial_iti"
     self.start_time = None
-    self.iti_duration = 1000
+
+    # Duration
+    if "iti_duration" in self.kwargs:
+      self.iti_duration = self.kwargs["iti_duration"]
+    else:
+      log("No iti_duration provided, using default of 1000ms", "warning")
+      self.iti_duration = 1000
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()

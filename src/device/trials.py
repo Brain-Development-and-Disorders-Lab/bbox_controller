@@ -103,18 +103,19 @@ class Interval(Base):
     self.start_time = None
 
     # Duration
-    if "iti_duration" in self.kwargs:
-      self.iti_duration = self.kwargs["iti_duration"]
+    if "duration" in self.kwargs:
+      self.duration = self.kwargs["duration"]
+      log("Duration provided, using provided duration of " + str(self.duration) + "ms", "success")
     else:
-      log("No iti_duration provided, using default of 1000ms", "warning")
-      self.iti_duration = 1000
+      log("No duration provided, using default of 1000ms", "warning")
+      self.duration = 1000
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
 
   def update(self, events):
     # Check if the ITI duration has passed
-    if pygame.time.get_ticks() - self.start_time > self.iti_duration:
+    if pygame.time.get_ticks() - self.start_time > self.duration:
       self.add_data("trial_iti_completed", True)
       return False
 

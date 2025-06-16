@@ -5,6 +5,9 @@ import websockets
 import json
 import queue
 import pygame
+import random
+import numpy as np
+from typing import Optional
 from device.controllers.IOController import IOController
 from device.controllers.DisplayController import DisplayController
 from device.controllers.DataController import DataController
@@ -33,13 +36,76 @@ TEST_STATES = {
 }
 
 # Other variables
-HOST = ""  # Listen on all available interfaces
+HOST = ""
 PORT = 8765
-INPUT_TEST_TIMEOUT = 10 # seconds
+INPUT_TEST_TIMEOUT = 10 # Seconds
 
 # Create a global device and message queue
 _device = None
 _device_message_queue = None
+
+class Randomness:
+  """
+  A class for generating reproducible random values with configurable seeds.
+  Supports exponential distribution for ITI generation.
+  """
+
+  def __init__(self, seed: Optional[int] = None):
+    """
+    Initialize the random generator with an optional seed.
+
+    Args:
+        seed: Optional seed for reproducible random sequences
+    """
+    self.seed = seed
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+    self._random_state = random.Random(seed)
+    self._np_random_state = np.random.RandomState(seed)
+
+  def set_seed(self, seed: int):
+    """
+    Set a new seed for the random generator.
+
+    Args:
+        seed: New seed value
+    """
+    self.seed = seed
+    self._random_state.seed(seed)
+    self._np_random_state.seed(seed)
+
+  def generate_iti(self, min: float = 1000, max: float = 10000,
+                          decay: float = 0.001) -> float:
+    """
+    Generate a random inter-trial interval (ITI) using exponential distribution.
+
+    Args:
+        min: Minimum ITI duration in milliseconds
+        max: Maximum ITI duration in milliseconds
+        decay: Decay constant for exponential distribution (lambda)
+                        Higher values = faster decay, more values near min
+                        Lower values = slower decay, more uniform distribution
+
+    Returns:
+        Random ITI duration in milliseconds
+    """
+    # Generate uniform random value between 0 and 1
+    u = self._np_random_state.uniform(0, 1)
+
+    # Use inverse transform sampling for truncated exponential distribution
+    # We want an exponential distribution truncated to [min, max]
+    # The CDF of truncated exponential is: F(x) = (1 - exp(-lambda * (x - min))) / (1 - exp(-lambda * (max - min)))
+    # The inverse is: x = min - ln(1 - u * (1 - exp(-lambda * (max - min)))) / lambda
+
+    # Calculate the normalization factor
+    normalization = 1 - np.exp(-decay * (max - min))
+
+    # Generate the truncated exponential value
+    mapped_value = min - np.log(1 - u * normalization) / decay
+    mapped_value = int(mapped_value)
+
+    return mapped_value
 
 class Device:
   def __init__(self):
@@ -47,6 +113,14 @@ class Device:
     self.io = IOController()
     self.display = DisplayController()
     self._data = None
+
+    # Randomness
+    self.randomness = Randomness()
+
+    # Load config
+    self.config = None
+    with open("config.json") as config_file:
+      self.config = json.load(config_file)["task"]
 
     # Setup display state
     self._display_state = {
@@ -113,10 +187,11 @@ class Device:
     self._current_trial = None
     self._trials = [
       Stage1(),
-      Interval(iti_duration=1000),
+      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
       Stage2(),
-      Interval(iti_duration=1000),
+      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
       Stage3(),
+      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
     ]
     for trial in self._trials:
       trial.screen = self.screen
@@ -137,7 +212,7 @@ class Device:
 
   def _render_waiting_screen(self):
     """Render the waiting screen with 'Waiting for start...' text"""
-    self.screen.fill((0, 0, 0))  # Black background
+    self.screen.fill((0, 0, 0))
 
     # Main waiting text
     text = self.font.render("Waiting for start...", True, (255, 255, 255))
@@ -161,9 +236,9 @@ class Device:
       # Render state text
       for i, line in enumerate(state_text):
         if 'PRESSED' in line or 'ACTIVE' in line or 'ON' in line:
-          color = (0, 255, 0)  # Green for active states
+          color = (0, 255, 0) # Green
         else:
-          color = (255, 100, 100)  # Red for inactive states
+          color = (255, 100, 100) # Red
 
         line_surface = sim_font.render(line, True, color)
         line_rect = line_surface.get_rect(
@@ -277,11 +352,7 @@ class Device:
 
     # Initialize data controller with animal ID
     self._data = DataController(animal_id)
-
-    # Load config
-    with open("config.json") as config_file:
-      variables = json.load(config_file)["task"]
-      self._data.add_task_data({"config": variables})
+    self._data.add_task_data({"config": self.config})
 
     # Start first trial
     self._current_trial = self._trials.pop(0)

@@ -263,24 +263,24 @@ class Device:
           return False
         # Simulation mode controls
         elif hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
-          if event.key == pygame.K_1:  # Left lever press
+          if event.key == pygame.K_1: # Left lever press
             self.io.simulate_left_lever(True)
-          elif event.key == pygame.K_2:  # Right lever press
+          elif event.key == pygame.K_2: # Right lever press
             self.io.simulate_right_lever(True)
-          elif event.key == pygame.K_3:  # Nose poke entry
+          elif event.key == pygame.K_3: # Nose poke entry
             self.io.simulate_nose_poke(True)
-          elif event.key == pygame.K_SPACE:  # Nose poke entry (existing)
+          elif event.key == pygame.K_SPACE: # Nose poke entry (existing)
             self.io.simulate_nose_poke(True)
       elif event.type == pygame.KEYUP:
         # Simulation mode controls - release
         if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
-          if event.key == pygame.K_1:  # Left lever release
+          if event.key == pygame.K_1: # Left lever release
             self.io.simulate_left_lever(False)
-          elif event.key == pygame.K_2:  # Right lever release
+          elif event.key == pygame.K_2: # Right lever release
             self.io.simulate_right_lever(False)
-          elif event.key == pygame.K_3:  # Nose poke exit
+          elif event.key == pygame.K_3: # Nose poke exit
             self.io.simulate_nose_poke(False)
-          elif event.key == pygame.K_SPACE:  # Nose poke exit (existing)
+          elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
             self.io.simulate_nose_poke(False)
 
     if not self._experiment_started:
@@ -353,6 +353,11 @@ class Device:
     # Initialize data controller with animal ID
     self._data = DataController(animal_id)
     self._data.add_task_data({"config": self.config})
+
+    # Add punishment duration to ITI trials
+    for trial in self._trials:
+      if trial.title == "trial_iti":
+        trial.set_duration(trial.duration + self._punishment_duration)
 
     # Start first trial
     self._current_trial = self._trials.pop(0)

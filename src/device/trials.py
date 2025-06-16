@@ -105,10 +105,14 @@ class Interval(Base):
     # Duration
     if "duration" in self.kwargs:
       self.duration = self.kwargs["duration"]
-      log("Duration provided, using provided duration of " + str(self.duration) + "ms", "success")
+      log("ITI duration provided, using provided duration of " + str(self.duration) + "ms", "success")
     else:
-      log("No duration provided, using default of 1000ms", "warning")
+      log("No ITI duration provided, using default of 1000ms", "warning")
       self.duration = 1000
+
+  def set_duration(self, duration):
+    self.duration = duration
+    log("ITI duration set to " + str(self.duration) + "ms", "success")
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()

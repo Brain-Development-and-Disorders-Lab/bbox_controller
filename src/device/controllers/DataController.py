@@ -14,9 +14,9 @@ class DataController:
         "animal_id": animal_id,
         "start_time": datetime.now().isoformat(),
         "end_time": None,
-        "screens": []
+        "trials": []
       },
-      "screens": {},
+      "trials": [],
       "task": {}
     }
 
@@ -30,15 +30,15 @@ class DataController:
 
   def add_trial_data(self, screen_name, data):
     """Add data for a specific screen"""
-    if screen_name not in self.data["screens"]:
-      self.data["screens"][screen_name] = []
-
-    # Add timestamp to the data
+    # Add timestamp and trial type to the data
     data["timestamp"] = datetime.now().isoformat()
-    self.data["screens"][screen_name].append(data)
+    data["trial_type"] = screen_name
 
-    # Add to screen history in metadata
-    self.data["metadata"]["screens"].append({
+    # Append to trials list
+    self.data["trials"].append(data)
+
+    # Add to trial history in metadata
+    self.data["metadata"]["trials"].append({
       "name": screen_name,
       "timestamp": data["timestamp"]
     })

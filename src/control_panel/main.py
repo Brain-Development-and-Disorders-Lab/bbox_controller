@@ -76,6 +76,8 @@ class ControlPanel(tk.Frame):
       self.port_var = tk.StringVar(self.master, "8765")
       self.animal_id_var = tk.StringVar(self.master, "")
       self.animal_id_var.trace_add("write", self.on_animal_id_change)
+      self.punishment_duration_var = tk.StringVar(self.master, "1000")
+      self.water_delivery_duration_var = tk.StringVar(self.master, "2000")
 
       # Test state
       self.test_state = {
@@ -375,6 +377,26 @@ class ControlPanel(tk.Frame):
     self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
     self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)
 
+    # Duration settings frame
+    duration_settings_frame = tk.Frame(experiment_management_frame)
+    duration_settings_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+
+    # Punishment duration input
+    punishment_frame = tk.Frame(duration_settings_frame)
+    punishment_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+
+    tk.Label(punishment_frame, text="Punishment Duration (ms):").pack(side=tk.LEFT, pady=0)
+    self.punishment_duration_input = tk.Entry(punishment_frame, textvariable=self.punishment_duration_var, width=8, state=tk.DISABLED)
+    self.punishment_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
+
+    # Water delivery duration input
+    water_delivery_frame = tk.Frame(duration_settings_frame)
+    water_delivery_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+
+    tk.Label(water_delivery_frame, text="Water Delivery Duration (ms):").pack(side=tk.LEFT, pady=0)
+    self.water_delivery_duration_input = tk.Entry(water_delivery_frame, textvariable=self.water_delivery_duration_var, width=8, state=tk.DISABLED)
+    self.water_delivery_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
+
     # Experiment buttons frame
     experiment_buttons_frame = tk.Frame(experiment_management_frame)
     experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
@@ -383,7 +405,7 @@ class ControlPanel(tk.Frame):
       experiment_buttons_frame,
       text="Start",
       font="Arial 10",
-      command=lambda: self.execute_command("start_experiment " + self.animal_id_var.get()),
+      command=lambda: self.execute_command(f"start_experiment {self.animal_id_var.get()} {self.punishment_duration_var.get()} {self.water_delivery_duration_var.get()}"),
       state=tk.DISABLED
     )
     self.start_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
@@ -403,7 +425,7 @@ class ControlPanel(tk.Frame):
     console_frame.grid_columnconfigure(0, weight=1)
     console_frame.grid_rowconfigure(0, weight=1)
 
-    self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="#E0E0E0")
+    self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="#E0E0E0", height=15)
     self.console.grid(row=0, column=0, sticky="nsew")
     self.console.config(state=tk.DISABLED)
 
@@ -573,6 +595,10 @@ class ControlPanel(tk.Frame):
     # Animal ID input
     self.animal_id_input.config(state=tk.NORMAL)
 
+    # Duration inputs
+    self.punishment_duration_input.config(state=tk.NORMAL)
+    self.water_delivery_duration_input.config(state=tk.NORMAL)
+
     # Disconnect button
     self.disconnect_button.config(state=tk.NORMAL)
 
@@ -598,6 +624,10 @@ class ControlPanel(tk.Frame):
 
     # Animal ID input
     self.animal_id_input.config(state=tk.DISABLED)
+
+    # Duration inputs
+    self.punishment_duration_input.config(state=tk.DISABLED)
+    self.water_delivery_duration_input.config(state=tk.DISABLED)
 
     # Experiment buttons
     self.start_experiment_button.config(state=tk.DISABLED)

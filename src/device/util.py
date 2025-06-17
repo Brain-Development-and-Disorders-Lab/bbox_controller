@@ -5,9 +5,9 @@ from typing import Optional
 import numpy as np
 
 
-class ExitStatus(str, Enum):
+class TrialOutcome(str, Enum):
   """
-  Exit codes for trials.
+  Trial outcome codes for trials.
   """
   SUCCESS = "success"
   FAILURE_NOSEPORT = "failure_noseport"

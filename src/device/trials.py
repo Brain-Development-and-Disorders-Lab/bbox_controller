@@ -8,6 +8,7 @@ import json
 from device.controllers.DisplayController import DisplayController, SIMULATION_MODE
 from device.controllers.IOController import IOController
 from device.logger import log
+from device.util import ExitStatus
 
 class Base:
   """
@@ -121,6 +122,7 @@ class Interval(Base):
     # Check if the ITI duration has passed
     if pygame.time.get_ticks() - self.start_time > self.duration:
       self.add_data("trial_iti_completed", True)
+      self.add_data("exit_status", ExitStatus.SUCCESS)
       return False
 
     # Handle any events
@@ -130,6 +132,7 @@ class Interval(Base):
           return False
         if event.key == pygame.K_SPACE:
           self.add_data("trial_iti_canceled", True)
+          self.add_data("exit_status", ExitStatus.CANCELLED)
           return False
 
     return True
@@ -239,6 +242,7 @@ class Stage1(Base):
         if event.key == pygame.K_ESCAPE:
           log("Trial canceled", "info")
           self.add_data("trial_canceled", True)
+          self.add_data("exit_status", ExitStatus.CANCELLED)
           return False
 
     # Track nose port state changes
@@ -280,6 +284,7 @@ class Stage1(Base):
     # Condition for trial end - must have nose port entry, water delivery complete, AND nose port exit
     if self.nose_port_entry and self.water_delivery_complete and self.nose_port_exit:
       log("Trial complete: nose port entry, water delivery, and nose port exit", "success")
+      self.add_data("exit_status", ExitStatus.SUCCESS)
       return False
     return True
 
@@ -375,6 +380,7 @@ class Stage2(Base):
     # Condition for trial end
     if self.water_delivery_complete and self.nose_port_exit:
       log("Trial ended after water delivery and nose port exit", "success")
+      self.add_data("exit_status", ExitStatus.SUCCESS)
       return False
 
     # Handle any PyGame events
@@ -383,6 +389,7 @@ class Stage2(Base):
         if event.key == pygame.K_ESCAPE:
           log("Trial canceled", "info")
           self.add_data("trial_canceled", True)
+          self.add_data("exit_status", ExitStatus.CANCELLED)
           return False
 
     # Handle IO events (works for both real hardware and simulation)
@@ -573,11 +580,13 @@ class Stage3(Base):
     if self.nose_port_entry and not self.nose_port_exit and not self.get_input_states()["nose_poke"]:
       self.is_error_trial = True
       log("Error: Premature nose withdrawal", "error")
+      self.add_data("exit_status", ExitStatus.FAILURE_NOSEPORT)
       return False
 
     # Condition for trial end - when water delivery is complete and nose port is exited
     if self.water_delivery_complete and self.nose_port_exit:
       log("Trial ended after water delivery and nose port exit", "success")
+      self.add_data("exit_status", ExitStatus.SUCCESS)
       return False
 
     # Handle any PyGame events
@@ -586,6 +595,7 @@ class Stage3(Base):
         if event.key == pygame.K_ESCAPE:
           log("Trial canceled", "info")
           self.add_data("trial_canceled", True)
+          self.add_data("exit_status", ExitStatus.CANCELLED)
           return False
 
     # Handle IO events (works for both real hardware and simulation)
@@ -656,6 +666,7 @@ class Stage3(Base):
           "timestamp": current_time
         })
         # Trial failure
+        self.add_data("exit_status", ExitStatus.FAILURE_NOLEVER)
         return False
 
     return True

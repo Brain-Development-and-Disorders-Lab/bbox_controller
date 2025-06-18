@@ -50,7 +50,7 @@ echo ""
 /tmp/lnxrouter --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
     -c "$CHANNEL" \
     --country "$COUNTRY" \
-    --gateway 192.168.4.1 \
+    -g 192.168.4.1 \
     --dhcp-dns 8.8.8.8,8.8.4.4
 
 echo ""

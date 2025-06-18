@@ -209,9 +209,9 @@ class Device:
           elif event.key == pygame.K_2: # Right lever press
             self.io.simulate_right_lever(True)
           elif event.key == pygame.K_3: # Nose poke entry
-            self.io.simulate_nose_poke(True)
+            self.io.simulate_nose_poke(False)
           elif event.key == pygame.K_SPACE: # Nose poke entry (existing)
-            self.io.simulate_nose_poke(True)
+            self.io.simulate_nose_poke(False)
       elif event.type == pygame.KEYUP:
         # Simulation mode controls - release
         if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
@@ -220,9 +220,9 @@ class Device:
           elif event.key == pygame.K_2: # Right lever release
             self.io.simulate_right_lever(False)
           elif event.key == pygame.K_3: # Nose poke exit
-            self.io.simulate_nose_poke(False)
+            self.io.simulate_nose_poke(True)
           elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
-            self.io.simulate_nose_poke(False)
+            self.io.simulate_nose_poke(True)
 
     if not self._experiment_started:
       # Show waiting screen
@@ -459,7 +459,7 @@ class Device:
     running_input_test_start_time = time.time()
     while running_input_test:
       input_state = self.io.get_input_states()
-      if input_state["nose_poke"] == True:
+      if input_state["nose_poke"] == False:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -469,7 +469,7 @@ class Device:
         log("Timed out while waiting for IR input", "error")
         return
 
-    if input_state["nose_poke"] != True:
+    if input_state["nose_poke"] != False:
       self._test_state["test_ir"]["state"] = TEST_STATES["FAILED"]
       _device_message_queue.put({"type": "test_state", "data": self._test_state})
       log("No IR input detected", "error")

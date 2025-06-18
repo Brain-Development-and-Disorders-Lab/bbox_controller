@@ -248,16 +248,16 @@ class Stage1(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry
+    if not current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry (nose_poke = False means nose is IN)
       self.nose_port_entry = True
       self.events.append({
         "type": "nose_port_entry",
         "timestamp": pygame.time.get_ticks()
       })
       log("Nose port entry detected", "info")
-    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
-      # Detect nose port exit
+    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
       self.events.append({
         "type": "nose_port_exit",
@@ -396,8 +396,8 @@ class Stage2(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry
+    if not current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry (nose_poke = False means nose is IN)
       self.nose_port_entry = True
       self.reward_triggered = True
       self.events.append({
@@ -405,8 +405,8 @@ class Stage2(Base):
         "timestamp": current_time
       })
       log("Nose port entry", "info")
-    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
-      # Detect nose port exit
+    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
       self.events.append({
         "type": "nose_port_exit",
@@ -580,7 +580,7 @@ class Stage3(Base):
     if (
         self.nose_port_entry
         and not self.nose_port_exit
-        and not self.get_input_states()["nose_poke"]
+        and self.get_input_states()["nose_poke"]
         and not self.water_delivery_complete
     ):
       self.is_error_trial = True
@@ -607,8 +607,8 @@ class Stage3(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry
+    if not current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry (nose_poke = False means nose is IN)
       self.nose_port_entry = True
       self.cue_start_time = current_time
       self.events.append({
@@ -616,8 +616,8 @@ class Stage3(Base):
         "timestamp": current_time
       })
       log("Nose port entry", "info")
-    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
-      # Detect nose port exit
+    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
       self.events.append({
         "type": "nose_port_exit",

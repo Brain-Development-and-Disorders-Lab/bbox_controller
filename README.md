@@ -28,13 +28,20 @@ You can run the device in simulation mode for development and testing without ph
 
 ### Hardware Usage
 
-To run the device controller code, use the Python script:
+The device controller runs only on the device and must be running on the same network as the device running the control panel software in order to communicate. There are two strategies for this:
 
-`python3 src/device/main.py`
+1. Connect the Raspberry Pi and the control panel device to the same local network; OR
+2. Set the Raspberry Pi to act as a wireless access point, and connect to it with the control panel device.
 
-Or, use the included shell script once `chmod +x` permissions have been applied:
+After setting execution permissions using `chmod +x`, `run_lan.sh` starts the device controller in LAN mode (strategy 1), or `run_ap.sh` starts the device controller in AP mode (strategy 2).
 
-`./src/device/run.sh`
+Strategy 2 is highly recommended, as it allows direct connectivity to the device without external networking equipment. The network SSID and password can be modified within the script.
+
+Defaults:
+
+- SSID: `BehaviorBox0`
+- Password: `behaviorbox0`
+- IP Addresss: `192.168.4.1`
 
 ## License
 

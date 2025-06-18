@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Run the behavior box device when accessing via a Raspberry Pi running linux-router
-# This script creates a WiFi access point using the linux-router tool and starts the device software
+# This script creates a WiFi access point using the `linux-router` tool
 
 set -e
 
@@ -12,9 +11,9 @@ INTERFACE="wlan0"
 CHANNEL="7"
 COUNTRY="US"
 
-echo "=================================="
-echo "Behavior Box: WiFi Access Point"
-echo "=================================="
+echo "====================================="
+echo "Behavior Box: WiFi Access Point Setup"
+echo "====================================="
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -25,7 +24,7 @@ fi
 # Install dependencies if not present
 if ! command -v curl >/dev/null 2>&1; then
     echo "Installing curl..."
-    apt update && apt install -y curl
+    apt update && apt install -y curl iptables
 fi
 
 # Download linux-router if not present
@@ -59,9 +58,3 @@ echo "Connect to '$SSID' with password '$PASSWORD'"
 echo "Device will be available at 192.168.4.1:8765"
 echo ""
 echo "To stop: sudo /tmp/lnxrouter --stop $INTERFACE"
-
-# Start the device controller
-echo "Starting device controller..."
-
-# Set PYTHONPATH to include src directory and run the device
-PYTHONPATH=../../src python main.py

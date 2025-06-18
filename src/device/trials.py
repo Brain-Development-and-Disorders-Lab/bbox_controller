@@ -248,7 +248,7 @@ class Stage1(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       self.events.append({
@@ -256,7 +256,7 @@ class Stage1(Base):
         "timestamp": pygame.time.get_ticks()
       })
       log("Nose port entry detected", "info")
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit
       self.nose_port_exit = True
       self.events.append({
@@ -396,7 +396,7 @@ class Stage2(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       self.reward_triggered = True
@@ -405,7 +405,7 @@ class Stage2(Base):
         "timestamp": current_time
       })
       log("Nose port entry", "info")
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit
       self.nose_port_exit = True
       self.events.append({
@@ -577,7 +577,12 @@ class Stage3(Base):
     current_time = pygame.time.get_ticks()
 
     # Handle error trial condition - premature nose withdrawal
-    if self.nose_port_entry and not self.nose_port_exit and not self.get_input_states()["nose_poke"]:
+    if (
+        self.nose_port_entry
+        and not self.nose_port_exit
+        and not self.get_input_states()["nose_poke"]
+        and not self.water_delivery_complete
+    ):
       self.is_error_trial = True
       log("Error: Premature nose withdrawal", "error")
       self.add_data("trial_outcome", TrialOutcome.FAILURE_NOSEPORT)
@@ -602,7 +607,7 @@ class Stage3(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       self.cue_start_time = current_time
@@ -611,7 +616,7 @@ class Stage3(Base):
         "timestamp": current_time
       })
       log("Nose port entry", "info")
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit
       self.nose_port_exit = True
       self.events.append({

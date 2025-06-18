@@ -459,7 +459,7 @@ class Device:
     running_input_test_start_time = time.time()
     while running_input_test:
       input_state = self.io.get_input_states()
-      if input_state["nose_poke"] == False:
+      if input_state["nose_poke"] == True:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -469,7 +469,7 @@ class Device:
         log("Timed out while waiting for IR input", "error")
         return
 
-    if input_state["nose_poke"] != False:
+    if input_state["nose_poke"] != True:
       self._test_state["test_ir"]["state"] = TEST_STATES["FAILED"]
       _device_message_queue.put({"type": "test_state", "data": self._test_state})
       log("No IR input detected", "error")

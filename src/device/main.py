@@ -120,6 +120,19 @@ class Device:
 
     # Setup trials
     self._current_trial = None
+    self._reset_trials()
+
+    # Experiment state
+    self._experiment_started = False
+    self._running = True
+    self._websocket_server = None  # Store reference to websocket server
+
+    # Experiment parameters (will be set when experiment starts)
+    self._punishment_duration = 1000
+    self._water_delivery_duration = 2000
+
+  def _reset_trials(self):
+    """Reset the trials list to its initial state"""
     self._trials = [
       Stage1(),
       Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
@@ -136,14 +149,7 @@ class Device:
       trial.io = self.io
       trial.display = self.display
 
-    # Experiment state
-    self._experiment_started = False
-    self._running = True
-    self._websocket_server = None  # Store reference to websocket server
-
-    # Experiment parameters (will be set when experiment starts)
-    self._punishment_duration = 1000
-    self._water_delivery_duration = 2000
+    log(f"Trials reset: {len(self._trials)} trials ready for next experiment", "info")
 
   def _render_waiting_screen(self):
     """Render the waiting screen with 'Waiting for start...' text"""
@@ -203,9 +209,9 @@ class Device:
           elif event.key == pygame.K_2: # Right lever press
             self.io.simulate_right_lever(True)
           elif event.key == pygame.K_3: # Nose poke entry
-            self.io.simulate_nose_poke(True)
+            self.io.simulate_nose_poke(False)
           elif event.key == pygame.K_SPACE: # Nose poke entry (existing)
-            self.io.simulate_nose_poke(True)
+            self.io.simulate_nose_poke(False)
       elif event.type == pygame.KEYUP:
         # Simulation mode controls - release
         if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
@@ -214,9 +220,9 @@ class Device:
           elif event.key == pygame.K_2: # Right lever release
             self.io.simulate_right_lever(False)
           elif event.key == pygame.K_3: # Nose poke exit
-            self.io.simulate_nose_poke(False)
+            self.io.simulate_nose_poke(True)
           elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
-            self.io.simulate_nose_poke(False)
+            self.io.simulate_nose_poke(True)
 
     if not self._experiment_started:
       # Show waiting screen
@@ -258,6 +264,10 @@ class Device:
           self._experiment_started = False
           self._current_trial = None
 
+          # Reset trials for next experiment
+          self._reset_trials()
+          log("Experiment completed, trials reset, returning to waiting state", "info")
+
           # Send message that task is complete
           _device_message_queue.put({
             "type": "task_status",
@@ -267,8 +277,9 @@ class Device:
           })
 
       # Render current trial
-      self._current_trial.render()
-      pygame.display.flip()
+      if self._current_trial:
+        self._current_trial.render()
+        pygame.display.flip()
 
     return True
 
@@ -319,6 +330,9 @@ class Device:
     # Stop the current experiment
     self._experiment_started = False
     self._current_trial = None
+
+    # Reset trials for next experiment
+    self._reset_trials()
 
     # Save data if available
     if self._data:

@@ -661,7 +661,9 @@ class ControlPanel(tk.Frame):
         status = received_message["data"]["status"]
         self.log(f"Task status: {status}", "info")
         # Update experiment buttons based on task status
-        if status == "completed":
+        if status == "started":
+          self.set_experiment_buttons_disabled(True)
+        elif status == "completed" or status == "stopped":
           self.set_experiment_buttons_disabled(False)
       elif received_message["type"] == "trial_start":
         self.log(f"Trial start: {received_message['data']['trial']}", "info")
@@ -739,7 +741,12 @@ class ControlPanel(tk.Frame):
       self.set_test_buttons_disabled(True)
     elif primary_command in EXPERIMENT_COMMANDS:
       self.send_command(command)
-      self.set_experiment_buttons_disabled(True)
+      if primary_command == "stop_experiment":
+        # For stop_experiment, immediately re-enable start button and disable stop button
+        self.set_experiment_buttons_disabled(False)
+      else:
+        # For start_experiment, disable start button and enable stop button
+        self.set_experiment_buttons_disabled(True)
     else:
       self.log(f"Invalid command: {command}", "error")
 

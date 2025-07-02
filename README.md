@@ -45,14 +45,6 @@ Wireless Access Point Defaults:
 - Password: `behaviorbox0`
 - IP Addresss: `192.168.4.1`
 
-#### Running on Startup
-
-To set the device code to run on startup, add the following text to `crontab` via the `crontab -e` command:
-
-```text
-@reboot (sleep 30; /home/richards/Documents/GitHub/bbox_controller/src/device/cron_wrapper.sh) >> /home/richards/Documents/GitHub/bbox_controller/src/device/logs/cron_output.log 2>&1
-```
-
 ### Data Management
 
 Datasets will be stored under the `src/device/data` directory in individual JSON format files with filenames: `[Animal ID]_[Date]_[Time].json`. Currently, datasets are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS.

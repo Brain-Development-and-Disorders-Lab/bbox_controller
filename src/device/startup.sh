@@ -26,11 +26,11 @@ git checkout main
 git pull
 
 # Create logs directory if it doesn't exist
-mkdir -p "$SCRIPT_DIR/../logs"
+mkdir -p "$SCRIPT_DIR/logs"
 
 # Run the setup_ap.sh script in the background
 echo "Starting WiFi access point setup..."
-sudo "$SCRIPT_DIR/setup_ap.sh" > "$SCRIPT_DIR/../logs/setup_ap.log" 2>&1 &
+sudo "$SCRIPT_DIR/setup_ap.sh" > "$SCRIPT_DIR/logs/setup_ap.log" 2>&1 &
 SETUP_AP_PID=$!
 
 # Wait a bit for the AP to start
@@ -38,10 +38,10 @@ sleep 10
 
 # Run the run.sh script in the background
 echo "Starting device controller..."
-sudo "$SCRIPT_DIR/run.sh" > "$SCRIPT_DIR/../logs/device_controller.log" 2>&1 &
+sudo "$SCRIPT_DIR/run.sh" > "$SCRIPT_DIR/logs/device_controller.log" 2>&1 &
 RUN_PID=$!
 
 echo "Startup complete. PIDs: setup_ap=$SETUP_AP_PID, run=$RUN_PID"
 echo "Logs available at:"
-echo "  - $SCRIPT_DIR/../logs/setup_ap.log"
-echo "  - $SCRIPT_DIR/../logs/device_controller.log"
+echo "  - $SCRIPT_DIR/logs/setup_ap.log"
+echo "  - $SCRIPT_DIR/logs/device_controller.log"

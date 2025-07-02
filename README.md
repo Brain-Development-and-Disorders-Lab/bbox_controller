@@ -50,7 +50,7 @@ Wireless Access Point Defaults:
 To set the device code to run on startup, add the following text to `crontab` via the `crontab -e` command:
 
 ```text
-@reboot (sleep 20; /home/richards/Documents/GitHub/bbox_controller/src/device/startup.sh) >> /home/richars/GitHub/bbox_controller/logs.txt 2>&1
+@reboot (sleep 20; /home/richards/Documents/GitHub/bbox_controller/src/device/startup.sh) >> /home/richards/GitHub/bbox_controller/src/device/logs/cron_output.log 2>&1
 ```
 
 ### Data Management

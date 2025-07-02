@@ -233,8 +233,6 @@ class Stage1(Base):
   def update(self, events):
     # Run update tasks
     self._update_water_delivery()
-    self._update_nose_port_state()
-    self._update_nose_port_light()
 
     # Handle PyGame events
     for event in events:
@@ -264,6 +262,10 @@ class Stage1(Base):
         "timestamp": pygame.time.get_ticks()
       })
       log("Nose port exit detected", "info")
+
+    # Update nose port state and light
+    self._update_nose_port_state()
+    self._update_nose_port_light()
 
     # Track lever presses
     left_lever = self.get_input_states()["left_lever"]
@@ -299,7 +301,7 @@ class Stage1(Base):
   def _update_nose_port_light(self):
     # Update nose port light
     if not SIMULATION_MODE:
-      pass
+      self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -718,7 +720,7 @@ class Stage3(Base):
   def _update_nose_port_light(self):
     # Update nose port light
     if not SIMULATION_MODE:
-      pass
+      self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen

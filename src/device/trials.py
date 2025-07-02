@@ -263,10 +263,6 @@ class Stage1(Base):
       })
       log("Nose port exit detected", "info")
 
-    # Update nose port state and light
-    self._update_nose_port_state()
-    self._update_nose_port_light()
-
     # Track lever presses
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
@@ -288,6 +284,11 @@ class Stage1(Base):
       log("Trial complete: nose port entry, water delivery, and nose port exit", "success")
       self.add_data("trial_outcome", TrialOutcome.SUCCESS)
       return False
+
+    # Update nose port state and light
+    self._update_nose_port_state()
+    self._update_nose_port_light()
+
     return True
 
   def _render_visual_cue(self):

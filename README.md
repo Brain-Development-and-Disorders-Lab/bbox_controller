@@ -28,12 +28,13 @@ You can run the device in simulation mode for development and testing without ph
 
 ### Hardware Usage
 
-The device controller runs only on the device and must be running on the same network as the device running the control panel software in order to communicate. There are two strategies for this:
+The device controller runs only on the device and the device controller must be on the same network as the control panel software in order to communicate. This is accomplished by setting the Raspberry Pi to act as a wireless access point (AP) and connecting to it directly.
 
-1. Connect the Raspberry Pi and the control panel device to the same local network; OR
-2. Set the Raspberry Pi to act as a wireless access point (AP), and connect to it with the control panel device.
+To run the device controller code on the Raspberry Pi, run the `startup.sh` script, located under `src/device` with administrator permissions: `sudo ./startup.sh`
 
-#### Running as a Wireless Access Point
+After a short delay, a notification that the wireless connectivity has been disabled should appear before the task starts in fullscreen.
+
+#### Running individual scripts
 
 First, turn off the wireless connectivity on the Raspberry Pi via the top menu bar. After setting execution permissions using `chmod +x`, running `sudo ./setup_ap.sh` starts the Raspberry Pi in AP mode.
 

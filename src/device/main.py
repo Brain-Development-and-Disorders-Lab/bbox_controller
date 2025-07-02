@@ -54,8 +54,11 @@ class Device:
 
     # Load config
     self.config = None
+    self.version = None
     with open("config.json") as config_file:
-      self.config = json.load(config_file)["task"]
+      config_data = json.load(config_file)
+      self.config = config_data["task"]
+      self.version = config_data.get("version", "unknown")
 
     # Setup display state
     self._display_state = {
@@ -159,6 +162,12 @@ class Device:
     text = self.font.render("Waiting for start...", True, (255, 255, 255))
     text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
     self.screen.blit(text, text_rect)
+
+    # Version text (smaller font)
+    version_font = pygame.font.SysFont("Arial", 24)
+    version_text = version_font.render(f"Version: {self.version}", True, (150, 150, 150))
+    version_rect = version_text.get_rect(center=(self.width // 2, self.height // 2 + 50))
+    self.screen.blit(version_text, version_rect)
 
     # Show simulation controls if in simulation mode
     if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
@@ -619,7 +628,12 @@ async def send_state_message(websocket):
   """
   while True:
     try:
-      await websocket.send(json.dumps({"type": "input_state", "data": _device.io.get_input_states()}))
+      state_data = {
+        "type": "input_state",
+        "data": _device.io.get_input_states(),
+        "version": _device.version
+      }
+      await websocket.send(json.dumps(state_data))
       await asyncio.sleep(0.05)
     except websockets.exceptions.ConnectionClosed:
       log("Control panel connection closed", "warning")

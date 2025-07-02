@@ -53,6 +53,16 @@ To set the device code to run on startup, add the following text to `crontab` vi
 @reboot (sleep 20; /home/richards/Documents/GitHub/bbox_controller/src/device/startup.sh) >> /home/richars/GitHub/bbox_controller/logs.txt 2>&1
 ```
 
+### Version Tracking
+
+The device code includes version tracking to help identify which version is running on the device. The version is stored in `src/device/config.json` and is displayed on the device screen and logged in the control panel.
+
+The version will be:
+
+- Displayed on the device's waiting screen
+- Sent to the control panel via WebSocket
+- Logged in the control panel console when connected
+
 ## License
 
 <!-- CC BY-NC-SA 4.0 License -->

@@ -233,8 +233,6 @@ class Stage1(Base):
   def update(self, events):
     # Run update tasks
     self._update_water_delivery()
-    self._update_nose_port_state()
-    self._update_nose_port_light()
 
     # Handle PyGame events
     for event in events:
@@ -286,6 +284,11 @@ class Stage1(Base):
       log("Trial complete: nose port entry, water delivery, and nose port exit", "success")
       self.add_data("trial_outcome", TrialOutcome.SUCCESS)
       return False
+
+    # Update nose port state and light
+    self._update_nose_port_state()
+    self._update_nose_port_light()
+
     return True
 
   def _render_visual_cue(self):
@@ -299,7 +302,7 @@ class Stage1(Base):
   def _update_nose_port_light(self):
     # Update nose port light
     if not SIMULATION_MODE:
-      pass
+      self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -718,7 +721,7 @@ class Stage3(Base):
   def _update_nose_port_light(self):
     # Update nose port light
     if not SIMULATION_MODE:
-      pass
+      self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen

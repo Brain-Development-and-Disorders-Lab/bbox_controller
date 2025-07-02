@@ -5,6 +5,19 @@
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Check for and activate Python virtual environment if present
+if [ -d "$SCRIPT_DIR/.venv" ]; then
+    echo "Activating Python virtual environment..."
+    source "$SCRIPT_DIR/.venv/bin/activate"
+    echo "Virtual environment activated: $(which python)"
+elif [ -d "$SCRIPT_DIR/venv" ]; then
+    echo "Activating Python virtual environment..."
+    source "$SCRIPT_DIR/venv/bin/activate"
+    echo "Virtual environment activated: $(which python)"
+else
+    echo "No virtual environment found, using system Python"
+fi
+
 echo "============================"
 echo "Behavior Box: Startup Script"
 echo "============================"

@@ -53,6 +53,52 @@ To set the device code to run on startup, add the following text to `crontab` vi
 @reboot (sleep 20; /home/richards/Documents/GitHub/bbox_controller/src/device/startup.sh) >> /home/richars/GitHub/bbox_controller/logs.txt 2>&1
 ```
 
+### Data Management
+
+Datasets will be stored under the `src/device/data` directory in individual JSON format files with filenames: `[Animal ID]_[Date]_[Time].json`. Currently, datasets are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS.
+
+Datasets are the following format:
+
+```text
+{
+  "metadata": {
+    "animal_id": [Animal ID],
+    "start_time": [Starting Timestamp],
+    "end_time": [Ending Timestamp],
+    "trials": [
+      {
+        "name": [Trial Name],
+        "timestamp": [Starting Timestamp]
+      },
+      ...
+    ]
+  },
+  "trials": [
+    {
+      "trial_outcome": [Outcome Code],
+      "events": [
+        {
+          "type": [Event Type],
+          "timestamp": [Event Timestamp]
+        },
+        ...
+      ],
+      "timestamp": [Starting Timestamp],
+      "trial_type": [Trial Name]
+      ... [Other Trial Parameters]
+    },
+    ...
+  ],
+  "task": {
+    "config": {
+      [Variable Name]: [Variable Value],
+      ...
+    },
+    "timestamp": [Starting Task Timestamp]
+  }
+}
+```
+
 ### Version Tracking
 
 The device code includes version tracking to help identify which version is running on the device. The version is stored in `src/device/config.json` and is displayed on the device screen and logged in the control panel.

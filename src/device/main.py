@@ -270,6 +270,13 @@ class Device:
             }
           })
         else:
+          # All trials completed - save data before resetting
+          if self._data:
+            if not self._data.save():
+              log("Failed to save data", "error")
+            else:
+              log("Data saved successfully", "success")
+
           self._experiment_started = False
           self._current_trial = None
 
@@ -343,7 +350,7 @@ class Device:
     # Reset trials for next experiment
     self._reset_trials()
 
-    # Save data if available
+    # Save data if available (fallback for manual stopping)
     if self._data:
       if not self._data.save():
         log("Failed to save data", "error")
@@ -705,15 +712,16 @@ async def main_loop(device):
       await asyncio.sleep(0)  # Allow other tasks to run
       await asyncio.sleep(1/60)
   finally:
+    # Emergency data save on shutdown
     if device._data:
-      log("Saving data before shutdown...", "info")
+      log("Emergency data save before shutdown...", "info")
       try:
         if device._data.save():
-          log("Data saved successfully", "success")
+          log("Emergency data save successful", "success")
         else:
-          log("Failed to save data", "error")
+          log("Emergency data save failed", "error")
       except Exception as e:
-        log(f"Error while saving data: {str(e)}", "error")
+        log(f"Error during emergency data save: {str(e)}", "error")
 
     # Cleanup
     if device._websocket_server:

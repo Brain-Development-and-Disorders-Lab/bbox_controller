@@ -20,6 +20,11 @@ fi
 # Change to the script directory
 cd "$SCRIPT_DIR"
 
+# Update the code from the repository after switching to the `main` branch
+echo "Updating code from repository..."
+git checkout main
+git pull
+
 # Create logs directory if it doesn't exist
 mkdir -p "$SCRIPT_DIR/../logs"
 

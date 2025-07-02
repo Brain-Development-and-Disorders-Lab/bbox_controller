@@ -6,13 +6,24 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Check for and activate Python virtual environment if present
-if [ -d "$SCRIPT_DIR/.venv" ]; then
-    echo "Activating Python virtual environment..."
-    source "$SCRIPT_DIR/.venv/bin/activate"
-    echo "Virtual environment activated: $(which python)"
-elif [ -d "$SCRIPT_DIR/venv" ]; then
-    echo "Activating Python virtual environment..."
-    source "$SCRIPT_DIR/venv/bin/activate"
+# Look for .venv in current directory and parent directories up to repository root
+VENV_PATH=""
+CURRENT_DIR="$SCRIPT_DIR"
+
+while [ "$CURRENT_DIR" != "/" ]; do
+    if [ -d "$CURRENT_DIR/.venv" ]; then
+        VENV_PATH="$CURRENT_DIR/.venv"
+        break
+    elif [ -d "$CURRENT_DIR/venv" ]; then
+        VENV_PATH="$CURRENT_DIR/venv"
+        break
+    fi
+    CURRENT_DIR="$(dirname "$CURRENT_DIR")"
+done
+
+if [ -n "$VENV_PATH" ]; then
+    echo "Activating Python virtual environment: $VENV_PATH"
+    source "$VENV_PATH/bin/activate"
     echo "Virtual environment activated: $(which python)"
 else
     echo "No virtual environment found, using system Python"

@@ -34,9 +34,19 @@ if [ ! -f "/tmp/lnxrouter" ]; then
     chmod +x /tmp/lnxrouter
 fi
 
+# Disable wireless connectivity
+echo "Disabling wireless connectivity..."
+ip link set wlan0 down
+sleep 2
+
 # Stop any existing access point
 echo "Stopping any existing access point..."
 /tmp/lnxrouter --stop "$INTERFACE" 2>/dev/null || true
+sleep 2
+
+# Stop any running instance of `dnsmasq`
+echo "Stopping any existing dnsmasq process..."
+systemctl stop dnsmasq 2>/dev/null || true
 sleep 2
 
 # Start the WiFi access point

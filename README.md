@@ -33,13 +33,35 @@ The device controller runs only on the device and must be running on the same ne
 1. Connect the Raspberry Pi and the control panel device to the same local network; OR
 2. Set the Raspberry Pi to act as a wireless access point (AP), and connect to it with the control panel device.
 
-After setting execution permissions using `chmod +x`, `setup_ap.sh` starts the Raspberry Pi in AP mode. In another terminal, use `run.sh` to start the device controller. It is highly recommended to setup the Raspberry Pi as a wireless access point, as it allows direct connectivity to the device without external networking equipment. The network SSID and password can be modified within the script.
+#### Running as a Wireless Access Point
 
-Defaults:
+First, turn off the wireless connectivity on the Raspberry Pi via the top menu bar. After setting execution permissions using `chmod +x`, running `sudo ./setup_ap.sh` starts the Raspberry Pi in AP mode.
 
-- SSID: `BehaviorBox0`
+In another terminal, use `run.sh` to start the device controller. It is highly recommended to setup the Raspberry Pi as a wireless access point, as it allows direct connectivity to the device without external networking equipment. The network SSID and password can be modified within the script.
+
+Wireless Access Point Defaults:
+
+- SSID: `BehaviorBox_0`
 - Password: `behaviorbox0`
 - IP Addresss: `192.168.4.1`
+
+#### Running on Startup
+
+To set the device code to run on startup, add the following text to `crontab` via the `crontab -e` command:
+
+```text
+@reboot (sleep 20; /home/richards/Documents/GitHub/bbox_controller/src/device/startup.sh) >> /home/richars/GitHub/bbox_controller/logs.txt 2>&1
+```
+
+### Version Tracking
+
+The device code includes version tracking to help identify which version is running on the device. The version is stored in `src/device/config.json` and is displayed on the device screen and logged in the control panel.
+
+The version will be:
+
+- Displayed on the device's waiting screen
+- Sent to the control panel via WebSocket
+- Logged in the control panel console when connected
 
 ## License
 

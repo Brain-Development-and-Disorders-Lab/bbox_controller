@@ -70,6 +70,7 @@ class ControlPanel(tk.Frame):
 
       # Connection state
       self.is_connected = False
+      self.device_version = "unknown"
 
       # UI variables
       self.ip_address_var = tk.StringVar(self.master, "localhost")
@@ -647,6 +648,12 @@ class ControlPanel(tk.Frame):
     if received_message:
       if received_message["type"] == "input_state":
         self.input_states = received_message["data"]
+        # Update device version if provided
+        if "version" in received_message:
+          new_version = received_message["version"]
+          if new_version != self.device_version:
+            self.device_version = new_version
+            self.log(f"Device version: {self.device_version}", "info", "SYSTEM")
         self.update_state_labels()
       elif received_message["type"] == "test_state":
         # Update only the specific test states that changed

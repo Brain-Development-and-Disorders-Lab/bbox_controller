@@ -1,4 +1,5 @@
 {
+  "version": "1.0.0",
   "task": {
     "iti_minimum": 100,
     "iti_maximum": 1000,

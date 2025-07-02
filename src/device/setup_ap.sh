@@ -2,6 +2,9 @@
 
 # This script creates a WiFi access point using the `linux-router` tool
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 set -e
 
 # Configuration
@@ -14,12 +17,17 @@ COUNTRY="US"
 echo "====================================="
 echo "Behavior Box: WiFi Access Point Setup"
 echo "====================================="
+echo "Script directory: $SCRIPT_DIR"
+echo "Timestamp: $(date)"
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
     echo "ERROR: This script must be run as root (use sudo)"
     exit 1
 fi
+
+# Change to the script directory
+cd "$SCRIPT_DIR"
 
 # Install dependencies if not present
 if ! command -v curl >/dev/null 2>&1; then

@@ -11,6 +11,7 @@ from device.controllers.DataController import DataController
 from device.trials import Interval, Stage1, Stage2, Stage3
 from device.logger import log, set_message_queue
 from device.util import Randomness
+from device.timeline_models import TimelineProcessor
 
 # Test commands
 TEST_COMMANDS = [
@@ -24,6 +25,16 @@ TEST_COMMANDS = [
 EXPERIMENT_COMMANDS = [
   "start_experiment",
   "stop_experiment"
+]
+
+# Timeline message types
+TIMELINE_MESSAGE_TYPES = [
+  "timeline_upload",
+  "timeline_validation",
+  "timeline_ready",
+  "timeline_error",
+  "timeline_progress",
+  "timeline_complete"
 ]
 
 TEST_STATES = {
@@ -51,6 +62,9 @@ class Device:
 
     # Randomness
     self.randomness = Randomness()
+
+    # Timeline processor
+    self.timeline_processor = TimelineProcessor(self)
 
     # Load config
     self.config = None
@@ -121,9 +135,9 @@ class Device:
     self.screen.fill((0, 0, 0))
     self.font = pygame.font.SysFont("Arial", 64)
 
-    # Setup trials
+    # Setup trials - start with no timeline
     self._current_trial = None
-    self._reset_trials()
+    self._trials = []
 
     # Experiment state
     self._experiment_started = False
@@ -136,48 +150,7 @@ class Device:
 
   def _reset_trials(self):
     """Reset the trials list to its initial state"""
-    self._trials = [
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-    ]
+    self._trials = []
     for trial in self._trials:
       trial.screen = self.screen
       trial.font = self.font
@@ -189,13 +162,24 @@ class Device:
     log(f"Trials reset: {len(self._trials)} trials ready for next experiment", "info")
 
   def _render_waiting_screen(self):
-    """Render the waiting screen with 'Waiting for start...' text"""
+    """Render the waiting screen with timeline upload message"""
     self.screen.fill((0, 0, 0))
 
     # Main waiting text
-    text = self.font.render("Waiting for start...", True, (255, 255, 255))
-    text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
-    self.screen.blit(text, text_rect)
+    if not self._trials:
+      text = self.font.render("Upload Timeline Required", True, (255, 255, 255))
+      text_rect = text.get_rect(center=(self.width // 2, self.height // 2 - 30))
+      self.screen.blit(text, text_rect)
+
+      # Secondary text
+      secondary_font = pygame.font.SysFont("Arial", 32)
+      secondary_text = secondary_font.render("Use control panel to upload timeline", True, (150, 150, 150))
+      secondary_rect = secondary_text.get_rect(center=(self.width // 2, self.height // 2 + 10))
+      self.screen.blit(secondary_text, secondary_rect)
+    else:
+      text = self.font.render("Waiting for start...", True, (255, 255, 255))
+      text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
+      self.screen.blit(text, text_rect)
 
     # Version text (smaller font)
     version_font = pygame.font.SysFont("Arial", 24)
@@ -314,9 +298,9 @@ class Device:
           self._experiment_started = False
           self._current_trial = None
 
-          # Reset trials for next experiment
-          self._reset_trials()
-          log("Experiment completed, trials reset, returning to waiting state", "info")
+          # Clear trials - timeline must be re-uploaded for next experiment
+          self._trials = []
+          log("Experiment completed, timeline cleared, returning to waiting state", "info")
 
           # Send message that task is complete
           _device_message_queue.put({
@@ -337,6 +321,11 @@ class Device:
     """Start the experiment with the given animal ID and duration parameters"""
     if self._experiment_started:
       log("Experiment already running", "warning")
+      return
+
+    # Check if trials are available
+    if not self._trials:
+      log("No timeline available - please upload a timeline first", "error")
       return
 
     # Store the experiment parameters
@@ -371,6 +360,41 @@ class Device:
 
     log("Experiment started", "info")
 
+  def start_experiment_with_timeline(self, animal_id, trials, config=None):
+    """Start the experiment with a custom timeline"""
+    if self._experiment_started:
+      log("Experiment already running", "warning")
+      return
+
+    # Log the parameters
+    log(f"Starting timeline experiment with animal ID: {animal_id}, {len(trials)} trials", "info")
+
+    # Initialize data controller with animal ID
+    self._data = DataController(animal_id)
+
+    # Use provided config or fall back to default
+    experiment_config = config or self.config
+    self._data.add_task_data({"config": experiment_config})
+
+    # Set trials from timeline
+    self._trials = trials.copy()
+
+    # Start first trial
+    self._current_trial = self._trials.pop(0)
+    self._current_trial.on_enter()
+    self._experiment_started = True
+
+    # Send initial message that task has started
+    _device_message_queue.put({
+      "type": "task_status",
+      "data": {
+        "status": "started",
+        "trial": self._current_trial.title
+      }
+    })
+
+    log("Timeline experiment started", "info")
+
   def stop_experiment(self):
     """Stop the current experiment"""
     if not self._experiment_started:
@@ -381,8 +405,8 @@ class Device:
     self._experiment_started = False
     self._current_trial = None
 
-    # Reset trials for next experiment
-    self._reset_trials()
+    # Clear trials - timeline must be re-uploaded for next experiment
+    self._trials = []
 
     # Save data if available (fallback for manual stopping)
     if self._data:
@@ -690,9 +714,17 @@ async def handle_connection(websocket, device: Device):
     # Handle incoming messages
     async for message in websocket:
       try:
-        command = message.strip()
+        # Try to parse as JSON first (for timeline messages)
+        try:
+          message_data = json.loads(message)
+          if "type" in message_data:
+            await handle_json_message(websocket, device, message_data)
+            continue
+        except json.JSONDecodeError:
+          pass  # Not JSON, treat as text command
 
-        # Handle the command
+        # Handle text commands (legacy)
+        command = message.strip()
         if command in TEST_COMMANDS:
           device.run_test(command)
         elif command.startswith("test_water_delivery"):
@@ -721,6 +753,56 @@ async def handle_connection(websocket, device: Device):
     # Reset test state when control panel disconnects
     device.reset_test_state()
     await websocket.close()
+
+async def handle_json_message(websocket, device: Device, message_data: dict):
+  """Handle JSON messages from the control panel"""
+  message_type = message_data.get("type")
+
+  if message_type == "timeline_upload":
+    # Handle timeline upload
+    timeline_data = message_data.get("data", {})
+    success, message = device.timeline_processor.process_timeline_upload(timeline_data)
+
+    # Send validation response
+    response = {
+      "type": "timeline_validation",
+      "success": success,
+      "message": message
+    }
+    await websocket.send(json.dumps(response))
+
+    if success:
+      log(f"Timeline uploaded successfully: {message}", "success")
+    else:
+      log(f"Timeline upload failed: {message}", "error")
+
+  elif message_type == "start_timeline_experiment":
+    # Handle timeline experiment start
+    animal_id = message_data.get("animal_id", "")
+    if not animal_id:
+      response = {
+        "type": "timeline_error",
+        "message": "Animal ID is required"
+      }
+      await websocket.send(json.dumps(response))
+      return
+
+    success, message = device.timeline_processor.execute_timeline(animal_id)
+
+    response = {
+      "type": "timeline_validation" if success else "timeline_error",
+      "success": success,
+      "message": message
+    }
+    await websocket.send(json.dumps(response))
+
+    if success:
+      log(f"Timeline experiment started: {message}", "success")
+    else:
+      log(f"Timeline experiment failed: {message}", "error")
+
+  else:
+    log(f"Unknown JSON message type: {message_type}", "warning")
 
 async def main_loop(device):
   """Main loop that runs both pygame and websocket communication"""

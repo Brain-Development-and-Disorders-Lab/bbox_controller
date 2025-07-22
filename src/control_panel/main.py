@@ -9,7 +9,7 @@ License: MIT
 # GUI imports
 import json
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import datetime
 import threading
 import atexit
@@ -17,12 +17,19 @@ import queue
 import websocket
 import time
 import os
+try:
+    from .timeline_models import TimelineManager
+    from .timeline_editor import TimelineEditor
+except ImportError:
+    # Fallback for when running as standalone script
+    from timeline_models import TimelineManager
+    from timeline_editor import TimelineEditor
 
 # Variables
 PADDING = 10
 SECTION_PADDING = 10
-TOTAL_WIDTH = 1200 + (PADDING * 6)
-PANEL_WIDTH = 1200
+TOTAL_WIDTH = 900 + (PADDING * 6)
+PANEL_WIDTH = 900
 PANEL_HEIGHT = 720
 COLUMN_WIDTH = 30
 HEADING_HEIGHT = 40
@@ -71,6 +78,10 @@ class ControlPanel(tk.Frame):
       # Connection state
       self.is_connected = False
       self.device_version = "unknown"
+
+      # Timeline management
+      self.timeline_manager = TimelineManager()
+      self.current_timeline = None
 
       # UI variables
       self.ip_address_var = tk.StringVar(self.master, "localhost")
@@ -130,6 +141,9 @@ class ControlPanel(tk.Frame):
 
       # Create the layout
       self.create_layout()
+
+      # Initialize timeline list after UI is created
+      self.update_timeline_list()
 
       # Configure log text tags for different states and sources
       self.console.tag_configure("info", foreground="#E0E0E0")  # Light gray for info
@@ -304,9 +318,9 @@ class ControlPanel(tk.Frame):
     tk.Entry(connection_frame, textvariable=self.ip_address_var, width=15).pack(side=tk.LEFT, padx=(0, 15))
     tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT, padx=(0, 5))
     tk.Entry(connection_frame, textvariable=self.port_var, width=6).pack(side=tk.LEFT, padx=(0, 15))
-    self.connect_button = tk.Button(connection_frame, text="Connect", command=self.connect_to_device)
+    self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_to_device)
     self.connect_button.pack(side=tk.LEFT, padx=(0, 5))
-    self.disconnect_button = tk.Button(connection_frame, text="Disconnect", command=self.disconnect_from_device, state=tk.DISABLED)
+    self.disconnect_button = tk.Button(connection_frame, text="Disconnect", font="Arial 10", command=self.disconnect_from_device, state=tk.DISABLED)
     self.disconnect_button.pack(side=tk.LEFT)
 
     # Main content area
@@ -398,6 +412,51 @@ class ControlPanel(tk.Frame):
     self.water_delivery_duration_input = tk.Entry(water_delivery_frame, textvariable=self.water_delivery_duration_var, width=8, state=tk.DISABLED)
     self.water_delivery_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
 
+    # Timeline management frame
+    timeline_frame = tk.Frame(experiment_management_frame)
+    timeline_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+
+    # Timeline selection
+    timeline_selection_frame = tk.Frame(timeline_frame)
+    timeline_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+
+    tk.Label(timeline_selection_frame, text="Timeline:").pack(side=tk.LEFT, pady=0)
+    self.timeline_var = tk.StringVar()
+    self.timeline_combo = ttk.Combobox(timeline_selection_frame, textvariable=self.timeline_var, state="readonly", width=18)
+    self.timeline_combo.pack(side=tk.LEFT, pady=0, padx=(5, 0))
+    self.timeline_combo.bind("<<ComboboxSelected>>", self.on_timeline_selected)
+
+    # Timeline buttons
+    timeline_buttons_frame = tk.Frame(timeline_frame)
+    timeline_buttons_frame.pack(side=tk.TOP, fill=tk.X)
+
+    self.new_timeline_button = tk.Button(
+      timeline_buttons_frame,
+      text="New Timeline",
+      font="Arial 10",
+      command=self.create_new_timeline,
+      state=tk.NORMAL
+    )
+    self.new_timeline_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
+    self.timeline_editor_button = tk.Button(
+      timeline_buttons_frame,
+      text="Edit Timeline",
+      font="Arial 10",
+      command=self.open_timeline_editor,
+      state=tk.DISABLED
+    )
+    self.timeline_editor_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
+    self.upload_timeline_button = tk.Button(
+      timeline_buttons_frame,
+      text="Upload to Device",
+      font="Arial 10",
+      command=self.upload_timeline_to_device,
+      state=tk.DISABLED
+    )
+    self.upload_timeline_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
     # Experiment buttons frame
     experiment_buttons_frame = tk.Frame(experiment_management_frame)
     experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
@@ -406,7 +465,7 @@ class ControlPanel(tk.Frame):
       experiment_buttons_frame,
       text="Start",
       font="Arial 10",
-      command=lambda: self.execute_command(f"start_experiment {self.animal_id_var.get()} {self.punishment_duration_var.get()} {self.water_delivery_duration_var.get()}"),
+      command=self.start_experiment,
       state=tk.DISABLED
     )
     self.start_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
@@ -556,10 +615,17 @@ class ControlPanel(tk.Frame):
 
   def on_animal_id_change(self, *args):
     """
-    Enables the start experiment button only if animal_id_input is not empty.
+    Enables the start experiment button only if animal_id_input is not empty and timeline is selected.
     """
-    if self.animal_id_var.get().strip():
-      self.start_experiment_button.config(state=tk.NORMAL)
+    animal_id = self.animal_id_var.get().strip()
+    if animal_id and self.is_connected:
+      # Enable start button if we have an animal ID and are connected
+      # For timeline experiments, also require a timeline to be selected
+      if self.current_timeline:
+        self.start_experiment_button.config(state=tk.NORMAL)
+      else:
+        # For basic experiments, just need animal ID
+        self.start_experiment_button.config(state=tk.NORMAL)
     else:
       self.start_experiment_button.config(state=tk.DISABLED)
 
@@ -600,8 +666,17 @@ class ControlPanel(tk.Frame):
     self.punishment_duration_input.config(state=tk.NORMAL)
     self.water_delivery_duration_input.config(state=tk.NORMAL)
 
+    # Timeline buttons - always enabled for timeline management
+    self.new_timeline_button.config(state=tk.NORMAL)
+    self.timeline_editor_button.config(state=tk.NORMAL)
+    self.upload_timeline_button.config(state=tk.NORMAL)
+    self.update_timeline_list()
+
     # Disconnect button
     self.disconnect_button.config(state=tk.NORMAL)
+
+    # Update start button state based on current conditions
+    self.on_animal_id_change()
 
   def on_disconnect(self):
     """
@@ -629,6 +704,11 @@ class ControlPanel(tk.Frame):
     # Duration inputs
     self.punishment_duration_input.config(state=tk.DISABLED)
     self.water_delivery_duration_input.config(state=tk.DISABLED)
+
+    # Timeline buttons - keep enabled for timeline management
+    self.new_timeline_button.config(state=tk.NORMAL)
+    self.timeline_editor_button.config(state=tk.NORMAL)
+    self.upload_timeline_button.config(state=tk.DISABLED)  # Disable upload when not connected
 
     # Experiment buttons
     self.start_experiment_button.config(state=tk.DISABLED)
@@ -678,6 +758,16 @@ class ControlPanel(tk.Frame):
         self.log(f"Trial complete: {received_message['data']['trial']}", "success")
       elif received_message["type"] == "device_log":
         self.log(received_message["data"]["message"], received_message["data"]["state"], "device")
+      elif received_message["type"] == "timeline_validation":
+        success = received_message.get("success", False)
+        message = received_message.get("message", "")
+        if success:
+          self.log(f"Timeline validation: {message}", "success")
+        else:
+          self.log(f"Timeline validation failed: {message}", "error")
+      elif received_message["type"] == "timeline_error":
+        message = received_message.get("message", "")
+        self.log(f"Timeline error: {message}", "error")
       else:
         self.log(f"Received unhandled message: {received_message}", "warning")
 
@@ -847,9 +937,126 @@ class ControlPanel(tk.Frame):
   def run_websocket(self):
     self.ws.run_forever()
 
+  def update_timeline_list(self):
+    """Update the timeline dropdown with available timelines"""
+    timelines = self.timeline_manager.list_timelines()
+    self.timeline_combo['values'] = timelines
+    if timelines and not self.timeline_var.get():
+      self.timeline_var.set(timelines[0])
+
+  def on_timeline_selected(self, event=None):
+    """Handle timeline selection"""
+    selected_timeline = self.timeline_var.get()
+    if selected_timeline:
+      self.current_timeline = self.timeline_manager.load_timeline(selected_timeline)
+      self.log(f"Selected timeline: {selected_timeline}", "info")
+      # Enable edit and start buttons when timeline is selected
+      self.timeline_editor_button.config(state=tk.NORMAL)
+      if self.is_connected and self.animal_id_var.get().strip():
+        self.start_experiment_button.config(state=tk.NORMAL)
+    else:
+      self.current_timeline = None
+      # Disable edit and start buttons when no timeline is selected
+      self.timeline_editor_button.config(state=tk.DISABLED)
+      self.start_experiment_button.config(state=tk.DISABLED)
+
+  def create_new_timeline(self):
+    """Create a new timeline and open it in the editor"""
+    # Create a new timeline with a default name
+    timeline = self.timeline_manager.create_timeline("New Timeline")
+
+    # Open the editor with the new timeline
+    editor = TimelineEditor(self.master, self.timeline_manager, self.on_timeline_saved)
+    editor.current_timeline = timeline
+    editor.update_ui()
+    editor.grab_set()  # Make modal
+
+  def open_timeline_editor(self):
+    """Open the timeline editor window with the selected timeline"""
+    if not self.current_timeline:
+      messagebox.showerror("No Timeline", "Please select a timeline to edit.")
+      return
+
+    editor = TimelineEditor(self.master, self.timeline_manager, self.on_timeline_saved)
+    editor.current_timeline = self.current_timeline
+    editor.update_ui()
+    editor.grab_set()  # Make modal
+
+  def on_timeline_saved(self, timeline):
+    """Handle timeline save from editor"""
+    self.update_timeline_list()
+    if timeline.name == self.timeline_var.get():
+      self.current_timeline = timeline
+    self.log(f"Timeline '{timeline.name}' saved", "success")
+
+    # Update button states
+    self.on_animal_id_change()
+
+  def upload_timeline_to_device(self):
+    """Upload the selected timeline to the device"""
+    if not self.is_connected:
+      messagebox.showerror("Not Connected", "Please connect to the device first.")
+      return
+
+    if not self.current_timeline:
+      messagebox.showerror("No Timeline", "Please select a timeline to upload.")
+      return
+
+    try:
+      # Validate timeline
+      is_valid, errors = self.current_timeline.validate()
+      if not is_valid:
+        error_msg = "Timeline validation failed:\n" + "\n".join(errors)
+        messagebox.showerror("Validation Error", error_msg)
+        return
+
+      # Send timeline upload message
+      message = {
+        "type": "timeline_upload",
+        "data": self.current_timeline.to_dict()
+      }
+      self.ws.send(json.dumps(message))
+      self.log(f"Uploading timeline '{self.current_timeline.name}' to device...", "info")
+
+    except Exception as e:
+      messagebox.showerror("Upload Error", f"Failed to upload timeline: {str(e)}")
+
+  def start_experiment(self):
+    """Start an experiment (basic or timeline-based)"""
+    if not self.is_connected:
+      messagebox.showerror("Not Connected", "Please connect to the device first.")
+      return
+
+    animal_id = self.animal_id_var.get().strip()
+    if not animal_id:
+      messagebox.showerror("No Animal ID", "Please enter an animal ID.")
+      return
+
+    # Check if we have a timeline selected
+    if self.current_timeline:
+      # Start timeline experiment
+      try:
+        # Send timeline experiment start message
+        message = {
+          "type": "start_timeline_experiment",
+          "animal_id": animal_id
+        }
+        self.ws.send(json.dumps(message))
+        self.log(f"Starting timeline experiment with animal ID: {animal_id}", "info")
+      except Exception as e:
+        messagebox.showerror("Start Error", f"Failed to start timeline experiment: {str(e)}")
+    else:
+      # Start basic experiment
+      try:
+        command = f"start_experiment {animal_id} {self.punishment_duration_var.get()} {self.water_delivery_duration_var.get()}"
+        self.execute_command(command)
+      except Exception as e:
+        messagebox.showerror("Start Error", f"Failed to start basic experiment: {str(e)}")
+
 def main():
   root = tk.Tk()
   root.title("Behavior Box: Control Panel")
+  root.geometry("900x720")
   root.resizable(False, False)
 
   # Set window icon

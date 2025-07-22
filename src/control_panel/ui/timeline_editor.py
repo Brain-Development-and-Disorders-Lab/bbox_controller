@@ -11,13 +11,16 @@ from tkinter import ttk, messagebox, filedialog
 import json
 from typing import Callable, Optional
 try:
-    from .timeline_models import (
+    from shared.models import (
         ExperimentTimeline, TrialConfig, ExperimentConfig,
         TimelineManager, AVAILABLE_TRIAL_TYPES
     )
 except ImportError:
     # Fallback for when running as standalone script
-    from timeline_models import (
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from shared.models import (
         ExperimentTimeline, TrialConfig, ExperimentConfig,
         TimelineManager, AVAILABLE_TRIAL_TYPES
     )

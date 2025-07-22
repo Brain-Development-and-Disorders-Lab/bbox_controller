@@ -1,15 +1,12 @@
 """
-Filename: timeline_models.py
-Author: Henry Burgess
-Date: 2025-03-07
-Description: Timeline models for device-side experiment execution
-License: MIT
+Shared models for bbox_controller project
 """
 
 import json
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
+
 
 @dataclass
 class TrialConfig:
@@ -18,6 +15,7 @@ class TrialConfig:
     id: str
     parameters: Dict[str, Any]
     description: str = ""
+
 
 @dataclass
 class ExperimentConfig:
@@ -31,6 +29,7 @@ class ExperimentConfig:
     hold_maximum: int = 1000
     valve_open: int = 100
     punish_time: int = 1000
+
 
 @dataclass
 class ExperimentTimeline:
@@ -55,6 +54,52 @@ class ExperimentTimeline:
             self.created_at = datetime.now().isoformat()
         if not self.modified_at:
             self.modified_at = datetime.now().isoformat()
+
+    def add_trial(self, trial_type: str, parameters: Dict[str, Any] = None,
+                  trial_id: str = None, description: str = "") -> str:
+        """Add a trial to the timeline"""
+        if trial_id is None:
+            trial_id = f"{trial_type}_{len(self.trials)}"
+
+        if parameters is None:
+            parameters = {}
+
+        trial = TrialConfig(
+            type=trial_type,
+            id=trial_id,
+            parameters=parameters,
+            description=description
+        )
+        self.trials.append(trial)
+        self.modified_at = datetime.now().isoformat()
+        return trial_id
+
+    def remove_trial(self, trial_id: str) -> bool:
+        """Remove a trial from the timeline"""
+        for i, trial in enumerate(self.trials):
+            if trial.id == trial_id:
+                self.trials.pop(i)
+                self.modified_at = datetime.now().isoformat()
+                return True
+        return False
+
+    def move_trial(self, trial_id: str, new_index: int) -> bool:
+        """Move a trial to a new position"""
+        for i, trial in enumerate(self.trials):
+            if trial.id == trial_id:
+                if 0 <= new_index < len(self.trials):
+                    trial = self.trials.pop(i)
+                    self.trials.insert(new_index, trial)
+                    self.modified_at = datetime.now().isoformat()
+                    return True
+        return False
+
+    def get_trial(self, trial_id: str) -> Optional[TrialConfig]:
+        """Get a trial by ID"""
+        for trial in self.trials:
+            if trial.id == trial_id:
+                return trial
+        return None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert timeline to dictionary for JSON serialization"""
@@ -130,104 +175,77 @@ class ExperimentTimeline:
 
         return len(errors) == 0, errors
 
-class TrialFactory:
-    """Factory for creating trial objects from timeline data"""
 
-    def __init__(self):
-        self.trial_types = {
-            "Stage1": "Stage1",
-            "Stage2": "Stage2",
-            "Stage3": "Stage3",
-            "Interval": "Interval"
-        }
+class TimelineManager:
+    """Manages timeline storage and retrieval"""
 
-    def create_trial(self, trial_type: str, parameters: Dict[str, Any], **kwargs):
-        """Create a trial object from type and parameters"""
-        if trial_type not in self.trial_types:
-            raise ValueError(f"Unknown trial type: {trial_type}")
+    def __init__(self, timelines_dir: str = "timelines"):
+        self.timelines_dir = timelines_dir
+        self._ensure_timelines_dir()
+        self._load_timelines()
 
-        # Import trial classes dynamically to avoid circular imports
-        if trial_type == "Stage1":
-            from device.trials import Stage1
-            return Stage1(**parameters, **kwargs)
-        elif trial_type == "Stage2":
-            from device.trials import Stage2
-            return Stage2(**parameters, **kwargs)
-        elif trial_type == "Stage3":
-            from device.trials import Stage3
-            return Stage3(**parameters, **kwargs)
-        elif trial_type == "Interval":
-            from device.trials import Interval
-            return Interval(**parameters, **kwargs)
-        else:
-            raise ValueError(f"Unsupported trial type: {trial_type}")
+    def _ensure_timelines_dir(self):
+        """Ensure the timelines directory exists"""
+        import os
+        if not os.path.exists(self.timelines_dir):
+            os.makedirs(self.timelines_dir)
 
-    def is_valid_trial_type(self, trial_type: str) -> bool:
-        """Check if a trial type is valid"""
-        return trial_type in self.trial_types
+    def _load_timelines(self):
+        """Load all timelines from the directory"""
+        import os
+        self.timelines = {}
+        if os.path.exists(self.timelines_dir):
+            for filename in os.listdir(self.timelines_dir):
+                if filename.endswith('.json'):
+                    name = filename[:-5]  # Remove .json extension
+                    try:
+                        with open(os.path.join(self.timelines_dir, filename), 'r') as f:
+                            timeline_data = json.load(f)
+                            self.timelines[name] = ExperimentTimeline.from_dict(timeline_data)
+                    except Exception as e:
+                        print(f"Error loading timeline {name}: {e}")
 
-class TimelineProcessor:
-    """Processor for handling timeline operations on the device"""
-
-    def __init__(self, device):
-        self.device = device
-        self.current_timeline: Optional[ExperimentTimeline] = None
-        self.trial_factory = TrialFactory()
-
-    def process_timeline_upload(self, timeline_data: Dict[str, Any]) -> tuple[bool, str]:
-        """Process a timeline upload from the control panel"""
+    def save_timeline(self, timeline: ExperimentTimeline) -> bool:
+        """Save a timeline to disk"""
+        import os
         try:
-            # Create timeline from data
-            timeline = ExperimentTimeline.from_dict(timeline_data)
-
-            # Validate timeline
-            is_valid, errors = timeline.validate()
-            if not is_valid:
-                error_msg = "Timeline validation failed: " + "; ".join(errors)
-                return False, error_msg
-
-            # Store timeline
-            self.current_timeline = timeline
-            return True, "Timeline validated and stored successfully"
-
+            filename = os.path.join(self.timelines_dir, f"{timeline.name}.json")
+            with open(filename, 'w') as f:
+                f.write(timeline.to_json())
+            self.timelines[timeline.name] = timeline
+            return True
         except Exception as e:
-            return False, f"Timeline processing error: {str(e)}"
+            print(f"Error saving timeline {timeline.name}: {e}")
+            return False
 
-    def execute_timeline(self, animal_id: str) -> tuple[bool, str]:
-        """Execute the current timeline with the given animal ID"""
-        if not self.current_timeline:
-            return False, "No timeline available for execution"
+    def load_timeline(self, name: str) -> Optional[ExperimentTimeline]:
+        """Load a timeline by name"""
+        return self.timelines.get(name)
 
+    def delete_timeline(self, name: str) -> bool:
+        """Delete a timeline from disk and memory"""
+        import os
         try:
-            # Convert timeline to trial objects
-            trials = []
-            for trial_data in self.current_timeline.trials:
-                trial = self.trial_factory.create_trial(
-                    trial_data.type,
-                    trial_data.parameters,
-                    screen=self.device.screen,
-                    font=self.device.font,
-                    width=self.device.width,
-                    height=self.device.height,
-                    io=self.device.io,
-                    display=self.device.display
-                )
-                trials.append(trial)
-
-            # Start experiment with timeline
-            self.device.start_experiment_with_timeline(animal_id, trials, self.current_timeline.config)
-            return True, f"Timeline '{self.current_timeline.name}' started successfully"
-
+            filename = os.path.join(self.timelines_dir, f"{name}.json")
+            if os.path.exists(filename):
+                os.remove(filename)
+            if name in self.timelines:
+                del self.timelines[name]
+            return True
         except Exception as e:
-            return False, f"Timeline execution error: {str(e)}"
+            print(f"Error deleting timeline {name}: {e}")
+            return False
 
-    def get_current_timeline(self) -> Optional[ExperimentTimeline]:
-        """Get the current timeline"""
-        return self.current_timeline
+    def list_timelines(self) -> List[str]:
+        """List all available timeline names"""
+        return list(self.timelines.keys())
 
-    def clear_timeline(self):
-        """Clear the current timeline"""
-        self.current_timeline = None
+    def create_timeline(self, name: str, description: str = "") -> ExperimentTimeline:
+        """Create a new timeline"""
+        timeline = ExperimentTimeline(name=name, description=description)
+        self.timelines[name] = timeline
+        return timeline
+
 
 # Available trial types for validation
 AVAILABLE_TRIAL_TYPES = {

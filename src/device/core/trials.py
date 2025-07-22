@@ -5,10 +5,10 @@ Trial base class and all following trials.
 import random
 import pygame
 import json
-from device.controllers.DisplayController import DisplayController, SIMULATION_MODE
-from device.controllers.IOController import IOController
-from device.logger import log
-from device.util import TrialOutcome
+from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
+from device.hardware.IOController import IOController
+from device.utils.logger import log
+from device.utils.helpers import TrialOutcome
 
 class Base:
   """

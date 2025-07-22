@@ -47,4 +47,4 @@ echo "Repository root: $REPO_ROOT"
 echo "PYTHONPATH: $REPO_ROOT/src"
 
 # Set PYTHONPATH to include `src` directory and run the device
-PYTHONPATH="$REPO_ROOT/src" python main.py
+PYTHONPATH="$REPO_ROOT/src" python device_app.py

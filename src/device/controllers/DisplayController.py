@@ -8,6 +8,7 @@ License: MIT
 
 from PIL import Image, ImageDraw, ImageFont
 import os
+import math
 
 try:
   from board import SCL, SDA
@@ -84,6 +85,78 @@ class DisplayController:
       self.draw_right.rectangle((0, 0, self.width, self.height), outline=1, fill=0)
       self.draw_right.text((5, 5), "Right Display", font=self.font, fill=1)
       self.draw_right.ellipse((20, 30, 108, 50), outline=1, fill=1)
+      self.display_right.image(self.image_right)
+      self.display_right.show()
+
+  def draw_alternating_pattern(self, side="both"):
+    """Draw horizontal alternating black and white lines with a circle of vertical lines"""
+    if side in ["left", "both"]:
+      # Clear the display
+      self.draw_left.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
+
+      # Draw 8 horizontal alternating black and white lines
+      line_height = self.height // 16  # 16 total lines (8 black + 8 white)
+      for i in range(16):
+        y_start = i * line_height
+        y_end = (i + 1) * line_height
+        fill_color = 1 if i % 2 == 0 else 0  # Alternate between white (1) and black (0)
+        self.draw_left.rectangle((0, y_start, self.width, y_end), outline=0, fill=fill_color)
+
+      # Draw circle with vertical alternating lines at approximately 2/3 width
+      circle_center_x = int(self.width * 2/3)  # Approximately 2/3 of display width
+      circle_center_y = self.height // 2
+      circle_radius = 15
+
+      # Draw vertical lines in a circle pattern
+      for angle in range(0, 360, 10):  # Every 10 degrees
+        rad = angle * 3.14159 / 180
+        x = circle_center_x + int(circle_radius * math.cos(rad))
+        y = circle_center_y + int(circle_radius * math.sin(rad))
+
+        # Alternate line color
+        line_color = 1 if angle % 20 == 0 else 0
+
+        # Draw vertical line segment
+        line_length = 8
+        y_start = max(0, y - line_length // 2)
+        y_end = min(self.height, y + line_length // 2)
+        self.draw_left.line((x, y_start, x, y_end), fill=line_color)
+
+      self.display_left.image(self.image_left)
+      self.display_left.show()
+
+    if side in ["right", "both"]:
+      # Clear the display
+      self.draw_right.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
+
+      # Draw 8 horizontal alternating black and white lines
+      line_height = self.height // 16  # 16 total lines (8 black + 8 white)
+      for i in range(16):
+        y_start = i * line_height
+        y_end = (i + 1) * line_height
+        fill_color = 1 if i % 2 == 0 else 0  # Alternate between white (1) and black (0)
+        self.draw_right.rectangle((0, y_start, self.width, y_end), outline=0, fill=fill_color)
+
+      # Draw circle with vertical alternating lines at approximately 2/3 width
+      circle_center_x = int(self.width * 2/3)  # Approximately 2/3 of display width
+      circle_center_y = self.height // 2
+      circle_radius = 15
+
+      # Draw vertical lines in a circle pattern
+      for angle in range(0, 360, 10):  # Every 10 degrees
+        rad = angle * 3.14159 / 180
+        x = circle_center_x + int(circle_radius * math.cos(rad))
+        y = circle_center_y + int(circle_radius * math.sin(rad))
+
+        # Alternate line color
+        line_color = 1 if angle % 20 == 0 else 0
+
+        # Draw vertical line segment
+        line_length = 8
+        y_start = max(0, y - line_length // 2)
+        y_end = min(self.height, y + line_length // 2)
+        self.draw_right.line((x, y_start, x, y_end), fill=line_color)
+
       self.display_right.image(self.image_right)
       self.display_right.show()
 

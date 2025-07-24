@@ -44,6 +44,9 @@ class DisplayController:
         print(f"Failed to initialize I2C bus: {e}")
         print("Switching to full simulation mode")
         self._init_simulation()
+    else:
+      # Initialize simulation mode displays
+      self._init_simulation()
 
     # Load a font - modified for cross-platform compatibility
     try:
@@ -72,6 +75,13 @@ class DisplayController:
       print(f"Failed to initialize {name} display at address 0x{address:02X}: {e}")
       print(f"Using simulation mode for {name} display")
       return DummyDisplay(128, 64)
+
+  def _init_simulation(self):
+    """Initialize dummy displays for simulation mode."""
+    print("Initializing simulation mode displays...")
+    self.display_left = DummyDisplay(128, 64)
+    self.display_right = DummyDisplay(128, 64)
+    print("Simulation mode displays initialized.")
 
   def draw_test_pattern(self, side="both"):
     if side in ["left", "both"]:

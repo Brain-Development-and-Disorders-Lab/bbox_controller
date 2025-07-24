@@ -139,44 +139,6 @@ class Device:
     self._trials = [
       Stage1(),
       Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
-      Stage1(),
-      Interval(duration=self.randomness.generate_iti(float(self.config["iti_minimum"]), float(self.config["iti_maximum"]))),
     ]
     for trial in self._trials:
       trial.screen = self.screen
@@ -304,27 +266,38 @@ class Device:
             }
           })
         else:
-          # All trials completed - save data before resetting
+          # All trials completed - instead of stopping, reset and continue looping
           if self._data:
             if not self._data.save():
               log("Failed to save data", "error")
             else:
               log("Data saved successfully", "success")
 
-          self._experiment_started = False
-          self._current_trial = None
-
-          # Reset trials for next experiment
+          # Reset trials for next loop
           self._reset_trials()
-          log("Experiment completed, trials reset, returning to waiting state", "info")
+          log("Trials completed, looping and restarting trials", "info")
 
-          # Send message that task is complete
-          _device_message_queue.put({
-            "type": "task_status",
-            "data": {
-              "status": "completed"
-            }
-          })
+          # Start the next loop of trials
+          if len(self._trials) > 0:
+            self._current_trial = self._trials.pop(0)
+            self._current_trial.on_enter()
+            _device_message_queue.put({
+              "type": "trial_start",
+              "data": {
+                "trial": self._current_trial.title
+              }
+            })
+          else:
+            # This should not happen, but just in case
+            log("No trials available after reset!", "error")
+            self._experiment_started = False
+            self._current_trial = None
+            _device_message_queue.put({
+              "type": "task_status",
+              "data": {
+                "status": "completed"
+              }
+            })
 
       # Render current trial
       if self._current_trial:

@@ -116,28 +116,11 @@ if is_raspberry_pi; then
     AP_PID=$!
     log INFO "AP setup process started with PID $AP_PID."
 
-    # Wait for AP to appear (scan for SSID)
-    AP_FOUND=0
-    for i in $(seq 1 $MAX_ATTEMPTS); do
-        log INFO "Scanning for AP SSID '$SSID' (attempt $i/$MAX_ATTEMPTS)..."
-        if iwlist $INTERFACE scan 2>/dev/null | grep -q "$SSID"; then
-            log INFO "AP '$SSID' is up!"
-            AP_FOUND=1
-            break
-        fi
-        # Check if AP process died
-        if ! kill -0 $AP_PID 2>/dev/null; then
-            log ERROR "AP setup process (PID $AP_PID) exited early. See $SCRIPT_DIR/logs/setup_ap.log."
-            exit 1
-        fi
-        sleep $SLEEP_BETWEEN
-    done
-
-    if [ $AP_FOUND -ne 1 ]; then
-        log ERROR "AP '$SSID' did not appear after $((MAX_ATTEMPTS * SLEEP_BETWEEN)) seconds. Killing AP process."
-        kill $AP_PID 2>/dev/null || true
-        exit 1
-    fi
+    # Prompt user to connect to AP and wait for acknowledgment
+    log INFO "Please connect your computer to the WiFi Access Point (SSID: $SSID, Password: $PASSWORD)."
+    log INFO "Once connected, press Enter to continue."
+    read -p "[User Action Required] Press Enter to continue after connecting to the AP..."
+    log INFO "User acknowledged AP connection. Continuing with device controller startup."
 else
     log WARN "Not running on a Raspberry Pi. Skipping AP setup."
     AP_PID="N/A"

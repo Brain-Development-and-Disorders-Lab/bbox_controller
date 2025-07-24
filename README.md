@@ -39,29 +39,31 @@ You can run the device in simulation mode for development and testing without ph
 
 The device controller runs only on the device and the device controller must be on the same network as the control panel software in order to communicate. This is accomplished by setting the Raspberry Pi to act as a wireless access point (AP) and connecting to it directly.
 
-To run the device controller code on the Raspberry Pi, run the `startup.sh` script, located under `src/device` with administrator permissions: `sudo ./startup.sh`
+## Starting the Device and Access Point
 
-After a short delay, a notification that the wireless connectivity has been disabled should appear before the task starts in fullscreen.
+The startup script is located in the `src/device` directory. To start both the WiFi Access Point and the device controller, run:
 
-#### Running individual scripts
+```bash
+sudo ./start.sh
+```
 
-First, turn off the wireless connectivity on the Raspberry Pi via the top menu bar. After setting execution permissions using `chmod +x`, running `sudo ./setup_ap.sh` starts the Raspberry Pi in AP mode.
+This is the only script you need to run. It will automatically set up the AP, launch the device controller, and handle all dependencies and logging. All logs are saved in the `logs/` directory.
 
-In another terminal, use `run.sh` to start the device controller. It is highly recommended to setup the Raspberry Pi as a wireless access point, as it allows direct connectivity to the device without external networking equipment. The network SSID and password can be modified within the script.
+## Default WiFi Access Point Settings
 
-Wireless Access Point Defaults:
+- **SSID:** `BehaviorBox_0`
+- **Password:** `behaviorbox0`
+- **IP Address:** `192.168.4.1`
 
-- SSID: `BehaviorBox_0`
-- Password: `behaviorbox0`
-- IP Addresss: `192.168.4.1`
+These are the default credentials for connecting to the device's WiFi network.
 
-### Data Management
+## Data Management
 
-Datasets will be stored under the `src/device/data` directory in individual JSON format files with filenames: `[Animal ID]_[Date]_[Time].json`. Currently, datasets are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS.
+Datasets are stored under the `src/device/data` directory in individual JSON files named `[Animal ID]_[Date]_[Time].json`. Currently, datasets are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS.
 
-Datasets are the following format:
+Datasets follow this format:
 
-```text
+```json
 {
   "metadata": {
     "animal_id": [Animal ID],
@@ -87,14 +89,13 @@ Datasets are the following format:
       ],
       "timestamp": [Starting Timestamp],
       "trial_type": [Trial Name]
-      ... [Other Trial Parameters]
+      // ... Other Trial Parameters ...
     },
     ...
   ],
   "task": {
     "config": {
-      [Variable Name]: [Variable Value],
-      ...
+      // [Variable Name]: [Variable Value], ...
     },
     "timestamp": [Starting Task Timestamp]
   }
@@ -105,11 +106,13 @@ Datasets are the following format:
 
 The device code includes version tracking to help identify which version is running on the device. The version is stored in `src/device/config.json` and is displayed on the device screen and logged in the control panel.
 
-The version will be:
-
 - Displayed on the device's waiting screen
 - Sent to the control panel via WebSocket
 - Logged in the control panel console when connected
+
+## Issues and Feedback
+
+Please contact **Henry Burgess** <henry.burgess@wustl.edu> for all code-related issues and feedback.
 
 ## License
 
@@ -119,7 +122,3 @@ The version will be:
 </a>
 <br />
 This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.
-
-## Issues and Feedback
-
-Please contact **Henry Burgess** <[henry.burgess@wustl.edu](mailto:henry.burgess@wustl.edu)> for all code-related issues and feedback.

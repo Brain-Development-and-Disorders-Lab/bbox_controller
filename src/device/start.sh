@@ -18,11 +18,10 @@ LOGFILE="$SCRIPT_DIR/logs/startup.log"
 INTERFACE="wlan0"
 CHANNEL="7"
 COUNTRY="US"
-MAX_ATTEMPTS=15
-SLEEP_BETWEEN=2
 
-# Parse command line arguments
+# Enable test mode if --test is present
 if [[ "$1" == "--test" ]]; then
+    # Use different SSID and password for test mode
     SSID="BehaviorBox_TEST"
     PASSWORD="behaviorboxtest"
     TEST_MODE=true
@@ -70,19 +69,20 @@ setup_ap() {
     # Check for internet connectivity
     if check_internet; then
         ONLINE=1
-        log INFO "Internet connectivity detected."
+        log INFO "Internet connectivity detected"
     else
         ONLINE=0
-        log WARN "No internet connectivity detected. Running in offline mode."
+        log WARN "No internet connectivity detected, running in offline mode"
     fi
 
     # Install dependencies if not present (only if online)
     if ! command -v curl >/dev/null 2>&1; then
         if [ $ONLINE -eq 1 ]; then
-            log WARN "curl not found. Installing curl and iptables..."
+            log WARN "Dependencies not found, installing curl and iptables..."
             apt update && apt install -y curl iptables
         else
-            log WARN "curl not found and no internet connection. Skipping install."
+            log WARN "Dependencies not found and no internet connection, exiting..."
+            exit 1
         fi
     fi
 
@@ -93,7 +93,8 @@ setup_ap() {
             curl -L -o /tmp/lnxrouter https://raw.githubusercontent.com/garywill/linux-router/master/lnxrouter
             chmod +x /tmp/lnxrouter
         else
-            log WARN "linux-router not found and no internet connection. Will attempt to use any existing local version."
+            log WARN "linux-router not found and no internet connection, exiting..."
+            exit 1
         fi
     fi
 
@@ -120,9 +121,9 @@ setup_ap() {
             --country "$COUNTRY" \
             -g 192.168.4.1 \
             --dhcp-dns 8.8.8.8,8.8.4.4
-        log INFO "WiFi access point process completed."
+        log INFO "WiFi access point process started..."
     else
-        log ERROR "linux-router is not available. Cannot start AP."
+        log ERROR "WiFi access point process failed to start, exiting..."
         exit 1
     fi
 }
@@ -152,16 +153,10 @@ start_device_controller() {
     if [ -n "$VENV_PATH" ]; then
         log INFO "Activating Python virtual environment: $VENV_PATH"
         source "$VENV_PATH/bin/activate"
-        log INFO "Virtual environment activated: $(which python)"
     else
         log WARN "No virtual environment found, using system Python"
     fi
 
-    log INFO "==============================="
-    log INFO "Behavior Box: Device Controller"
-    log INFO "==============================="
-    log INFO "Script directory: $SCRIPT_DIR"
-    log INFO "Timestamp: $(date)"
     log INFO "Starting device controller..."
 
     # Change to the script directory
@@ -233,10 +228,10 @@ cleanup() {
 # Initialize logging
 mkdir -p "$SCRIPT_DIR/logs"
 
-log INFO "============================"
-log INFO "Behavior Box: Startup Script"
-log INFO "============================"
-log INFO "Script directory: $SCRIPT_DIR"
+log INFO "======================================================"
+log INFO "    Behavior Box: Device Controller Startup Script    "
+log INFO "======================================================"
+log INFO "Directory: $SCRIPT_DIR"
 log INFO "Timestamp: $(date)"
 if [ "$TEST_MODE" = true ]; then
     log INFO "Mode: TEST (SSID: $SSID)"
@@ -246,7 +241,7 @@ fi
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
-    log ERROR "This script must be run as root (use sudo)"
+    log ERROR "This script must be run as root"
     exit 1
 fi
 
@@ -255,33 +250,29 @@ trap cleanup EXIT SIGINT SIGTERM
 
 # Start AP setup in background only if on Raspberry Pi
 if is_raspberry_pi; then
-    log INFO "Raspberry Pi detected. Launching AP setup in background..."
-    setup_ap > "$SCRIPT_DIR/logs/setup_ap.log" 2>&1 &
+    log INFO "Raspberry Pi detected, launching AP setup in background..."
+    setup_ap &
     AP_PID=$!
-    log INFO "AP setup process started with PID $AP_PID."
+    log INFO "AP setup process started with PID: $AP_PID"
 
     # Prompt user to connect to AP and wait for acknowledgment
-    log INFO "Please connect your computer to the WiFi Access Point (SSID: $SSID, Password: $PASSWORD)."
-    log INFO "Once connected, press Enter to continue."
-    read -p "[User Action Required] Press Enter to continue after connecting to the AP..."
-    log INFO "User acknowledged AP connection. Continuing with device controller startup."
+    log INFO "Please connect your computer to the WiFi Access Point (SSID: $SSID, Password: $PASSWORD)"
+    read -p "[ACTION REQUIRED] Press Enter to continue after connecting to $SSID"
+    log INFO "Continuing with device controller startup..."
 else
-    log WARN "Not running on a Raspberry Pi. Skipping AP setup."
+    log WARN "Not running on a Raspberry Pi, skipping AP setup"
     AP_PID="N/A"
 fi
 
-# Start device controller in background
-log INFO "Starting device controller in background..."
+log INFO "Starting device controller..."
 start_device_controller > "$SCRIPT_DIR/logs/device_controller.log" 2>&1 &
-RUN_PID=$!
-log INFO "Device controller started with PID $RUN_PID."
+RUN_PID=$! # Store PID of device controller process
+log INFO "Device controller started with PID: $RUN_PID"
 
-# Final status
 log INFO "Startup complete. PIDs: ap=$AP_PID, run=$RUN_PID"
 log INFO "Logs available at:"
-log INFO "  - $SCRIPT_DIR/logs/startup.log (this file)"
-log INFO "  - $SCRIPT_DIR/logs/setup_ap.log (AP setup)"
-log INFO "  - $SCRIPT_DIR/logs/device_controller.log (device controller)"
+log INFO "  - $SCRIPT_DIR/logs/startup.log"
+log INFO "  - $SCRIPT_DIR/logs/device_controller.log"
 
-# Wait for device controller process
+# Wait for device controller process to complete
 wait $RUN_PID

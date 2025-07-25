@@ -110,8 +110,30 @@ setup_ap() {
             -c "$CHANNEL" \
             --country "$COUNTRY" \
             -g 192.168.4.1 \
-            --dhcp-dns 8.8.8.8,8.8.4.4
-        log INFO "WiFi access point process completed."
+            --dhcp-dns 8.8.8.8,8.8.4.4 &
+        AP_ROUTER_PID=$!
+        log INFO "WiFi access point startup initiated with PID $AP_ROUTER_PID."
+
+        # Wait for AP to be ready (check if interface is up and has IP)
+        log INFO "Waiting for WiFi access point to be ready..."
+        local attempts=0
+        local max_wait=30  # Maximum 30 seconds to wait
+        while [ $attempts -lt $max_wait ]; do
+            if ip addr show $INTERFACE | grep -q "inet.*192.168.4.1" && \
+               ip link show $INTERFACE | grep -q "UP"; then
+                log INFO "WiFi access point is ready (interface up with IP 192.168.4.1)."
+                break
+            fi
+            sleep 1
+            attempts=$((attempts + 1))
+            if [ $((attempts % 5)) -eq 0 ]; then
+                log INFO "Still waiting for AP to be ready... (attempt $attempts/$max_wait)"
+            fi
+        done
+
+        if [ $attempts -ge $max_wait ]; then
+            log WARN "AP startup timeout reached, but continuing..."
+        fi
     else
         log ERROR "linux-router is not available. Cannot start AP."
         exit 1

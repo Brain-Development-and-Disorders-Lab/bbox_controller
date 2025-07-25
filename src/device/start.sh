@@ -13,10 +13,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGFILE="$SCRIPT_DIR/logs/startup.log"
 
 # WiFi Access Point Configuration
-SSID="BehaviorBox_0"
-PASSWORD="behaviorbox0"
+SSID="TestAP"
+PASSWORD="testpass123"
 INTERFACE="wlan0"
-CHANNEL="7"
+CHANNEL="1"
 COUNTRY="US"
 
 # =============================================================================
@@ -183,6 +183,28 @@ setup_wifi_ap() {
     systemctl stop dnsmasq 2>/dev/null || true
     sleep 2
 
+    # Set regulatory domain
+    log INFO "Setting regulatory domain..."
+    iw reg set $COUNTRY 2>/dev/null || true
+
+    # Ensure interface is properly down and ready for AP mode
+    log INFO "Preparing interface for AP mode..."
+    ip link set $INTERFACE down
+    sleep 1
+    ip link set $INTERFACE up
+    sleep 1
+
+    # Check interface capabilities
+    log INFO "Checking interface capabilities..."
+    iw dev $INTERFACE info 2>/dev/null || log WARN "iw dev not available"
+
+    # Check if interface supports AP mode
+    if iw list 2>/dev/null | grep -A 20 "Supported interface modes" | grep -q "AP"; then
+        log INFO "Interface supports AP mode"
+    else
+        log WARN "Interface may not support AP mode"
+    fi
+
     # Return the linux-router path for later use
     echo "$LNXROUTER_PATH"
 }
@@ -236,6 +258,12 @@ if is_raspberry_pi; then
 
     # Start the access point in background after user connects
     log INFO "Starting WiFi access point in background..."
+    log INFO "Command: $LNXROUTER_PATH --ap $INTERFACE $SSID -p $PASSWORD -c $CHANNEL --country $COUNTRY -g 192.168.4.1 --dhcp-dns 8.8.8.8,8.8.4.4"
+
+    # Check interface state before starting AP
+    log INFO "Interface state before AP start:"
+    iwconfig $INTERFACE 2>/dev/null || log WARN "iwconfig not available"
+
     "$LNXROUTER_PATH" --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
         -c "$CHANNEL" \
         --country "$COUNTRY" \
@@ -245,14 +273,27 @@ if is_raspberry_pi; then
     log INFO "WiFi access point started with PID: $AP_PID"
 
     # Give the AP a moment to start and check if it's working
-    sleep 3
+    sleep 5
     if kill -0 $AP_PID 2>/dev/null; then
-        log INFO "WiFi access point is running successfully"
+        log INFO "WiFi access point process is running"
+
+        # Check interface state after starting AP
+        log INFO "Interface state after AP start:"
+        iwconfig $INTERFACE 2>/dev/null || log WARN "iwconfig not available"
+
         # Check if the interface is up and configured
         if ip addr show $INTERFACE | grep -q "inet "; then
             log INFO "WiFi interface is configured with IP address"
         else
             log WARN "WiFi interface may not be fully configured yet"
+        fi
+
+        # Check if interface is in Master mode
+        if iwconfig $INTERFACE 2>/dev/null | grep -q "Mode:Master"; then
+            log INFO "WiFi interface is in Master mode (AP mode)"
+        else
+            log ERROR "WiFi interface is not in Master mode - AP may not be working"
+            log INFO "Current mode: $(iwconfig $INTERFACE 2>/dev/null | grep Mode || echo 'Unknown')"
         fi
     else
         log ERROR "WiFi access point failed to start"

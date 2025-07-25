@@ -348,6 +348,8 @@ class TimelineEditor(tk.Toplevel):
 
             # Add trial to timeline
             self.current_timeline.add_trial(trial_type, default_params, trial_id, description)
+            # Update timeline from UI to preserve user input before refreshing UI
+            self.update_timeline_from_ui()
             self.update_ui()
             dialog.destroy()
 
@@ -375,6 +377,8 @@ class TimelineEditor(tk.Toplevel):
             trial = self.current_timeline.trials[index]
             if messagebox.askyesno("Confirm", f"Remove trial '{trial.id}'?"):
                 self.current_timeline.remove_trial(trial.id)
+                # Update timeline from UI to preserve user input before refreshing UI
+                self.update_timeline_from_ui()
                 self.update_ui()
 
     def move_trial_up(self):
@@ -390,6 +394,8 @@ class TimelineEditor(tk.Toplevel):
         if index > 0:
             trial = self.current_timeline.trials[index]
             self.current_timeline.move_trial(trial.id, index - 1)
+            # Update timeline from UI to preserve user input before refreshing UI
+            self.update_timeline_from_ui()
             self.update_ui()
             self.trial_listbox.selection_set(index - 1)
 
@@ -406,6 +412,8 @@ class TimelineEditor(tk.Toplevel):
         if index < len(self.current_timeline.trials) - 1:
             trial = self.current_timeline.trials[index]
             self.current_timeline.move_trial(trial.id, index + 1)
+            # Update timeline from UI to preserve user input before refreshing UI
+            self.update_timeline_from_ui()
             self.update_ui()
             self.trial_listbox.selection_set(index + 1)
 

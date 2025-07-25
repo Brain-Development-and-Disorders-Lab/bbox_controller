@@ -56,6 +56,7 @@ class ControlPanel(tk.Frame):
       # Timeline management
       self.timeline_manager = TimelineManager()
       self.current_timeline = None
+      self.timeline_uploaded_to_device = False  # Track if timeline is uploaded to device
 
       # UI variables
       self.ip_address_var = tk.StringVar(self.master, "localhost")
@@ -410,14 +411,7 @@ class ControlPanel(tk.Frame):
     )
     self.timeline_editor_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
 
-    self.upload_timeline_button = tk.Button(
-      timeline_buttons_frame,
-      text="Upload to Device",
-      font="Arial 10",
-      command=self.upload_timeline_to_device,
-      state=tk.DISABLED
-    )
-    self.upload_timeline_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
 
     # Experiment buttons frame
     experiment_buttons_frame = tk.Frame(experiment_management_frame)
@@ -635,7 +629,6 @@ class ControlPanel(tk.Frame):
     # Timeline buttons - always enabled for timeline management
     self.new_timeline_button.config(state=tk.NORMAL)
     self.timeline_editor_button.config(state=tk.NORMAL)
-    self.upload_timeline_button.config(state=tk.NORMAL)
     self.update_timeline_list()
 
     # Disconnect button
@@ -674,7 +667,6 @@ class ControlPanel(tk.Frame):
     # Timeline buttons - keep enabled for timeline management
     self.new_timeline_button.config(state=tk.NORMAL)
     self.timeline_editor_button.config(state=tk.NORMAL)
-    self.upload_timeline_button.config(state=tk.DISABLED)  # Disable upload when not connected
 
     # Experiment buttons
     self.start_experiment_button.config(state=tk.DISABLED)
@@ -729,8 +721,11 @@ class ControlPanel(tk.Frame):
         message = received_message.get("message", "")
         if success:
           self.log(f"Timeline validation: {message}", "success")
+          # Mark timeline as uploaded to device
+          self.timeline_uploaded_to_device = True
         else:
           self.log(f"Timeline validation failed: {message}", "error")
+          self.timeline_uploaded_to_device = False
       elif received_message["type"] == "timeline_error":
         message = received_message.get("message", "")
         self.log(f"Timeline error: {message}", "error")
@@ -877,6 +872,9 @@ class ControlPanel(tk.Frame):
       "nose_light": False,
     }
 
+    # Reset timeline upload state
+    self.timeline_uploaded_to_device = False
+
     self.reset_tests()
 
   def run_websocket(self):
@@ -895,12 +893,15 @@ class ControlPanel(tk.Frame):
     if selected_timeline:
       self.current_timeline = self.timeline_manager.load_timeline(selected_timeline)
       self.log(f"Selected timeline: {selected_timeline}", "info")
-      # Enable edit and start buttons when timeline is selected
+      # Reset upload state when timeline changes
+      self.timeline_uploaded_to_device = False
+      # Enable edit button when timeline is selected
       self.timeline_editor_button.config(state=tk.NORMAL)
-      if self.is_connected and self.animal_id_var.get().strip():
-        self.start_experiment_button.config(state=tk.NORMAL)
+      # Update start button state
+      self.on_animal_id_change()
     else:
       self.current_timeline = None
+      self.timeline_uploaded_to_device = False
       # Disable edit and start buttons when no timeline is selected
       self.timeline_editor_button.config(state=tk.DISABLED)
       self.start_experiment_button.config(state=tk.DISABLED)
@@ -937,34 +938,7 @@ class ControlPanel(tk.Frame):
     # Update button states
     self.on_animal_id_change()
 
-  def upload_timeline_to_device(self):
-    """Upload the selected timeline to the device"""
-    if not self.is_connected:
-      messagebox.showerror("Not Connected", "Please connect to the device first.")
-      return
 
-    if not self.current_timeline:
-      messagebox.showerror("No Timeline", "Please select a timeline to upload.")
-      return
-
-    try:
-      # Validate timeline
-      is_valid, errors = self.current_timeline.validate()
-      if not is_valid:
-        error_msg = "Timeline validation failed:\n" + "\n".join(errors)
-        messagebox.showerror("Validation Error", error_msg)
-        return
-
-      # Send timeline upload message
-      message = {
-        "type": "timeline_upload",
-        "data": self.current_timeline.to_dict()
-      }
-      self.ws.send(json.dumps(message))
-      self.log(f"Uploading timeline '{self.current_timeline.name}' to device...", "info")
-
-    except Exception as e:
-      messagebox.showerror("Upload Error", f"Failed to upload timeline: {str(e)}")
 
   def start_experiment(self):
     """Start an experiment (basic or timeline-based)"""
@@ -979,6 +953,30 @@ class ControlPanel(tk.Frame):
 
     # Check if we have a timeline selected
     if self.current_timeline:
+      # Automatically upload timeline if not already uploaded
+      if not self.timeline_uploaded_to_device:
+        self.log("Uploading timeline to device...", "info")
+        try:
+          # Validate timeline
+          is_valid, errors = self.current_timeline.validate()
+          if not is_valid:
+            error_msg = "Timeline validation failed:\n" + "\n".join(errors)
+            messagebox.showerror("Validation Error", error_msg)
+            return
+
+          # Send timeline upload message
+          message = {
+            "type": "timeline_upload",
+            "data": self.current_timeline.to_dict()
+          }
+          self.ws.send(json.dumps(message))
+
+          # The device will validate and store the timeline before starting
+          self.log("Timeline upload initiated, starting experiment...", "info")
+        except Exception as e:
+          messagebox.showerror("Upload Error", f"Failed to upload timeline: {str(e)}")
+          return
+
       # Start timeline experiment
       try:
         # Send timeline experiment start message

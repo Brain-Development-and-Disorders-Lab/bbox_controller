@@ -98,151 +98,52 @@ class DisplayController:
       self.display_right.image(self.image_right)
       self.display_right.show()
 
+  def _draw_circle_stripes(self, draw_obj, orientation, circle_center_x, circle_center_y, circle_radius, num_stripes, stripe_width):
+    """Helper method to draw circle stripes for either orientation"""
+    for i in range(num_stripes):
+      # Calculate position and distance from center
+      pos = i * stripe_width
+      distance_from_center = abs(pos - (circle_center_x if orientation == "vertical" else circle_center_y))
+
+      # Calculate stripe length using circle equation
+      if distance_from_center <= circle_radius:
+        stripe_length = 2 * int(math.sqrt(circle_radius**2 - distance_from_center**2))
+      else:
+        continue  # Skip stripes outside circle
+
+      if orientation == "vertical":
+        # Draw vertical stripe
+        y_start = circle_center_y - stripe_length // 2
+        y_end = circle_center_y + stripe_length // 2
+        y_start = max(0, y_start)
+        y_end = min(self.height, y_end)
+        draw_obj.rectangle((pos, y_start, pos + stripe_width - 1, y_end), outline=0, fill=1)
+      else:
+        # Draw horizontal stripe
+        x_start = circle_center_x - stripe_length // 2
+        x_end = circle_center_x + stripe_length // 2
+        x_start = max(0, x_start)
+        x_end = min(self.width, x_end)
+        draw_obj.rectangle((x_start, pos, x_end, pos + stripe_width - 1), outline=0, fill=1)
+
   def draw_alternating_pattern(self, side="both", stripe_orientation="vertical"):
     """Draw circles using stripes with varying lengths to create circular appearance"""
+    # Common parameters
+    circle_center_x = self.width // 2
+    circle_center_y = self.height // 2
+    circle_radius = 25
+    num_stripes = 32
+    stripe_width = self.width // num_stripes
+
     if side in ["left", "both"]:
-      # Clear the display with black background
       self.draw_left.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
-
-      # Circle parameters
-      circle_center_x = self.width // 2
-      circle_center_y = self.height // 2
-      circle_radius = 25
-
-      # Stripe parameters - ensure stripes cover full display
-      num_stripes = 32  # Doubled from 16 to halve stripe thickness
-      stripe_width = self.width // num_stripes  # Calculate width to cover full display
-
-      if stripe_orientation == "vertical":
-        # Draw vertical stripes to create circle appearance
-        for i in range(num_stripes):
-          # Calculate x position for this stripe
-          x = i * stripe_width
-
-          # Calculate distance from center for this x position
-          distance_from_center = abs(x - circle_center_x)
-
-          # Calculate stripe length based on circle equation
-          if distance_from_center <= circle_radius:
-            # Use circle equation: y = sqrt(r^2 - x^2)
-            # Stripe length is 2 * y (full height of circle at this x)
-            stripe_length = 2 * int(math.sqrt(circle_radius**2 - distance_from_center**2))
-          else:
-            stripe_length = 0  # Outside circle, no stripe
-
-          if stripe_length > 0:
-            # Calculate y position to center the stripe
-            y_start = circle_center_y - stripe_length // 2
-            y_end = circle_center_y + stripe_length // 2
-
-            # Ensure stripe stays within display bounds
-            y_start = max(0, y_start)
-            y_end = min(self.height, y_end)
-
-            # Draw the stripe
-            self.draw_left.rectangle((x, y_start, x + stripe_width - 1, y_end), outline=0, fill=1)
-      else:  # horizontal
-        # Draw horizontal stripes to create circle appearance
-        for i in range(num_stripes):
-          # Calculate y position for this stripe
-          y = i * stripe_width
-
-          # Calculate distance from center for this y position
-          distance_from_center = abs(y - circle_center_y)
-
-          # Calculate stripe length based on circle equation
-          if distance_from_center <= circle_radius:
-            # Use circle equation: x = sqrt(r^2 - y^2)
-            # Stripe length is 2 * x (full width of circle at this y)
-            stripe_length = 2 * int(math.sqrt(circle_radius**2 - distance_from_center**2))
-          else:
-            stripe_length = 0  # Outside circle, no stripe
-
-          if stripe_length > 0:
-            # Calculate x position to center the stripe
-            x_start = circle_center_x - stripe_length // 2
-            x_end = circle_center_x + stripe_length // 2
-
-            # Ensure stripe stays within display bounds
-            x_start = max(0, x_start)
-            x_end = min(self.width, x_end)
-
-            # Draw the stripe
-            self.draw_left.rectangle((x_start, y, x_end, y + stripe_width - 1), outline=0, fill=1)
-
+      self._draw_circle_stripes(self.draw_left, stripe_orientation, circle_center_x, circle_center_y, circle_radius, num_stripes, stripe_width)
       self.display_left.image(self.image_left)
       self.display_left.show()
 
     if side in ["right", "both"]:
-      # Clear the display with black background
       self.draw_right.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
-
-      # Circle parameters
-      circle_center_x = self.width // 2
-      circle_center_y = self.height // 2
-      circle_radius = 25
-
-      # Stripe parameters - ensure stripes cover full display
-      num_stripes = 32  # Doubled from 16 to halve stripe thickness
-      stripe_width = self.width // num_stripes  # Calculate width to cover full display
-
-      if stripe_orientation == "vertical":
-        # Draw vertical stripes to create circle appearance
-        for i in range(num_stripes):
-          # Calculate x position for this stripe
-          x = i * stripe_width
-
-          # Calculate distance from center for this x position
-          distance_from_center = abs(x - circle_center_x)
-
-          # Calculate stripe length based on circle equation
-          if distance_from_center <= circle_radius:
-            # Use circle equation: y = sqrt(r^2 - x^2)
-            # Stripe length is 2 * y (full height of circle at this x)
-            stripe_length = 2 * int(math.sqrt(circle_radius**2 - distance_from_center**2))
-          else:
-            stripe_length = 0  # Outside circle, no stripe
-
-          if stripe_length > 0:
-            # Calculate y position to center the stripe
-            y_start = circle_center_y - stripe_length // 2
-            y_end = circle_center_y + stripe_length // 2
-
-            # Ensure stripe stays within display bounds
-            y_start = max(0, y_start)
-            y_end = min(self.height, y_end)
-
-            # Draw the stripe
-            self.draw_right.rectangle((x, y_start, x + stripe_width - 1, y_end), outline=0, fill=1)
-      else:  # horizontal
-        # Draw horizontal stripes to create circle appearance
-        for i in range(num_stripes):
-          # Calculate y position for this stripe
-          y = i * stripe_width
-
-          # Calculate distance from center for this y position
-          distance_from_center = abs(y - circle_center_y)
-
-          # Calculate stripe length based on circle equation
-          if distance_from_center <= circle_radius:
-            # Use circle equation: x = sqrt(r^2 - y^2)
-            # Stripe length is 2 * x (full width of circle at this y)
-            stripe_length = 2 * int(math.sqrt(circle_radius**2 - distance_from_center**2))
-          else:
-            stripe_length = 0  # Outside circle, no stripe
-
-          if stripe_length > 0:
-            # Calculate x position to center the stripe
-            x_start = circle_center_x - stripe_length // 2
-            x_end = circle_center_x + stripe_length // 2
-
-            # Ensure stripe stays within display bounds
-            x_start = max(0, x_start)
-            x_end = min(self.width, x_end)
-
-            # Draw the stripe
-            self.draw_right.rectangle((x_start, y, x_end, y + stripe_width - 1), outline=0, fill=1)
-
+      self._draw_circle_stripes(self.draw_right, stripe_orientation, circle_center_x, circle_center_y, circle_radius, num_stripes, stripe_width)
       self.display_right.image(self.image_right)
       self.display_right.show()
 

@@ -5,6 +5,7 @@ import websockets
 import json
 import queue
 import pygame
+from dataclasses import asdict
 from device.hardware.IOController import IOController
 from device.hardware.DisplayController import DisplayController
 from device.hardware.DataController import DataController
@@ -100,6 +101,8 @@ class Device:
     self._experiment_started = False
     self._running = True
     self._websocket_server = None  # Store reference to websocket server
+    self._original_timeline_config = None  # Store original timeline configuration for looping
+    self._should_loop = False  # Whether the timeline should loop
 
     # Experiment parameters (will be set when experiment starts)
     self._punishment_duration = 1000
@@ -123,14 +126,9 @@ class Device:
     self.screen.fill((0, 0, 0))
 
     # Main waiting text
-    if not self._trials:
-      text = self.font.render("Waiting for timeline...", True, (255, 255, 255))
-      text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
-      self.screen.blit(text, text_rect)
-    else:
-      text = self.font.render("Waiting for start...", True, (255, 255, 255))
-      text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
-      self.screen.blit(text, text_rect)
+    text = self.font.render("Waiting...", True, (255, 255, 255))
+    text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
+    self.screen.blit(text, text_rect)
 
     # Version text (smaller font)
     version_font = pygame.font.SysFont("Arial", 24)
@@ -228,22 +226,48 @@ class Device:
           # Send message about new trial starting
           _device_message_queue.put(MessageBuilder.trial_start(self._current_trial.title))
         else:
-          # All trials completed - save data before resetting
-          if self._data:
-            if not self._data.save():
-              log("Failed to save data", "error")
-            else:
-              log("Data saved successfully", "success")
+          # All trials completed - check if we should loop
+          if self._should_loop and self._original_timeline_config:
+            # Reset trials for next loop by creating new trial instances
+            self._trials = []
+            for trial_config in self._original_timeline_config:
+              # Create a new trial instance with the same parameters
+              new_trial = self.timeline_processor.trial_factory.create_trial(
+                trial_config["type"],  # Get the trial type name
+                trial_config["kwargs"],  # Use the original parameters
+                screen=self.screen,
+                font=self.font,
+                width=self.width,
+                height=self.height,
+                io=self.io,
+                display=self.display
+              )
+              self._trials.append(new_trial)
 
-          self._experiment_started = False
-          self._current_trial = None
+            self._current_trial = self._trials.pop(0)
+            self._current_trial.on_enter()
 
-          # Clear trials - timeline must be re-uploaded for next experiment
-          self._trials = []
-          log("Experiment completed, timeline cleared, returning to waiting state", "info")
+            log("Timeline loop completed, starting next iteration", "info")
+            _device_message_queue.put(MessageBuilder.trial_start(self._current_trial.title))
+          else:
+            # All trials completed - save data before resetting
+            if self._data:
+              if not self._data.save():
+                log("Failed to save data", "error")
+              else:
+                log("Data saved successfully", "success")
 
-          # Send message that task is complete
-          _device_message_queue.put(MessageBuilder.task_status("completed"))
+            self._experiment_started = False
+            self._current_trial = None
+
+            # Clear trials - timeline must be re-uploaded for next experiment
+            self._trials = []
+            self._original_timeline_config = None
+            self._should_loop = False
+            log("Experiment completed, timeline cleared, returning to waiting state", "info")
+
+            # Send message that task is complete
+            _device_message_queue.put(MessageBuilder.task_status("completed"))
 
       # Render current trial
       if self._current_trial:
@@ -272,7 +296,16 @@ class Device:
 
     # Initialize data controller with animal ID
     self._data = DataController(animal_id)
-    self._data.add_task_data({"config": self.config})
+
+    # Convert ExperimentConfig to dictionary for JSON serialization
+    if hasattr(self.config, '__dataclass_fields__'):
+      # It's a dataclass (ExperimentConfig), convert to dict
+      config_dict = asdict(self.config)
+    else:
+      # It's already a dict or other type
+      config_dict = self.config
+
+    self._data.add_task_data({"config": config_dict})
 
     # Add punishment duration to ITI trials
     for trial in self._trials:
@@ -289,7 +322,7 @@ class Device:
 
     log("Experiment started", "info")
 
-  def start_experiment_with_timeline(self, animal_id, trials, config=None):
+  def start_experiment_with_timeline(self, animal_id, trials, config=None, loop=False, trial_configs=None):
     """Start the experiment with a custom timeline"""
     if self._experiment_started:
       log("Experiment already running", "warning")
@@ -303,10 +336,21 @@ class Device:
 
     # Use provided config or fall back to default
     experiment_config = config or self.config
-    self._data.add_task_data({"config": experiment_config})
+
+    # Convert ExperimentConfig to dictionary for JSON serialization
+    if hasattr(experiment_config, '__dataclass_fields__'):
+      # It's a dataclass (ExperimentConfig), convert to dict
+      config_dict = asdict(experiment_config)
+    else:
+      # It's already a dict or other type
+      config_dict = experiment_config
+
+    self._data.add_task_data({"config": config_dict})
 
     # Set trials from timeline
     self._trials = trials.copy()
+    self._original_timeline_config = trial_configs or []  # Store original timeline configuration
+    self._should_loop = loop  # Set loop flag
 
     # Start first trial
     self._current_trial = self._trials.pop(0)

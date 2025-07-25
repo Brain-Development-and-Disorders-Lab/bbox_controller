@@ -80,6 +80,7 @@ class TimelineProcessor:
         try:
             # Convert timeline to trial objects
             trials = []
+            trial_configs = []  # Store configurations for looping
             for trial_data in self.current_timeline.trials:
                 trial = self.trial_factory.create_trial(
                     trial_data.type,
@@ -93,8 +94,14 @@ class TimelineProcessor:
                 )
                 trials.append(trial)
 
+                # Store configuration for looping
+                trial_configs.append({
+                    "type": trial_data.type,
+                    "kwargs": trial_data.parameters
+                })
+
             # Start experiment with timeline
-            self.device.start_experiment_with_timeline(animal_id, trials, self.current_timeline.config)
+            self.device.start_experiment_with_timeline(animal_id, trials, self.current_timeline.config, self.current_timeline.loop, trial_configs)
             return True, f"Timeline '{self.current_timeline.name}' started successfully"
 
         except Exception as e:
@@ -107,5 +114,3 @@ class TimelineProcessor:
     def clear_timeline(self):
         """Clear the current timeline"""
         self.current_timeline = None
-
-from shared.models import AVAILABLE_TRIAL_TYPES

@@ -74,21 +74,14 @@ class TimelineEditor(tk.Toplevel):
         self.description_entry = ttk.Entry(self.info_frame, textvariable=self.description_var, width=45, font="Arial 10")
         self.description_entry.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=5)
 
-        # Action buttons
-        button_frame = ttk.Frame(self.info_frame)
-        button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0))
-
-        self.new_button = tk.Button(button_frame, text="New Timeline", font="Arial 10", command=self.new_timeline)
-        self.new_button.pack(side=tk.LEFT, padx=(0, 5))
-
-        self.load_button = tk.Button(button_frame, text="Load Timeline", font="Arial 10", command=self.load_timeline)
-        self.load_button.pack(side=tk.LEFT, padx=(0, 5))
-
-        self.save_button = tk.Button(button_frame, text="Save Timeline", font="Arial 10", command=self.save_timeline)
-        self.save_button.pack(side=tk.LEFT, padx=(0, 5))
-
-        self.export_button = tk.Button(button_frame, text="Export", font="Arial 10", command=self.export_timeline)
-        self.export_button.pack(side=tk.LEFT, padx=(0, 5))
+        # Loop checkbox
+        self.loop_var = tk.BooleanVar()
+        self.loop_checkbox = ttk.Checkbutton(
+            self.info_frame,
+            text="Loop timeline when completed",
+            variable=self.loop_var
+        )
+        self.loop_checkbox.grid(row=2, column=0, columnspan=2, sticky="w", padx=(0, 10), pady=5)
 
         # Left column - Trial management
         self.left_frame = ttk.LabelFrame(self.main_frame, text="Trial Management", padding="10")
@@ -157,6 +150,21 @@ class TimelineEditor(tk.Toplevel):
         self.validation_text = tk.Text(self.right_frame, height=4, wrap=tk.WORD, font="Arial 10")
         self.validation_text.grid(row=len(config_fields)+1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
 
+        # Bottom action buttons
+        self.action_frame = ttk.Frame(self.main_frame)
+
+        self.new_button = tk.Button(self.action_frame, text="New", font="Arial 10", command=self.new_timeline, width=8)
+        self.new_button.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.load_button = tk.Button(self.action_frame, text="Load", font="Arial 10", command=self.load_timeline, width=8)
+        self.load_button.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.save_button = tk.Button(self.action_frame, text="Save", font="Arial 10", command=self.save_timeline, width=8)
+        self.save_button.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.export_button = tk.Button(self.action_frame, text="Export", font="Arial 10", command=self.export_timeline, width=8)
+        self.export_button.pack(side=tk.LEFT, padx=(0, 5))
+
     def create_layout(self):
         """Create the layout of the UI"""
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -176,6 +184,9 @@ class TimelineEditor(tk.Toplevel):
         # Right column
         self.right_frame.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
         self.right_frame.columnconfigure(1, weight=1)
+
+        # Action buttons at bottom (spans both columns)
+        self.action_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
 
         # Initialize with empty timeline
         self.new_timeline()
@@ -430,6 +441,7 @@ class TimelineEditor(tk.Toplevel):
         # Update timeline info
         self.name_var.set(self.current_timeline.name)
         self.description_var.set(self.current_timeline.description)
+        self.loop_var.set(self.current_timeline.loop)
 
         # Update trial list
         self.trial_listbox.delete(0, tk.END)
@@ -453,6 +465,7 @@ class TimelineEditor(tk.Toplevel):
         # Update timeline info
         self.current_timeline.name = self.name_var.get().strip()
         self.current_timeline.description = self.description_var.get().strip()
+        self.current_timeline.loop = self.loop_var.get()
 
         # Update configuration
         for field, var in self.config_widgets.items():

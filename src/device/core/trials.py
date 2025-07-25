@@ -17,19 +17,18 @@ class Base:
   """
   def __init__(self, *args, **kwargs):
     # Screen properties
-    self.screen = None
-    self.width = None
-    self.height = None
-    self.font = None
-    self.title = "base_screen"
+    self.screen = kwargs.get('screen')
+    self.width = kwargs.get('width')
+    self.height = kwargs.get('height')
+    self.font = kwargs.get('font')
 
     # Arguments
     self.args = args
     self.kwargs = kwargs
 
     # Controllers
-    self.io: IOController = None
-    self.display: DisplayController = None
+    self.io: IOController = kwargs.get('io')
+    self.display: DisplayController = kwargs.get('display')
 
     # All trial data
     self.data = {}
@@ -159,8 +158,8 @@ class Stage1(Base):
     port light upon mouse enters the nose port. Record all events time, such as
     nose port entry, lever press, etc.
   """
-  def __init__(self):
-    super().__init__()
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
     self.title = "trial_stage_1"
     self.start_time = None
     self.water_start_time = None
@@ -334,8 +333,8 @@ class Stage2(Base):
     reward water delivery. Turn off the visual cue and nose port light upon mouse enters the
     nose port. Start the ITI counting after the mouse exits the nose port.
   """
-  def __init__(self):
-    super().__init__()
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
     self.title = "trial_stage_2"
     self.start_time = None
     self.water_start_time = None
@@ -528,8 +527,8 @@ class Stage3(Base):
     randomly generated cue display time between minimum and maximum cue display time if no lever
     pressing event detected. Premature nose withdraw will induce an error trial and terminate the trial.
   """
-  def __init__(self):
-    super().__init__()
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
     self.title = "trial_stage_3"
     self.start_time = None
     self.water_start_time = None

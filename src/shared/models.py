@@ -42,6 +42,7 @@ class ExperimentTimeline:
     metadata: Dict[str, Any] = None
     created_at: str = ""
     modified_at: str = ""
+    loop: bool = False  # Whether to loop the timeline when completed
 
     def __post_init__(self):
         if self.trials is None:
@@ -111,7 +112,8 @@ class ExperimentTimeline:
             "config": asdict(self.config),
             "metadata": self.metadata,
             "created_at": self.created_at,
-            "modified_at": self.modified_at
+            "modified_at": self.modified_at,
+            "loop": self.loop
         }
 
     def to_json(self) -> str:
@@ -139,7 +141,8 @@ class ExperimentTimeline:
             config=config,
             metadata=data.get("metadata", {}),
             created_at=data.get("created_at", ""),
-            modified_at=data.get("modified_at", "")
+            modified_at=data.get("modified_at", ""),
+            loop=data.get("loop", False)
         )
         return timeline
 

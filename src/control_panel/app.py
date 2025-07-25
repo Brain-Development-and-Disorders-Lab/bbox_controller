@@ -582,13 +582,12 @@ class ControlPanel(tk.Frame):
     """
     animal_id = self.animal_id_var.get().strip()
     if animal_id and self.is_connected:
-      # Enable start button if we have an animal ID and are connected
-      # For timeline experiments, also require a timeline to be selected
+      # For timeline experiments, require both animal ID and a timeline to be selected
       if self.current_timeline:
         self.start_experiment_button.config(state=tk.NORMAL)
       else:
-        # For basic experiments, just need animal ID
-        self.start_experiment_button.config(state=tk.NORMAL)
+        # No timeline selected, disable start button
+        self.start_experiment_button.config(state=tk.DISABLED)
     else:
       self.start_experiment_button.config(state=tk.DISABLED)
 
@@ -655,6 +654,7 @@ class ControlPanel(tk.Frame):
     self.test_actuators_button.config(state=tk.DISABLED)
     self.test_ir_button.config(state=tk.DISABLED)
     self.test_nose_light_button.config(state=tk.DISABLED)
+    self.test_displays_button.config(state=tk.DISABLED)
     self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
 
     # Animal ID input
@@ -885,7 +885,16 @@ class ControlPanel(tk.Frame):
     timelines = self.timeline_manager.list_timelines()
     self.timeline_combo['values'] = timelines
     if timelines and not self.timeline_var.get():
+      # Set default value and actually load the timeline
       self.timeline_var.set(timelines[0])
+      self.on_timeline_selected()  # This will load the timeline and update button states
+    elif not timelines:
+      # Clear selection if no timelines available
+      self.timeline_var.set("")
+      self.current_timeline = None
+      self.timeline_uploaded_to_device = False
+      self.timeline_editor_button.config(state=tk.DISABLED)
+      self.on_animal_id_change()
 
   def on_timeline_selected(self, event=None):
     """Handle timeline selection"""
@@ -949,6 +958,11 @@ class ControlPanel(tk.Frame):
     animal_id = self.animal_id_var.get().strip()
     if not animal_id:
       messagebox.showerror("No Animal ID", "Please enter an animal ID.")
+      return
+
+    # Check if we have a timeline selected (additional safety check)
+    if not self.current_timeline:
+      messagebox.showerror("No Timeline", "Please select a timeline to run an experiment.")
       return
 
     # Check if we have a timeline selected

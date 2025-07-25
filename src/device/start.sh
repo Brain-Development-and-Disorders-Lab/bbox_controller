@@ -256,7 +256,7 @@ trap cleanup EXIT SIGINT SIGTERM
 # Start AP setup in background only if on Raspberry Pi
 if is_raspberry_pi; then
     log INFO "Raspberry Pi detected, launching AP setup in background..."
-    setup_ap &
+    setup_ap > "$SCRIPT_DIR/logs/ap.log" 2>&1 &
     AP_PID=$!
     log INFO "AP setup process started with PID: $AP_PID"
 
@@ -270,14 +270,15 @@ else
 fi
 
 log INFO "Starting device controller..."
-start_device_controller > "$SCRIPT_DIR/logs/device_controller.log" 2>&1 &
+start_device_controller > "$SCRIPT_DIR/logs/run.log" 2>&1 &
 RUN_PID=$! # Store PID of device controller process
 log INFO "Device controller started with PID: $RUN_PID"
 
 log INFO "Startup complete. PIDs: ap=$AP_PID, run=$RUN_PID"
 log INFO "Logs available at:"
 log INFO "  - $SCRIPT_DIR/logs/startup.log"
-log INFO "  - $SCRIPT_DIR/logs/device_controller.log"
+log INFO "  - $SCRIPT_DIR/logs/ap.log"
+log INFO "  - $SCRIPT_DIR/logs/run.log"
 
 # Wait for device controller process to complete
 wait $RUN_PID

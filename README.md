@@ -45,11 +45,19 @@ sudo ./start.sh --test
 
 This is the only script you need to run. It will automatically set up the AP, launch the device controller, and handle all dependencies and logging. All logs are saved in the `logs/` directory.
 
+### Log Files
+
+The startup script generates three log files in the `src/device/logs/` directory:
+
+- **`startup.log`** - Main startup script execution and WiFi AP setup
+- **`ap.log`** - WiFi access point configuration and status
+- **`run.log`** - Device controller runtime output and experiment data
+
 ## Default WiFi Access Point Settings
 
 - **SSID:** `BehaviorBox_0`
 - **Password:** `behaviorbox0`
-- **IP Address:** `192.168.4.1`
+- **Device IP Address:** `192.168.4.1`
 
 These are the default credentials for connecting to the device's WiFi network.
 

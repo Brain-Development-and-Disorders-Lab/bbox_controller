@@ -8,6 +8,7 @@ License: MIT
 
 from PIL import Image, ImageDraw, ImageFont
 import os
+import math
 
 try:
   from board import SCL, SDA
@@ -43,6 +44,9 @@ class DisplayController:
         print(f"Failed to initialize I2C bus: {e}")
         print("Switching to full simulation mode")
         self._init_simulation()
+    else:
+      # Initialize simulation mode displays
+      self._init_simulation()
 
     # Load a font - modified for cross-platform compatibility
     try:
@@ -72,6 +76,13 @@ class DisplayController:
       print(f"Using simulation mode for {name} display")
       return DummyDisplay(128, 64)
 
+  def _init_simulation(self):
+    """Initialize dummy displays for simulation mode."""
+    print("Initializing simulation mode displays...")
+    self.display_left = DummyDisplay(128, 64)
+    self.display_right = DummyDisplay(128, 64)
+    print("Simulation mode displays initialized.")
+
   def draw_test_pattern(self, side="both"):
     if side in ["left", "both"]:
       self.draw_left.rectangle((0, 0, self.width, self.height), outline=1, fill=0)
@@ -84,6 +95,55 @@ class DisplayController:
       self.draw_right.rectangle((0, 0, self.width, self.height), outline=1, fill=0)
       self.draw_right.text((5, 5), "Right Display", font=self.font, fill=1)
       self.draw_right.ellipse((20, 30, 108, 50), outline=1, fill=1)
+      self.display_right.image(self.image_right)
+      self.display_right.show()
+
+  def _draw_circle_stripes(self, draw_obj, orientation, circle_center_x, circle_center_y, circle_radius, num_stripes, stripe_width):
+    """Helper method to draw circle stripes for either orientation"""
+    for i in range(num_stripes):
+      # Calculate position and distance from center
+      pos = i * stripe_width
+      distance_from_center = abs(pos - (circle_center_x if orientation == "vertical" else circle_center_y))
+
+      # Calculate stripe length using circle equation
+      if distance_from_center <= circle_radius:
+        stripe_length = 2 * int(math.sqrt(circle_radius**2 - distance_from_center**2))
+      else:
+        continue  # Skip stripes outside circle
+
+      if orientation == "vertical":
+        # Draw vertical stripe
+        y_start = circle_center_y - stripe_length // 2
+        y_end = circle_center_y + stripe_length // 2
+        y_start = max(0, y_start)
+        y_end = min(self.height, y_end)
+        draw_obj.rectangle((pos, y_start, pos + stripe_width - 1, y_end), outline=0, fill=1)
+      else:
+        # Draw horizontal stripe
+        x_start = circle_center_x - stripe_length // 2
+        x_end = circle_center_x + stripe_length // 2
+        x_start = max(0, x_start)
+        x_end = min(self.width, x_end)
+        draw_obj.rectangle((x_start, pos, x_end, pos + stripe_width - 1), outline=0, fill=1)
+
+  def draw_alternating_pattern(self, side="both", stripe_orientation="vertical"):
+    """Draw circles using stripes with varying lengths to create circular appearance"""
+    # Common parameters
+    circle_center_x = self.width // 2
+    circle_center_y = self.height // 2
+    circle_radius = 25
+    num_stripes = 32
+    stripe_width = self.width // num_stripes
+
+    if side in ["left", "both"]:
+      self.draw_left.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
+      self._draw_circle_stripes(self.draw_left, stripe_orientation, circle_center_x, circle_center_y, circle_radius, num_stripes, stripe_width)
+      self.display_left.image(self.image_left)
+      self.display_left.show()
+
+    if side in ["right", "both"]:
+      self.draw_right.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
+      self._draw_circle_stripes(self.draw_right, stripe_orientation, circle_center_x, circle_center_y, circle_radius, num_stripes, stripe_width)
       self.display_right.image(self.image_right)
       self.display_right.show()
 

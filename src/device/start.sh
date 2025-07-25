@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# Behavior Box: Startup Script
+# Behavior Box: Device Script
 # =============================================================================
 # This script sets up a WiFi access point and starts the device controller
 # on a Raspberry Pi device. It handles both online and offline scenarios.
@@ -15,13 +15,22 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGFILE="$SCRIPT_DIR/logs/startup.log"
-SSID="BehaviorBox_TEST"
-PASSWORD="behaviorboxtest"
 INTERFACE="wlan0"
 CHANNEL="7"
 COUNTRY="US"
 MAX_ATTEMPTS=15
 SLEEP_BETWEEN=2
+
+# Parse command line arguments
+if [[ "$1" == "--test" ]]; then
+    SSID="BehaviorBox_TEST"
+    PASSWORD="behaviorboxtest"
+    TEST_MODE=true
+else
+    SSID="BehaviorBox_0"
+    PASSWORD="behaviorbox0"
+    TEST_MODE=false
+fi
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -103,37 +112,15 @@ setup_ap() {
     systemctl stop dnsmasq 2>/dev/null || true
     sleep 2
 
-    # Start the WiFi access point
+        # Start the WiFi access point
     if [ -f "/tmp/lnxrouter" ]; then
         log INFO "Starting WiFi access point: SSID='$SSID', Password='$PASSWORD', Channel='$CHANNEL', Country='$COUNTRY'"
         /tmp/lnxrouter --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
             -c "$CHANNEL" \
             --country "$COUNTRY" \
             -g 192.168.4.1 \
-            --dhcp-dns 8.8.8.8,8.8.4.4 &
-        AP_ROUTER_PID=$!
-        log INFO "WiFi access point startup initiated with PID $AP_ROUTER_PID."
-
-        # Wait for AP to be ready (check if interface is up and has IP)
-        log INFO "Waiting for WiFi access point to be ready..."
-        local attempts=0
-        local max_wait=30  # Maximum 30 seconds to wait
-        while [ $attempts -lt $max_wait ]; do
-            if ip addr show $INTERFACE | grep -q "inet.*192.168.4.1" && \
-               ip link show $INTERFACE | grep -q "UP"; then
-                log INFO "WiFi access point is ready (interface up with IP 192.168.4.1)."
-                break
-            fi
-            sleep 1
-            attempts=$((attempts + 1))
-            if [ $((attempts % 5)) -eq 0 ]; then
-                log INFO "Still waiting for AP to be ready... (attempt $attempts/$max_wait)"
-            fi
-        done
-
-        if [ $attempts -ge $max_wait ]; then
-            log WARN "AP startup timeout reached, but continuing..."
-        fi
+            --dhcp-dns 8.8.8.8,8.8.4.4
+        log INFO "WiFi access point process completed."
     else
         log ERROR "linux-router is not available. Cannot start AP."
         exit 1
@@ -193,9 +180,11 @@ start_device_controller() {
 # CLEANUP FUNCTIONS
 # =============================================================================
 
-# Cleanup routine to stop background processes
+# Cleanup routine to stop background processes and restore WiFi
 cleanup() {
-    log INFO "Cleaning up background processes..."
+    log INFO "Cleaning up background processes and restoring WiFi..."
+
+    # Stop background processes
     if [ "$AP_PID" != "N/A" ] && [ -n "$AP_PID" ] && kill -0 $AP_PID 2>/dev/null; then
         kill $AP_PID
         log INFO "Stopped AP process (PID $AP_PID)."
@@ -203,6 +192,37 @@ cleanup() {
     if [ -n "$RUN_PID" ] && kill -0 $RUN_PID 2>/dev/null; then
         kill $RUN_PID
         log INFO "Stopped device controller process (PID $RUN_PID)."
+    fi
+
+    # Restore WiFi interface to normal operation
+    if is_raspberry_pi; then
+        log INFO "Restoring WiFi interface $INTERFACE to normal operation..."
+
+        # Stop any running access point
+        if [ -f "/tmp/lnxrouter" ]; then
+            log INFO "Stopping access point on $INTERFACE..."
+            /tmp/lnxrouter --stop "$INTERFACE" 2>/dev/null || true
+            sleep 2
+        fi
+
+        # Stop dnsmasq if it was started by the AP
+        log INFO "Stopping dnsmasq service..."
+        systemctl stop dnsmasq 2>/dev/null || true
+        sleep 1
+
+        # Bring interface back up
+        log INFO "Bringing interface $INTERFACE back up..."
+        ip link set $INTERFACE up 2>/dev/null || true
+        sleep 1
+
+        # Restart networking services if available
+        if command -v systemctl >/dev/null 2>&1; then
+            log INFO "Restarting networking services..."
+            systemctl restart networking 2>/dev/null || true
+            systemctl restart wpa_supplicant 2>/dev/null || true
+        fi
+
+        log INFO "WiFi interface restoration completed."
     fi
 }
 
@@ -218,6 +238,11 @@ log INFO "Behavior Box: Startup Script"
 log INFO "============================"
 log INFO "Script directory: $SCRIPT_DIR"
 log INFO "Timestamp: $(date)"
+if [ "$TEST_MODE" = true ]; then
+    log INFO "Mode: TEST (SSID: $SSID)"
+else
+    log INFO "Mode: PRODUCTION (SSID: $SSID)"
+fi
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then

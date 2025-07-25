@@ -23,6 +23,9 @@ class TestStateManager:
             "test_nose_light": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
+            "test_displays": {
+                "state": TEST_STATES["NOT_TESTED"],
+            },
         }
 
     def get_test_state(self, test_name: str) -> int:
@@ -84,7 +87,7 @@ class TestCommandValidator:
             return False, f"Unknown test command: {base_command}"
 
         # Validate duration parameters for commands that support them
-        if base_command in ["test_water_delivery", "test_nose_light"]:
+        if base_command in ["test_water_delivery", "test_nose_light", "test_displays"]:
             if len(parts) > 1:
                 try:
                     duration = int(parts[1])

@@ -502,6 +502,28 @@ class Device:
     self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["RUNNING"])
     asyncio.create_task(self._test_nose_light(duration_ms))
 
+  async def _test_displays(self, duration_ms=2000):
+    try:
+      # Draw test pattern on both displays
+      self.display.draw_test_pattern("both")
+      await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
+      # Clear displays after test
+      self.display.clear_displays()
+    except Exception as e:
+      self.test_state_manager.set_test_state("test_displays", TEST_STATES["FAILED"])
+      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      log(f"Could not control displays: {str(e)}", "error")
+
+    if self.test_state_manager.get_test_state("test_displays") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_displays", TEST_STATES["PASSED"])
+      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      log(f"Display test passed (duration: {duration_ms}ms)", "success")
+
+  def test_displays(self, duration_ms=2000):
+    log(f"Testing displays for {duration_ms}ms", "start")
+    self.test_state_manager.set_test_state("test_displays", TEST_STATES["RUNNING"])
+    asyncio.create_task(self._test_displays(duration_ms))
+
   def run_test(self, command):
     if command == "test_water_delivery":
       self.test_water_delivery()
@@ -533,6 +555,19 @@ class Device:
           log(f"Invalid duration for nose light test: {parts[1]}", "error")
       else:
         self.test_nose_light()  # Use default duration
+    elif command == "test_displays":
+      self.test_displays()
+    elif command.startswith("test_displays"):
+      # Parse duration from command: "test_displays <duration_ms>"
+      parts = command.split(" ")
+      if len(parts) > 1:
+        try:
+          duration_ms = int(parts[1])
+          self.test_displays(duration_ms)
+        except ValueError:
+          log(f"Invalid duration for display test: {parts[1]}", "error")
+      else:
+        self.test_displays()  # Use default duration
 
   def run_experiment(self, command):
     primary_command = command.split(" ")[0]

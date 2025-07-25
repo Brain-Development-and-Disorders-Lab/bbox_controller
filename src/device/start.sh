@@ -161,10 +161,24 @@ setup_wifi_ap() {
 
     # Configure wireless interface
     log INFO "Configuring wireless interface..."
+
+    # Stop any existing WiFi connections
+    log INFO "Disconnecting from existing WiFi networks..."
+    wpa_cli -i $INTERFACE disconnect 2>/dev/null || true
+    wpa_cli -i $INTERFACE terminate 2>/dev/null || true
+
+    # Stop network manager and wpa_supplicant
+    log INFO "Stopping network services..."
+    systemctl stop wpa_supplicant 2>/dev/null || true
+    systemctl stop NetworkManager 2>/dev/null || true
+
+    # Bring down the interface
+    log INFO "Bringing down wireless interface..."
     ip link set $INTERFACE down
     sleep 2
 
     # Stop existing services
+    log INFO "Stopping existing access point services..."
     "$LNXROUTER_PATH" --stop "$INTERFACE" 2>/dev/null || true
     systemctl stop dnsmasq 2>/dev/null || true
     sleep 2
@@ -226,9 +240,24 @@ if is_raspberry_pi; then
         -c "$CHANNEL" \
         --country "$COUNTRY" \
         -g 192.168.4.1 \
-        --dhcp-dns 8.8.8.8,8.8.4.4 > /dev/null 2>&1 &
+        --dhcp-dns 8.8.8.8,8.8.4.4 &
     AP_PID=$!
-    log INFO "WiFi access point running with PID: $AP_PID"
+    log INFO "WiFi access point started with PID: $AP_PID"
+
+    # Give the AP a moment to start and check if it's working
+    sleep 3
+    if kill -0 $AP_PID 2>/dev/null; then
+        log INFO "WiFi access point is running successfully"
+        # Check if the interface is up and configured
+        if ip addr show $INTERFACE | grep -q "inet "; then
+            log INFO "WiFi interface is configured with IP address"
+        else
+            log WARN "WiFi interface may not be fully configured yet"
+        fi
+    else
+        log ERROR "WiFi access point failed to start"
+        exit 1
+    fi
 else
     log WARN "Not on Raspberry Pi, skipping WiFi setup"
     AP_PID="N/A"

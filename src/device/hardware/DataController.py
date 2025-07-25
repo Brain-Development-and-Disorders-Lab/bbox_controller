@@ -58,6 +58,10 @@ class DataController:
     data["timestamp"] = datetime.now().isoformat()
     self.data["task"].update(data)
 
+  def add_statistics(self, statistics):
+    """Add statistics data"""
+    self.data["statistics"] = statistics
+
   def save(self) -> bool:
     """Save the current data to file"""
     try:

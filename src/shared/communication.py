@@ -107,6 +107,14 @@ class MessageBuilder:
             "animal_id": animal_id
         }
 
+    @staticmethod
+    def statistics(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a statistics message"""
+        return {
+            "type": "statistics",
+            "data": data
+        }
+
 
 class MessageParser:
     """Utility class for parsing and validating messages"""

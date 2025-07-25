@@ -169,15 +169,8 @@ setup_wifi_ap() {
     systemctl stop dnsmasq 2>/dev/null || true
     sleep 2
 
-    # Start access point
-    log INFO "Starting WiFi access point..."
-    "$LNXROUTER_PATH" --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
-        -c "$CHANNEL" \
-        --country "$COUNTRY" \
-        -g 192.168.4.1 \
-        --dhcp-dns 8.8.8.8,8.8.4.4
-
-    log INFO "WiFi access point started successfully"
+    # Return the linux-router path for later use
+    echo "$LNXROUTER_PATH"
 }
 
 # =============================================================================
@@ -220,13 +213,22 @@ start_device_controller() {
 
 # Start WiFi access point if on Raspberry Pi
 if is_raspberry_pi; then
-    log INFO "Raspberry Pi detected, starting WiFi access point..."
-    setup_wifi_ap &
-    AP_PID=$!
-    log INFO "WiFi access point started with PID: $AP_PID"
+    log INFO "Raspberry Pi detected, setting up WiFi access point..."
+    LNXROUTER_PATH=$(setup_wifi_ap)
+    log INFO "WiFi access point setup completed"
 
     log INFO "Please connect to WiFi (SSID: $SSID, Password: $PASSWORD)"
     read -p "[USER ACTION] Press Enter after connecting to WiFi..."
+
+    # Start the access point in background after user connects
+    log INFO "Starting WiFi access point in background..."
+    "$LNXROUTER_PATH" --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
+        -c "$CHANNEL" \
+        --country "$COUNTRY" \
+        -g 192.168.4.1 \
+        --dhcp-dns 8.8.8.8,8.8.4.4 > /dev/null 2>&1 &
+    AP_PID=$!
+    log INFO "WiFi access point running with PID: $AP_PID"
 else
     log WARN "Not on Raspberry Pi, skipping WiFi setup"
     AP_PID="N/A"

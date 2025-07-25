@@ -118,19 +118,32 @@ setup_wifi_ap() {
     if ! command -v curl >/dev/null 2>&1; then
         if [ "$ONLINE" = true ]; then
             log WARN "Installing missing dependencies..."
-            apt update && apt install -y curl iptables
+            log INFO "Running apt update..."
+            if ! apt update; then
+                log ERROR "apt update failed, exiting..."
+                exit 1
+            fi
+            log INFO "Installing curl and iptables..."
+            if ! apt install -y curl iptables; then
+                log ERROR "Failed to install dependencies, exiting..."
+                exit 1
+            fi
+            log INFO "Dependencies installed successfully"
         else
             log WARN "Missing dependencies and no internet connection, exiting..."
             exit 1
         fi
+    else
+        log INFO "Dependencies already available"
     fi
 
     # Find or download linux-router
+    log INFO "Searching for linux-router executable..."
     LNXROUTER_PATH=$(find_linux_router)
     if [ -z "$LNXROUTER_PATH" ]; then
         if [ "$ONLINE" = true ]; then
             log WARN "Downloading linux-router..."
-            if curl -L -o /tmp/lnxrouter https://raw.githubusercontent.com/garywill/linux-router/master/lnxrouter; then
+            if curl -L --connect-timeout 10 --max-time 30 -o /tmp/lnxrouter https://raw.githubusercontent.com/garywill/linux-router/master/lnxrouter; then
                 chmod +x /tmp/lnxrouter
                 LNXROUTER_PATH="/tmp/lnxrouter"
                 log INFO "Successfully downloaded linux-router"
@@ -208,7 +221,7 @@ start_device_controller() {
 # Start WiFi access point if on Raspberry Pi
 if is_raspberry_pi; then
     log INFO "Raspberry Pi detected, starting WiFi access point..."
-    setup_wifi_ap > "$SCRIPT_DIR/logs/setup_ap.log" 2>&1 &
+    setup_wifi_ap &
     AP_PID=$!
     log INFO "WiFi access point started with PID: $AP_PID"
 
@@ -229,7 +242,9 @@ log INFO "Device controller started with PID: $CONTROLLER_PID"
 # =============================================================================
 
 log INFO "Startup complete - AP PID: $AP_PID, Controller PID: $CONTROLLER_PID"
-log INFO "Logs: $SCRIPT_DIR/logs/"
+log INFO "Logs:"
+log INFO "  - $SCRIPT_DIR/logs/startup.log (startup activities)"
+log INFO "  - $SCRIPT_DIR/logs/device_controller.log (device controller)"
 
 cleanup() {
     log INFO "Cleaning up processes..."

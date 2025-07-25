@@ -110,7 +110,7 @@ class DisplayController:
       circle_radius = 25
 
       # Stripe parameters - ensure stripes cover full display
-      num_stripes = 16  # Same number as current background
+      num_stripes = 32  # Doubled from 16 to halve stripe thickness
       stripe_width = self.width // num_stripes  # Calculate width to cover full display
 
       if stripe_orientation == "vertical":
@@ -183,7 +183,7 @@ class DisplayController:
       circle_radius = 25
 
       # Stripe parameters - ensure stripes cover full display
-      num_stripes = 16  # Same number as current background
+      num_stripes = 32  # Doubled from 16 to halve stripe thickness
       stripe_width = self.width // num_stripes  # Calculate width to cover full display
 
       if stripe_orientation == "vertical":

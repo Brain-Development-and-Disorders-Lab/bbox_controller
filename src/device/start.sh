@@ -187,11 +187,11 @@ cleanup() {
     # Stop background processes
     if [ "$AP_PID" != "N/A" ] && [ -n "$AP_PID" ] && kill -0 $AP_PID 2>/dev/null; then
         kill $AP_PID
-        log INFO "Stopped AP process (PID $AP_PID)."
+        log INFO "Stopped AP process PID: $AP_PID"
     fi
     if [ -n "$RUN_PID" ] && kill -0 $RUN_PID 2>/dev/null; then
         kill $RUN_PID
-        log INFO "Stopped device controller process (PID $RUN_PID)."
+        log INFO "Stopped device controller process PID: $RUN_PID"
     fi
 
     # Restore WiFi interface to normal operation
@@ -222,7 +222,7 @@ cleanup() {
             systemctl restart wpa_supplicant 2>/dev/null || true
         fi
 
-        log INFO "WiFi interface restoration completed."
+        log INFO "WiFi interface restoration started, please allow 1-2 minutes to complete"
     fi
 }
 
@@ -274,7 +274,9 @@ start_device_controller > "$SCRIPT_DIR/logs/run.log" 2>&1 &
 RUN_PID=$! # Store PID of device controller process
 log INFO "Device controller started with PID: $RUN_PID"
 
-log INFO "Startup complete. PIDs: ap=$AP_PID, run=$RUN_PID"
+log INFO "Startup complete, PIDS:"
+log INFO "  - WiFi access point: $AP_PID"
+log INFO "  - Device controller: $RUN_PID"
 log INFO "Logs available at:"
 log INFO "  - $SCRIPT_DIR/logs/startup.log"
 log INFO "  - $SCRIPT_DIR/logs/ap.log"

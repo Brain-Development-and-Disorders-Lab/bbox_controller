@@ -38,6 +38,11 @@ The startup script is located in the `src/device` directory. To start both the W
 sudo ./start.sh
 ```
 
+For testing to avoid SSID conflicts, use the `--test` flag:
+```bash
+sudo ./start.sh --test
+```
+
 This is the only script you need to run. It will automatically set up the AP, launch the device controller, and handle all dependencies and logging. All logs are saved in the `logs/` directory.
 
 ## Default WiFi Access Point Settings

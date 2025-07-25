@@ -8,7 +8,16 @@ The control panel facilitates wireless monitoring and control via Websockets. To
 
 Use the *Connection* frame to connect to the device using an IP address and port number. The *Console* frame shows the live console output from the device. The *Input Status* frame shows the current state of the device IO with low latency. The *Test Status* frame allows the IO to be tested, specifically the water deliver, actuators, and the IR beam.
 
-To run an experiment, enter the animal ID in the *Experiment Management* frame and click the *Start* button.
+### Experiment Management
+
+**Basic Experiments**: To run a basic experiment, enter the animal ID in the *Experiment Management* frame and click the *Start* button.
+
+**Timeline Experiments**: For advanced experiment protocols, use the timeline management system:
+1. Click *Edit Timeline* to open the timeline editor
+2. Create custom experiment protocols with multiple trial types
+3. Save and manage timelines
+4. Upload timelines to the device
+5. Execute timeline-based experiments
 
 ## Device
 

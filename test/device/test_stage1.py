@@ -16,9 +16,9 @@ os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'device'))
 # Initialize pygame for font support
 pygame.init()
 
-from device.trials import Stage1
-from device.controllers.IOController import IOController
-from device.logger import log
+from device.core.trials import Stage1
+from device.hardware.IOController import IOController
+from device.utils.logger import log
 
 def test_stage1_nose_port_exit():
     """Test that Stage1 properly waits for nose port exit"""

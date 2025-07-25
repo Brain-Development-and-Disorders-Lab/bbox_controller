@@ -7,8 +7,8 @@ This script tests the extended simulation functionality
 import sys
 import os
 
-from device.controllers.IOController import IOController
-from device.logger import log
+from device.hardware.IOController import IOController
+from device.utils.logger import log
 
 def test_simulation():
     """Test the simulation mode functionality"""

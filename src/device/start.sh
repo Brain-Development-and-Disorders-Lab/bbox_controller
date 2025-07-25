@@ -179,6 +179,11 @@ start_device_controller() {
 cleanup() {
     log INFO "Cleaning up background processes and restoring WiFi..."
 
+    # Kill any waiting read command (user input prompt)
+    if [ -n "$(jobs -p)" ]; then
+        kill $(jobs -p) 2>/dev/null || true
+    fi
+
     # Stop background processes
     if [ "$AP_PID" != "N/A" ] && [ -n "$AP_PID" ] && kill -0 $AP_PID 2>/dev/null; then
         kill $AP_PID

@@ -192,7 +192,7 @@ class Stage1(Base):
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
       self.display.clear_displays()
-      self.display.draw_test_pattern(self.cue_side)
+      self.display.draw_alternating_pattern(self.cue_side)
       log("Visual cue displayed on the " + self.cue_side + " side", "success")
 
     log("Trial started", "info")
@@ -295,7 +295,7 @@ class Stage1(Base):
     # Update visual state
     if not SIMULATION_MODE:
       if self.visual_cue:
-        self.display.draw_test_pattern(self.cue_side)
+        self.display.draw_alternating_pattern(self.cue_side)
       else:
         self.display.clear_displays()
 
@@ -369,7 +369,7 @@ class Stage2(Base):
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
       self.display.clear_displays()
-      self.display.draw_test_pattern(self.cue_side)
+      self.display.draw_alternating_pattern(self.cue_side)
       log("Visual cue displayed on the " + self.cue_side + " side", "success")
 
     log("Trial started", "info")
@@ -484,7 +484,7 @@ class Stage2(Base):
     # Update visual state
     if not SIMULATION_MODE:
       if self.visual_cue:
-        self.display.draw_test_pattern(self.cue_side)
+        self.display.draw_alternating_pattern(self.cue_side)
       else:
         self.display.clear_displays()
 
@@ -714,7 +714,7 @@ class Stage3(Base):
     # Update visual state
     if not SIMULATION_MODE:
       if self.visual_cue:
-        self.display.draw_test_pattern(self.cue_side)
+        self.display.draw_alternating_pattern(self.cue_side)
       else:
         self.display.clear_displays()
 

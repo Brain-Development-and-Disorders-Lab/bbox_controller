@@ -18,6 +18,7 @@ TEST_COMMANDS = [
   "test_actuators",
   "test_ir",
   "test_nose_light",
+  "test_display",
 ]
 
 # Experiment commands
@@ -82,6 +83,9 @@ class Device:
         "state": TEST_STATES["NOT_TESTED"],
       },
       "test_nose_light": {
+        "state": TEST_STATES["NOT_TESTED"],
+      },
+      "test_display": {
         "state": TEST_STATES["NOT_TESTED"],
       },
     }
@@ -533,6 +537,28 @@ class Device:
     self._test_state["test_nose_light"]["state"] = TEST_STATES["RUNNING"]
     asyncio.create_task(self._test_nose_light(duration_ms))
 
+  async def _test_display(self, duration_ms=2000):
+    try:
+      # Show the alternating pattern on both displays
+      self.display.draw_alternating_pattern("both")
+      await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
+      # Clear the displays after the test
+      self.display.clear_displays()
+    except Exception as e:
+      self._test_state["test_display"]["state"] = TEST_STATES["FAILED"]
+      _device_message_queue.put({"type": "test_state", "data": self._test_state})
+      log(f"Could not control displays: {str(e)}", "error")
+
+    if self._test_state["test_display"]["state"] == TEST_STATES["RUNNING"]:
+      self._test_state["test_display"]["state"] = TEST_STATES["PASSED"]
+      _device_message_queue.put({"type": "test_state", "data": self._test_state})
+      log(f"Display test passed (duration: {duration_ms}ms)", "success")
+
+  def test_display(self, duration_ms=2000):
+    log(f"Testing display pattern for {duration_ms}ms", "start")
+    self._test_state["test_display"]["state"] = TEST_STATES["RUNNING"]
+    asyncio.create_task(self._test_display(duration_ms))
+
   def run_test(self, command):
     if command == "test_water_delivery":
       self.test_water_delivery()
@@ -564,6 +590,19 @@ class Device:
           log(f"Invalid duration for nose light test: {parts[1]}", "error")
       else:
         self.test_nose_light()  # Use default duration
+    elif command == "test_display":
+      self.test_display()
+    elif command.startswith("test_display"):
+      # Parse duration from command: "test_display <duration_ms>"
+      parts = command.split(" ")
+      if len(parts) > 1:
+        try:
+          duration_ms = int(parts[1])
+          self.test_display(duration_ms)
+        except ValueError:
+          log(f"Invalid duration for display test: {parts[1]}", "error")
+      else:
+        self.test_display()  # Use default duration
 
   def run_experiment(self, command):
     primary_command = command.split(" ")[0]
@@ -671,6 +710,8 @@ async def handle_connection(websocket, device: Device):
         elif command.startswith("test_water_delivery"):
           device.run_test(command)
         elif command.startswith("test_nose_light"):
+          device.run_test(command)
+        elif command.startswith("test_display"):
           device.run_test(command)
         elif command.startswith("start_experiment"):
           device.run_experiment(command)

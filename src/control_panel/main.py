@@ -45,6 +45,7 @@ TEST_COMMANDS = [
   "test_actuators",
   "test_ir",
   "test_nose_light",
+  "test_display",
 ]
 
 # Experiment commands
@@ -92,6 +93,9 @@ class ControlPanel(tk.Frame):
           "state": TEST_STATES["NOT_TESTED"],
         },
         "test_nose_light": {
+          "state": TEST_STATES["NOT_TESTED"],
+        },
+        "test_display": {
           "state": TEST_STATES["NOT_TESTED"],
         },
       }
@@ -351,6 +355,7 @@ class ControlPanel(tk.Frame):
     self.create_test_row(test_status_frame, "Test Actuators", "test_actuators", False)
     self.create_test_row(test_status_frame, "Test IR", "test_ir", False)
     self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light", True)
+    self.create_test_row(test_status_frame, "Test Display", "test_display", True)
 
     # Reset button
     self.reset_tests_button = tk.Button(
@@ -435,6 +440,7 @@ class ControlPanel(tk.Frame):
     self.test_actuators_button = self.test_indicators["test_actuators"]["button"]
     self.test_ir_button = self.test_indicators["test_ir"]["button"]
     self.test_nose_light_button = self.test_indicators["test_nose_light"]["button"]
+    self.test_display_button = self.test_indicators["test_display"]["button"]
 
   def log(self, message, state="info", source="UI"):
     """
@@ -518,24 +524,30 @@ class ControlPanel(tk.Frame):
       self.test_actuators_button.config(state=tk.DISABLED)
       self.test_water_delivery_button.config(state=tk.DISABLED)
       self.test_nose_light_button.config(state=tk.DISABLED)
+      self.test_display_button.config(state=tk.DISABLED)
 
       # Disable duration inputs
       if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
         self.test_indicators["test_water_delivery"]["duration_entry"].config(state=tk.DISABLED)
       if "test_nose_light" in self.test_indicators and "duration_entry" in self.test_indicators["test_nose_light"]:
         self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.DISABLED)
+      if "test_display" in self.test_indicators and "duration_entry" in self.test_indicators["test_display"]:
+        self.test_indicators["test_display"]["duration_entry"].config(state=tk.DISABLED)
     else:
       # Enable test buttons
       self.test_ir_button.config(state=tk.NORMAL)
       self.test_actuators_button.config(state=tk.NORMAL)
       self.test_water_delivery_button.config(state=tk.NORMAL)
       self.test_nose_light_button.config(state=tk.NORMAL)
+      self.test_display_button.config(state=tk.NORMAL)
 
       # Enable duration inputs
       if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
         self.test_indicators["test_water_delivery"]["duration_entry"].config(state=tk.NORMAL)
       if "test_nose_light" in self.test_indicators and "duration_entry" in self.test_indicators["test_nose_light"]:
         self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.NORMAL)
+      if "test_display" in self.test_indicators and "duration_entry" in self.test_indicators["test_display"]:
+        self.test_indicators["test_display"]["duration_entry"].config(state=tk.NORMAL)
 
   def set_experiment_buttons_disabled(self, disabled):
     """
@@ -591,6 +603,7 @@ class ControlPanel(tk.Frame):
     self.test_actuators_button.config(state=tk.NORMAL)
     self.test_ir_button.config(state=tk.NORMAL)
     self.test_nose_light_button.config(state=tk.NORMAL)
+    self.test_display_button.config(state=tk.NORMAL)
     self.reset_tests_button.config(state=tk.NORMAL)  # Enable reset button
 
     # Animal ID input
@@ -621,6 +634,7 @@ class ControlPanel(tk.Frame):
     self.test_actuators_button.config(state=tk.DISABLED)
     self.test_ir_button.config(state=tk.DISABLED)
     self.test_nose_light_button.config(state=tk.DISABLED)
+    self.test_display_button.config(state=tk.DISABLED)
     self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
 
     # Animal ID input
@@ -818,6 +832,9 @@ class ControlPanel(tk.Frame):
         "state": TEST_STATES["NOT_TESTED"],
       },
       "test_nose_light": {
+        "state": TEST_STATES["NOT_TESTED"],
+      },
+      "test_display": {
         "state": TEST_STATES["NOT_TESTED"],
       },
     }

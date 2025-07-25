@@ -1,54 +1,16 @@
 #!/bin/bash
 
-# Behavior Box Device Controller Startup Script
-# Sets up WiFi access point and starts the device controller
-
-set -e
-
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGFILE="$SCRIPT_DIR/logs/startup.log"
-
-# WiFi Access Point Configuration
-SSID="TestAP"
-PASSWORD="testpass123"
+SSID="BehaviorBox_TEST"
+PASSWORD="behaviorboxtest"
 INTERFACE="wlan0"
-CHANNEL="1"
+CHANNEL="7"
 COUNTRY="US"
+MAX_ATTEMPTS=15
+SLEEP_BETWEEN=2
 
-# =============================================================================
-# COMMAND LINE ARGUMENTS
-# =============================================================================
-
-TEST_MODE=false
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --test|-t)
-            TEST_MODE=true
-            SSID="BehaviorBox_TEST"
-            PASSWORD="behaviorboxtest"
-            shift
-            ;;
-        --help|-h)
-            echo "Usage: $0 [--test]"
-            echo "  --test    Use test SSID and password"
-            echo "  --help    Show this help message"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Use --help for usage information"
-            exit 1
-            ;;
-    esac
-done
-
-# =============================================================================
-# SETUP AND VALIDATION
-# =============================================================================
+set -e
 
 mkdir -p "$SCRIPT_DIR/logs"
 
@@ -60,163 +22,111 @@ log() {
     echo "$ts [$level] $msg" | tee -a "$LOGFILE"
 }
 
-log INFO "================================================"
-log INFO "        Behavior Box: Device Controller         "
-log INFO "================================================"
-log INFO "Directory: $SCRIPT_DIR"
-log INFO "Mode: $([ "$TEST_MODE" = true ] && echo "TEST" || echo "PRODUCTION")"
+log INFO "============================"
+log INFO "Behavior Box: Startup Script"
+log INFO "============================"
+log INFO "Script directory: $SCRIPT_DIR"
+log INFO "Timestamp: $(date)"
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
-    log ERROR "This script must be run as root"
+    log ERROR "This script must be run as root (use sudo)"
     exit 1
 fi
 
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-# Check for internet connectivity
+# Function to check for internet connectivity
 check_internet() {
-    ping -c 1 -W 2 github.com >/dev/null 2>&1
+    if ping -c 1 -W 2 github.com >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
 }
 
-# Check if running on Raspberry Pi
+# Function to set up AP (runs in background)
+setup_ap() {
+    log INFO "Setting up WiFi Access Point..."
+    # Check for internet connectivity
+    if check_internet; then
+        ONLINE=1
+        log INFO "Internet connectivity detected."
+    else
+        ONLINE=0
+        log WARN "No internet connectivity detected. Running in offline mode."
+    fi
+    # Install dependencies if not present (only if online)
+    if ! command -v curl >/dev/null 2>&1; then
+        if [ $ONLINE -eq 1 ]; then
+            log WARN "curl not found. Installing curl and iptables..."
+            apt update && apt install -y curl iptables
+        else
+            log WARN "curl not found and no internet connection. Skipping install."
+        fi
+    fi
+    # Download linux-router if not present (only if online)
+    if [ ! -f "/tmp/lnxrouter" ]; then
+        if [ $ONLINE -eq 1 ]; then
+            log INFO "Downloading linux-router..."
+            curl -L -o /tmp/lnxrouter https://raw.githubusercontent.com/garywill/linux-router/master/lnxrouter
+            chmod +x /tmp/lnxrouter
+        else
+            log WARN "linux-router not found and no internet connection. Will attempt to use any existing local version."
+        fi
+    fi
+    # Disable wireless connectivity
+    log INFO "Disabling wireless connectivity on $INTERFACE..."
+    ip link set $INTERFACE down
+    sleep 2
+    # Stop any existing access point
+    log INFO "Stopping any existing access point on $INTERFACE..."
+    /tmp/lnxrouter --stop "$INTERFACE" 2>/dev/null || true
+    sleep 2
+    # Stop any running instance of `dnsmasq`
+    log INFO "Stopping any existing dnsmasq process..."
+    systemctl stop dnsmasq 2>/dev/null || true
+    sleep 2
+    # Start the WiFi access point
+    if [ -f "/tmp/lnxrouter" ]; then
+        log INFO "Starting WiFi access point: SSID='$SSID', Password='$PASSWORD', Channel='$CHANNEL', Country='$COUNTRY'"
+        /tmp/lnxrouter --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
+            -c "$CHANNEL" \
+            --country "$COUNTRY" \
+            -g 192.168.4.1 \
+            --dhcp-dns 8.8.8.8,8.8.4.4
+        log INFO "WiFi access point process completed."
+    else
+        log ERROR "linux-router is not available. Cannot start AP."
+        exit 1
+    fi
+}
+
+# Function to check if running on Raspberry Pi
 is_raspberry_pi() {
     grep -q 'Raspberry Pi' /proc/device-tree/model 2>/dev/null || \
     grep -q 'Raspberry Pi' /sys/firmware/devicetree/base/model 2>/dev/null
 }
 
-# Find linux-router executable
-find_linux_router() {
-    for path in "/tmp/lnxrouter" "/usr/local/bin/lnxrouter" "/usr/bin/lnxrouter" "$SCRIPT_DIR/lnxrouter"; do
-        if [ -f "$path" ] && [ -x "$path" ]; then
-            echo "$path"
-            return 0
-        fi
-    done
-    return 1
-}
+# Start AP setup in background only if on Raspberry Pi
+if is_raspberry_pi; then
+    log INFO "Raspberry Pi detected. Launching AP setup in background..."
+    setup_ap > "$SCRIPT_DIR/logs/setup_ap.log" 2>&1 &
+    AP_PID=$!
+    log INFO "AP setup process started with PID $AP_PID."
 
-# =============================================================================
-# WIFI ACCESS POINT SETUP
-# =============================================================================
+    # Prompt user to connect to AP and wait for acknowledgment
+    log INFO "Please connect your computer to the WiFi Access Point (SSID: $SSID, Password: $PASSWORD)."
+    log INFO "Once connected, press Enter to continue."
+    read -p "[User Action Required] Press Enter to continue after connecting to the AP..."
+    log INFO "User acknowledged AP connection. Continuing with device controller startup."
+else
+    log WARN "Not running on a Raspberry Pi. Skipping AP setup."
+    AP_PID="N/A"
+fi
 
-setup_wifi_ap() {
-    log INFO "Setting up WiFi access point..."
-
-    # Check internet connectivity
-    if check_internet; then
-        log INFO "Internet connectivity detected"
-        ONLINE=true
-    else
-        log WARN "No internet connectivity detected"
-        ONLINE=false
-    fi
-
-    # Install dependencies if needed
-    if ! command -v curl >/dev/null 2>&1; then
-        if [ "$ONLINE" = true ]; then
-            log WARN "Installing missing dependencies..."
-            log INFO "Running apt update..."
-            if ! apt update; then
-                log ERROR "apt update failed, exiting..."
-                exit 1
-            fi
-            log INFO "Installing curl and iptables..."
-            if ! apt install -y curl iptables; then
-                log ERROR "Failed to install dependencies, exiting..."
-                exit 1
-            fi
-            log INFO "Dependencies installed successfully"
-        else
-            log WARN "Missing dependencies and no internet connection, exiting..."
-            exit 1
-        fi
-    else
-        log INFO "Dependencies already available"
-    fi
-
-    # Find or download linux-router
-    log INFO "Searching for linux-router executable..."
-    LNXROUTER_PATH=$(find_linux_router)
-    if [ -z "$LNXROUTER_PATH" ]; then
-        if [ "$ONLINE" = true ]; then
-            log WARN "Downloading linux-router..."
-            if curl -L --connect-timeout 10 --max-time 30 -o /tmp/lnxrouter https://raw.githubusercontent.com/garywill/linux-router/master/lnxrouter; then
-                chmod +x /tmp/lnxrouter
-                LNXROUTER_PATH="/tmp/lnxrouter"
-                log INFO "Successfully downloaded linux-router"
-            else
-                log ERROR "Failed to download linux-router, exiting..."
-                exit 1
-            fi
-        else
-            log ERROR "No linux-router found and no internet connection, exiting..."
-            exit 1
-        fi
-    else
-        log INFO "Found linux-router at: $LNXROUTER_PATH"
-    fi
-
-    # Configure wireless interface
-    log INFO "Configuring wireless interface..."
-
-    # Stop any existing WiFi connections
-    log INFO "Disconnecting from existing WiFi networks..."
-    wpa_cli -i $INTERFACE disconnect 2>/dev/null || true
-    wpa_cli -i $INTERFACE terminate 2>/dev/null || true
-
-    # Stop network manager and wpa_supplicant
-    log INFO "Stopping network services..."
-    systemctl stop wpa_supplicant 2>/dev/null || true
-    systemctl stop NetworkManager 2>/dev/null || true
-
-    # Bring down the interface
-    log INFO "Bringing down wireless interface..."
-    ip link set $INTERFACE down
-    sleep 2
-
-    # Stop existing services
-    log INFO "Stopping existing access point services..."
-    "$LNXROUTER_PATH" --stop "$INTERFACE" 2>/dev/null || true
-    systemctl stop dnsmasq 2>/dev/null || true
-    sleep 2
-
-    # Set regulatory domain
-    log INFO "Setting regulatory domain..."
-    iw reg set $COUNTRY 2>/dev/null || true
-
-    # Ensure interface is properly down and ready for AP mode
-    log INFO "Preparing interface for AP mode..."
-    ip link set $INTERFACE down
-    sleep 1
-    ip link set $INTERFACE up
-    sleep 1
-
-    # Check interface capabilities
-    log INFO "Checking interface capabilities..."
-    iw dev $INTERFACE info 2>/dev/null || log WARN "iw dev not available"
-
-    # Check if interface supports AP mode
-    if iw list 2>/dev/null | grep -A 20 "Supported interface modes" | grep -q "AP"; then
-        log INFO "Interface supports AP mode"
-    else
-        log WARN "Interface may not support AP mode"
-    fi
-
-    # Return the linux-router path for later use
-    echo "$LNXROUTER_PATH"
-}
-
-# =============================================================================
-# DEVICE CONTROLLER SETUP
-# =============================================================================
-
+# Start device controller in background (merged logic from device_controller.sh)
 start_device_controller() {
-    log INFO "Starting device controller..."
-
-    # Find and activate virtual environment
+    log INFO "Preparing to start device controller..."
+    # Check for and activate Python virtual environment if present
     VENV_PATH=""
     CURRENT_DIR="$SCRIPT_DIR"
     while [ "$CURRENT_DIR" != "/" ]; do
@@ -229,101 +139,53 @@ start_device_controller() {
         fi
         CURRENT_DIR="$(dirname "$CURRENT_DIR")"
     done
-
     if [ -n "$VENV_PATH" ]; then
-        log INFO "Activating virtual environment: $VENV_PATH"
+        log INFO "Activating Python virtual environment: $VENV_PATH"
         source "$VENV_PATH/bin/activate"
+        log INFO "Virtual environment activated: $(which python)"
     else
         log WARN "No virtual environment found, using system Python"
     fi
-
-    # Set up environment and start controller
+    log INFO "==============================="
+    log INFO "Behavior Box: Device Controller"
+    log INFO "==============================="
+    log INFO "Script directory: $SCRIPT_DIR"
+    log INFO "Timestamp: $(date)"
+    log INFO "Starting device controller..."
+    # Change to the script directory
     cd "$SCRIPT_DIR"
+    # Set PYTHONPATH to include the repository root (where .venv is located)
     REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+    log INFO "Repository root: $REPO_ROOT"
+    log INFO "PYTHONPATH: $REPO_ROOT/src"
+    # Set PYTHONPATH to include `src` directory and run the device
     PYTHONPATH="$REPO_ROOT/src" python main.py
 }
 
-# =============================================================================
-# MAIN EXECUTION
-# =============================================================================
-
-# Start WiFi access point if on Raspberry Pi
-if is_raspberry_pi; then
-    log INFO "Raspberry Pi detected, setting up WiFi access point..."
-    LNXROUTER_PATH=$(setup_wifi_ap)
-    log INFO "WiFi access point setup completed"
-
-    log INFO "Please connect to WiFi (SSID: $SSID, Password: $PASSWORD)"
-    read -p "[USER ACTION] Press Enter after connecting to WiFi..."
-
-    # Start the access point in background after user connects
-    log INFO "Starting WiFi access point in background..."
-    log INFO "Command: $LNXROUTER_PATH --ap $INTERFACE $SSID -p $PASSWORD -c $CHANNEL --country $COUNTRY -g 192.168.4.1 --dhcp-dns 8.8.8.8,8.8.4.4"
-
-    # Check interface state before starting AP
-    log INFO "Interface state before AP start:"
-    iwconfig $INTERFACE 2>/dev/null || log WARN "iwconfig not available"
-
-    "$LNXROUTER_PATH" --ap "$INTERFACE" "$SSID" -p "$PASSWORD" \
-        -c "$CHANNEL" \
-        --country "$COUNTRY" \
-        -g 192.168.4.1 \
-        --dhcp-dns 8.8.8.8,8.8.4.4 &
-    AP_PID=$!
-    log INFO "WiFi access point started with PID: $AP_PID"
-
-    # Give the AP a moment to start and check if it's working
-    sleep 5
-    if kill -0 $AP_PID 2>/dev/null; then
-        log INFO "WiFi access point process is running"
-
-        # Check interface state after starting AP
-        log INFO "Interface state after AP start:"
-        iwconfig $INTERFACE 2>/dev/null || log WARN "iwconfig not available"
-
-        # Check if the interface is up and configured
-        if ip addr show $INTERFACE | grep -q "inet "; then
-            log INFO "WiFi interface is configured with IP address"
-        else
-            log WARN "WiFi interface may not be fully configured yet"
-        fi
-
-        # Check if interface is in Master mode
-        if iwconfig $INTERFACE 2>/dev/null | grep -q "Mode:Master"; then
-            log INFO "WiFi interface is in Master mode (AP mode)"
-        else
-            log ERROR "WiFi interface is not in Master mode - AP may not be working"
-            log INFO "Current mode: $(iwconfig $INTERFACE 2>/dev/null | grep Mode || echo 'Unknown')"
-        fi
-    else
-        log ERROR "WiFi access point failed to start"
-        exit 1
-    fi
-else
-    log WARN "Not on Raspberry Pi, skipping WiFi setup"
-    AP_PID="N/A"
-fi
-
-# Start device controller
+log INFO "Starting device controller in background..."
 start_device_controller > "$SCRIPT_DIR/logs/device_controller.log" 2>&1 &
-CONTROLLER_PID=$!
-log INFO "Device controller started with PID: $CONTROLLER_PID"
+RUN_PID=$!
+log INFO "Device controller started with PID $RUN_PID."
 
-# =============================================================================
-# CLEANUP AND MONITORING
-# =============================================================================
-
-log INFO "Startup complete - AP PID: $AP_PID, Controller PID: $CONTROLLER_PID"
-log INFO "Logs:"
-log INFO "  - $SCRIPT_DIR/logs/startup.log (startup activities)"
+log INFO "Startup complete. PIDs: ap=$AP_PID, run=$RUN_PID"
+log INFO "Logs available at:"
+log INFO "  - $SCRIPT_DIR/logs/startup.log (this file)"
+log INFO "  - $SCRIPT_DIR/logs/setup_ap.log (AP setup)"
 log INFO "  - $SCRIPT_DIR/logs/device_controller.log (device controller)"
 
+# Cleanup routine to stop background processes
 cleanup() {
-    log INFO "Cleaning up processes..."
-    [ "$AP_PID" != "N/A" ] && [ -n "$AP_PID" ] && kill -0 $AP_PID 2>/dev/null && kill $AP_PID
-    [ -n "$CONTROLLER_PID" ] && kill -0 $CONTROLLER_PID 2>/dev/null && kill $CONTROLLER_PID
+    log INFO "Cleaning up background processes..."
+    if [ "$AP_PID" != "N/A" ] && [ -n "$AP_PID" ] && kill -0 $AP_PID 2>/dev/null; then
+        kill $AP_PID
+        log INFO "Stopped AP process (PID $AP_PID)."
+    fi
+    if [ -n "$RUN_PID" ] && kill -0 $RUN_PID 2>/dev/null; then
+        kill $RUN_PID
+        log INFO "Stopped device controller process (PID $RUN_PID)."
+    fi
 }
 trap cleanup EXIT SIGINT SIGTERM
 
-# Wait for device controller to complete
-wait $CONTROLLER_PID
+# Optionally, wait for both processes (uncomment if you want the script to block)
+wait $RUN_PID

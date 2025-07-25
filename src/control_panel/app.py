@@ -84,6 +84,15 @@ class ControlPanel(tk.Frame):
         "nose_light": tk.BooleanVar(self.master, False),
       }
 
+      # Statistics tracking
+      self.statistics = {
+        "nose_pokes": 0,
+        "left_lever_presses": 0,
+        "right_lever_presses": 0,
+        "trial_count": 0,
+        "water_deliveries": 0
+      }
+
       # Configure source-specific colors
       self.source_colors = {
         "UI": "#0066CC",      # Blue for UI logs
@@ -293,20 +302,12 @@ class ControlPanel(tk.Frame):
     status_frame = tk.Frame(content_frame)
     status_frame.grid(row=0, column=0, sticky="n", padx=(0, PADDING))
 
-    # Display Status section
-    displays_frame = tk.LabelFrame(status_frame, text="Display Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    displays_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
+    # Statistics section
+    statistics_frame = tk.LabelFrame(status_frame, text="Live Statistics", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    statistics_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
 
-    # Display canvas with proper aspect ratio
-    display_width = PANEL_WIDTH / 3 - 50
-    display_height = display_width * (9/16) # Maintain 16:9 aspect ratio
-    display_canvas = tk.Canvas(
-      displays_frame,
-      width=display_width,
-      height=display_height,
-      bg="black"
-    )
-    display_canvas.pack(pady=10)
+    # Create statistics display
+    self.create_statistics_display(statistics_frame)
 
     # Input Status section
     input_status_frame = tk.LabelFrame(status_frame, text="Input Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -693,6 +694,10 @@ class ControlPanel(tk.Frame):
             self.device_version = new_version
             self.log(f"Device version: {self.device_version}", "info", "SYSTEM")
         self.update_state_labels()
+      elif received_message["type"] == "statistics":
+        # Update statistics display
+        self.statistics = received_message["data"]
+        self.update_statistics(self.statistics)
       elif received_message["type"] == "test_state":
         # Update only the specific test states that changed
         for test_name, test_data in received_message["data"].items():
@@ -708,6 +713,7 @@ class ControlPanel(tk.Frame):
         # Update experiment buttons based on task status
         if status == "started":
           self.set_experiment_buttons_disabled(True)
+          self.reset_statistics_display() # Reset statistics when experiment starts
         elif status == "completed" or status == "stopped":
           self.set_experiment_buttons_disabled(False)
       elif received_message["type"] == "trial_start":
@@ -1009,6 +1015,73 @@ class ControlPanel(tk.Frame):
         self.execute_command(command)
       except Exception as e:
         messagebox.showerror("Start Error", f"Failed to start basic experiment: {str(e)}")
+
+  def create_statistics_display(self, parent):
+    """
+    Creates a frame to display live statistics.
+    """
+    # Create a frame to hold the statistics
+    stats_frame = tk.Frame(parent)
+    stats_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
+
+    # Create labels for each statistic with proper alignment
+    # Nose Pokes
+    nose_pokes_frame = tk.Frame(stats_frame)
+    nose_pokes_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(nose_pokes_frame, text="Nose Pokes:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.nose_pokes_label = tk.Label(nose_pokes_frame, text="0", font=("Arial", 11), anchor="e")
+    self.nose_pokes_label.pack(side=tk.RIGHT)
+
+    # Left Lever Presses
+    left_lever_frame = tk.Frame(stats_frame)
+    left_lever_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(left_lever_frame, text="Left Lever Presses:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.left_lever_presses_label = tk.Label(left_lever_frame, text="0", font=("Arial", 11), anchor="e")
+    self.left_lever_presses_label.pack(side=tk.RIGHT)
+
+    # Right Lever Presses
+    right_lever_frame = tk.Frame(stats_frame)
+    right_lever_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(right_lever_frame, text="Right Lever Presses:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.right_lever_presses_label = tk.Label(right_lever_frame, text="0", font=("Arial", 11), anchor="e")
+    self.right_lever_presses_label.pack(side=tk.RIGHT)
+
+    # Trial Count
+    trial_frame = tk.Frame(stats_frame)
+    trial_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(trial_frame, text="Trials:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.trial_count_label = tk.Label(trial_frame, text="0", font=("Arial", 11), anchor="e")
+    self.trial_count_label.pack(side=tk.RIGHT)
+
+    # Water Deliveries
+    water_frame = tk.Frame(stats_frame)
+    water_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(water_frame, text="Water Deliveries:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.water_deliveries_label = tk.Label(water_frame, text="0", font=("Arial", 11), anchor="e")
+    self.water_deliveries_label.pack(side=tk.RIGHT)
+
+  def update_statistics(self, stats):
+    """
+    Updates the live statistics display with new values.
+    """
+    self.nose_pokes_label.config(text=str(stats['nose_pokes']))
+    self.left_lever_presses_label.config(text=str(stats['left_lever_presses']))
+    self.right_lever_presses_label.config(text=str(stats['right_lever_presses']))
+    self.trial_count_label.config(text=str(stats['trial_count']))
+    self.water_deliveries_label.config(text=str(stats['water_deliveries']))
+
+  def reset_statistics_display(self):
+    """
+    Resets the statistics display to zero.
+    """
+    self.statistics = {
+      "nose_pokes": 0,
+      "left_lever_presses": 0,
+      "right_lever_presses": 0,
+      "trial_count": 0,
+      "water_deliveries": 0
+    }
+    self.update_statistics(self.statistics)
 
 def main():
   root = tk.Tk()

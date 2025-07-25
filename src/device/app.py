@@ -66,6 +66,24 @@ class Device:
       "nose_light": False,
     }
 
+    # Statistics tracking
+    self._statistics = {
+      "nose_pokes": 0,
+      "left_lever_presses": 0,
+      "right_lever_presses": 0,
+      "trial_count": 0,
+      "water_deliveries": 0
+    }
+
+    # Track previous input states for detecting changes
+    self._previous_input_states = {
+      "left_lever": False,
+      "right_lever": False,
+      "nose_poke": False,
+      "water_port": False,
+      "nose_light": False,
+    }
+
     # Initialize pygame in the new process
     pygame.init()
 
@@ -200,6 +218,9 @@ class Device:
           elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
             self.io.simulate_nose_poke(True)
 
+    # Update input states and statistics
+    self._update_input_states_and_statistics()
+
     if not self._experiment_started:
       # Show waiting screen
       self._render_waiting_screen()
@@ -208,6 +229,9 @@ class Device:
       if not self._current_trial.update(events):
         # Trial is complete, move to next trial
         self._current_trial.on_exit()
+
+        # Increment trial count
+        self._statistics["trial_count"] += 1
 
         # Save trial data
         trial_data = self._current_trial.get_data()
@@ -252,6 +276,8 @@ class Device:
           else:
             # All trials completed - save data before resetting
             if self._data:
+              # Save final statistics
+              self._data.add_statistics(self.get_statistics())
               if not self._data.save():
                 log("Failed to save data", "error")
               else:
@@ -276,6 +302,49 @@ class Device:
 
     return True
 
+  def _update_input_states_and_statistics(self):
+    """Update input states and track statistics based on changes"""
+    # Get current input states
+    current_input_states = self.io.get_input_states()
+
+    # Update device input states
+    self._input_states = current_input_states.copy()
+
+    # Check for changes and update statistics
+    if self._experiment_started:  # Only track during experiments
+      # Check for nose poke activation (transition from True to False)
+      if self._previous_input_states["nose_poke"] and not current_input_states["nose_poke"]:
+        self._statistics["nose_pokes"] += 1
+
+      # Check for left lever press (transition from False to True)
+      if not self._previous_input_states["left_lever"] and current_input_states["left_lever"]:
+        self._statistics["left_lever_presses"] += 1
+
+      # Check for right lever press (transition from False to True)
+      if not self._previous_input_states["right_lever"] and current_input_states["right_lever"]:
+        self._statistics["right_lever_presses"] += 1
+
+      # Check for water delivery (transition from False to True)
+      if not self._previous_input_states["water_port"] and current_input_states["water_port"]:
+        self._statistics["water_deliveries"] += 1
+
+    # Update previous states for next comparison
+    self._previous_input_states = current_input_states.copy()
+
+  def get_statistics(self):
+    """Get current statistics"""
+    return self._statistics.copy()
+
+  def reset_statistics(self):
+    """Reset all statistics to zero"""
+    self._statistics = {
+      "nose_pokes": 0,
+      "left_lever_presses": 0,
+      "right_lever_presses": 0,
+      "trial_count": 0,
+      "water_deliveries": 0
+    }
+
   def start_experiment(self, animal_id, punishment_duration=1000, water_delivery_duration=2000):
     """Start the experiment with the given animal ID and duration parameters"""
     if self._experiment_started:
@@ -286,6 +355,9 @@ class Device:
     if not self._trials:
       log("No timeline available - please upload a timeline first", "error")
       return
+
+    # Reset statistics for new experiment
+    self.reset_statistics()
 
     # Store the experiment parameters
     self._punishment_duration = punishment_duration
@@ -327,6 +399,9 @@ class Device:
     if self._experiment_started:
       log("Experiment already running", "warning")
       return
+
+    # Reset statistics for new experiment
+    self.reset_statistics()
 
     # Log the parameters
     log(f"Starting timeline experiment with animal ID: {animal_id}, {len(trials)} trials", "info")
@@ -377,6 +452,8 @@ class Device:
 
     # Save data if available (fallback for manual stopping)
     if self._data:
+      # Save final statistics
+      self._data.add_statistics(self.get_statistics())
       if not self._data.save():
         log("Failed to save data", "error")
       else:
@@ -691,6 +768,12 @@ async def send_state_message(websocket):
     try:
       state_data = MessageBuilder.input_state(_device.io.get_input_states(), _device.version)
       await websocket.send(json.dumps(state_data))
+
+      # Also send statistics if experiment is running
+      if _device._experiment_started:
+        stats_data = MessageBuilder.statistics(_device.get_statistics())
+        await websocket.send(json.dumps(stats_data))
+
       await asyncio.sleep(0.05)
     except websockets.exceptions.ConnectionClosed:
       log("Control panel connection closed", "warning")

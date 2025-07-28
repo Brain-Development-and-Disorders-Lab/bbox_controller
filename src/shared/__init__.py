@@ -9,7 +9,7 @@ from .communication import *
 from .test_management import *
 
 # Single source of truth for version number
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 # Version info for easy access
 VERSION = __version__

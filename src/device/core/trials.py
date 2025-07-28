@@ -361,7 +361,7 @@ class Stage2(Base):
     self.start_time = pygame.time.get_ticks()
 
     # Setup trial
-    # Activate the nose port light
+    # Activate the nose port light and visual cue
     self.nose_port_light = True
     self.visual_cue = True
 
@@ -442,8 +442,8 @@ class Stage2(Base):
     # Update water delivery
     self._update_water_delivery()
     self._update_nose_port_state()
-    self._update_visual_cue()
     self._update_nose_port_light()
+    self._update_visual_cue()
 
     return True
 

@@ -8,4 +8,8 @@ from .models import *
 from .communication import *
 from .test_management import *
 
-__version__ = "1.0.0"
+# Single source of truth for version number
+__version__ = "1.1.0"
+
+# Version info for easy access
+VERSION = __version__

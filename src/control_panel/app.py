@@ -1,45 +1,29 @@
+#!/usr/bin/env python3
 """
-Filename: main.py
-Author: Henry Burgess
-Date: 2025-03-07
-Description: Main file for the control panel interface
-License: MIT
+Control Panel for Behavior Box Controller
+Provides a web interface for controlling and monitoring the device
 """
 
-# GUI imports
-import json
 import tkinter as tk
 from tkinter import ttk, messagebox
-import datetime
+import json
+import os
 import threading
-import atexit
 import queue
 import websocket
+import atexit
 import time
-import os
-try:
-    from .ui.timeline_editor import TimelineEditor
-except ImportError:
-    # Fallback for when running as standalone script
-    from ui.timeline_editor import TimelineEditor
+from datetime import datetime
 
-# Shared library imports
-try:
-    from shared.constants import TEST_COMMANDS, TEST_STATES, EXPERIMENT_COMMANDS, LOG_STATES, PADDING, SECTION_PADDING, TOTAL_WIDTH, PANEL_WIDTH, PANEL_HEIGHT, COLUMN_WIDTH, HEADING_HEIGHT, UPDATE_INTERVAL, INPUT_TEST_TIMEOUT
-    from shared.models import TimelineManager
-    from shared.communication import MessageParser, CommandParser
-    from shared.test_management import TestStateManager
-except ImportError:
-    # Fallback for when running as standalone script
-    import sys
-    import os
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-    from shared.constants import TEST_COMMANDS, TEST_STATES, EXPERIMENT_COMMANDS, LOG_STATES, PADDING, SECTION_PADDING, TOTAL_WIDTH, PANEL_WIDTH, PANEL_HEIGHT, COLUMN_WIDTH, HEADING_HEIGHT, UPDATE_INTERVAL, INPUT_TEST_TIMEOUT
-    from shared.models import TimelineManager
-    from shared.communication import MessageParser, CommandParser
-    from shared.test_management import TestStateManager
+# Import shared modules
+from shared import VERSION
+from shared.constants import *
+from shared.communication import MessageParser, CommandParser
+from shared.test_management import TestStateManager
+from shared.models import TimelineManager
 
-# Variables - now imported from shared library
+# Import UI components
+from .ui.timeline_editor import TimelineEditor
 
 class ControlPanel(tk.Frame):
   def __init__(self, master=None):
@@ -109,6 +93,9 @@ class ControlPanel(tk.Frame):
 
       # Store log history for filtering
       self.log_history = []
+
+      # Set version from shared module
+      self.version = VERSION
 
       # Create the layout
       self.create_layout()
@@ -292,7 +279,14 @@ class ControlPanel(tk.Frame):
     self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_to_device)
     self.connect_button.pack(side=tk.LEFT, padx=(0, 5))
     self.disconnect_button = tk.Button(connection_frame, text="Disconnect", font="Arial 10", command=self.disconnect_from_device, state=tk.DISABLED)
-    self.disconnect_button.pack(side=tk.LEFT)
+    self.disconnect_button.pack(side=tk.LEFT, padx=(0, 15))
+
+    # Version information
+    version_frame = tk.LabelFrame(connection_frame, text="Versions", font=("Arial", 9), fg="gray", padx=5, pady=2)
+    version_frame.pack(side=tk.RIGHT, padx=(15, 0))
+    tk.Label(version_frame, text=f"Control Panel: {self.version}", font=("Arial", 9), fg="gray").pack(side=tk.TOP, anchor="w")
+    self.device_version_label = tk.Label(version_frame, text="Device: unknown", font=("Arial", 9), fg="gray")
+    self.device_version_label.pack(side=tk.BOTTOM, anchor="w")
 
     # Main content area
     content_frame = tk.Frame(main_frame)
@@ -303,7 +297,7 @@ class ControlPanel(tk.Frame):
     status_frame.grid(row=0, column=0, sticky="n", padx=(0, PADDING))
 
     # Statistics section
-    statistics_frame = tk.LabelFrame(status_frame, text="Live Statistics", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    statistics_frame = tk.LabelFrame(status_frame, text="Experiment Statistics", padx=SECTION_PADDING, pady=SECTION_PADDING)
     statistics_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
 
     # Create statistics display
@@ -348,17 +342,21 @@ class ControlPanel(tk.Frame):
     experiment_management_frame = tk.LabelFrame(experiment_frame, text="Experiment Management", padx=SECTION_PADDING, pady=SECTION_PADDING)
     experiment_management_frame.pack(side=tk.TOP, fill=tk.X)
 
+    # Variables section
+    variables_frame = tk.LabelFrame(experiment_management_frame, text="Variables", padx=8, pady=8)
+    variables_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+
     # Animal ID input frame
-    animal_id_frame = tk.Frame(experiment_management_frame)
-    animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+    animal_id_frame = tk.Frame(variables_frame)
+    animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
 
     tk.Label(animal_id_frame, text="Animal ID:").pack(side=tk.LEFT, pady=0)
     self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
     self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)
 
     # Duration settings frame
-    duration_settings_frame = tk.Frame(experiment_management_frame)
-    duration_settings_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+    duration_settings_frame = tk.Frame(variables_frame)
+    duration_settings_frame.pack(side=tk.TOP, fill=tk.X)
 
     # Punishment duration input
     punishment_frame = tk.Frame(duration_settings_frame)
@@ -376,12 +374,12 @@ class ControlPanel(tk.Frame):
     self.water_delivery_duration_input = tk.Entry(water_delivery_frame, textvariable=self.water_delivery_duration_var, width=8, state=tk.DISABLED)
     self.water_delivery_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
 
-    # Timeline management frame
-    timeline_frame = tk.Frame(experiment_management_frame)
-    timeline_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+    # Timeline section
+    timeline_section_frame = tk.LabelFrame(experiment_management_frame, text="Timeline", padx=8, pady=8)
+    timeline_section_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
     # Timeline selection
-    timeline_selection_frame = tk.Frame(timeline_frame)
+    timeline_selection_frame = tk.Frame(timeline_section_frame)
     timeline_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
 
     tk.Label(timeline_selection_frame, text="Timeline:").pack(side=tk.LEFT, pady=0)
@@ -391,7 +389,7 @@ class ControlPanel(tk.Frame):
     self.timeline_combo.bind("<<ComboboxSelected>>", self.on_timeline_selected)
 
     # Timeline buttons
-    timeline_buttons_frame = tk.Frame(timeline_frame)
+    timeline_buttons_frame = tk.Frame(timeline_section_frame)
     timeline_buttons_frame.pack(side=tk.TOP, fill=tk.X)
 
     self.new_timeline_button = tk.Button(
@@ -442,7 +440,7 @@ class ControlPanel(tk.Frame):
     console_frame.grid_columnconfigure(0, weight=1)
     console_frame.grid_rowconfigure(0, weight=1)
 
-    self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="#E0E0E0", height=15)
+    self.console = tk.Text(console_frame, font="Arial 10", wrap=tk.NONE, bg="black", fg="#E0E0E0", height=14)
     self.console.grid(row=0, column=0, sticky="nsew")
     self.console.config(state=tk.DISABLED)
 
@@ -462,7 +460,7 @@ class ControlPanel(tk.Frame):
     state (str): The state of the message.
     source (str): The source of the message.
     """
-    timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+    timestamp = datetime.now().strftime('%H:%M:%S')
     source_upper = source.upper()
 
     # Store log entry in history
@@ -673,6 +671,10 @@ class ControlPanel(tk.Frame):
     self.start_experiment_button.config(state=tk.DISABLED)
     self.stop_experiment_button.config(state=tk.DISABLED)
 
+    # Reset device version display
+    self.device_version = "unknown"
+    self.device_version_label.config(text="Device: unknown")
+
     self.log("Disconnected from the device", "info")
 
   def on_message(self, ws, message):
@@ -692,6 +694,7 @@ class ControlPanel(tk.Frame):
           new_version = received_message["version"]
           if new_version != self.device_version:
             self.device_version = new_version
+            self.device_version_label.config(text=f"Device: {self.device_version}")
             self.log(f"Device version: {self.device_version}", "info", "SYSTEM")
         self.update_state_labels()
       elif received_message["type"] == "statistics":
@@ -1086,7 +1089,7 @@ class ControlPanel(tk.Frame):
 def main():
   root = tk.Tk()
   root.title("Behavior Box: Control Panel")
-  root.geometry("900x720")
+  root.geometry("864x672")
   root.resizable(False, False)
 
   # Set window icon

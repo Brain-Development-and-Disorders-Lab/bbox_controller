@@ -8,12 +8,10 @@ License: MIT
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import json
 from typing import Callable, Optional
 try:
     from shared.models import (
-        ExperimentTimeline, TrialConfig, ExperimentConfig,
-        TimelineManager, AVAILABLE_TRIAL_TYPES
+        ExperimentTimeline, TimelineManager, AVAILABLE_TRIAL_TYPES
     )
 except ImportError:
     # Fallback for when running as standalone script
@@ -21,8 +19,7 @@ except ImportError:
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     from shared.models import (
-        ExperimentTimeline, TrialConfig, ExperimentConfig,
-        TimelineManager, AVAILABLE_TRIAL_TYPES
+        ExperimentTimeline, TimelineManager, AVAILABLE_TRIAL_TYPES
     )
 
 class TimelineEditor(tk.Toplevel):
@@ -38,8 +35,8 @@ class TimelineEditor(tk.Toplevel):
 
         # Configure window
         self.title("Timeline Editor")
-        self.geometry("900x800")
-        self.resizable(True, True)
+        self.geometry("640x600")
+        self.resizable(False, False)
 
         # Center window on parent
         self.transient(parent)
@@ -87,7 +84,7 @@ class TimelineEditor(tk.Toplevel):
         self.left_frame = ttk.LabelFrame(self.main_frame, text="Trial Management", padding="10")
 
         # Trial list
-        ttk.Label(self.left_frame, text="Trial List:", font="Arial 10 bold").pack(anchor="w", pady=(0, 5))
+        ttk.Label(self.left_frame, text="List:", font="Arial 10 bold").pack(anchor="w", pady=(0, 5))
 
         # Trial listbox with scrollbar
         listbox_frame = ttk.Frame(self.left_frame)
@@ -104,22 +101,22 @@ class TimelineEditor(tk.Toplevel):
         self.trial_listbox.bind('<<ListboxSelect>>', self.on_trial_selected)
 
         # Trial control buttons
-        ttk.Label(self.left_frame, text="Trial Controls:", font="Arial 10 bold").pack(anchor="w", pady=(0, 5))
+        ttk.Label(self.left_frame, text="Controls:", font="Arial 10 bold").pack(anchor="w", pady=(0, 5))
 
         button_frame = ttk.Frame(self.left_frame)
         button_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.add_trial_button = tk.Button(button_frame, text="Add Trial", font="Arial 10", command=self.add_trial, width=10)
-        self.add_trial_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.add_trial_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 5))
 
         self.remove_trial_button = tk.Button(button_frame, text="Remove Trial", font="Arial 10", command=self.remove_trial, width=10)
-        self.remove_trial_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.remove_trial_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 5))
 
         self.move_up_button = tk.Button(button_frame, text="Move Up", font="Arial 10", command=self.move_trial_up, width=10)
-        self.move_up_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.move_up_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0))
 
         self.move_down_button = tk.Button(button_frame, text="Move Down", font="Arial 10", command=self.move_trial_down, width=10)
-        self.move_down_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.move_down_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0))
 
         # Right column - Experiment parameters
         self.right_frame = ttk.LabelFrame(self.main_frame, text="Experiment Parameters", padding="10")
@@ -170,8 +167,8 @@ class TimelineEditor(tk.Toplevel):
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Configure grid weights
-        self.main_frame.columnconfigure(0, weight=1)
-        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.columnconfigure(0, weight=0)  # Fixed width for trial management
+        self.main_frame.columnconfigure(1, weight=1)  # Expandable for experiment parameters
         self.main_frame.rowconfigure(1, weight=1)
 
         # Info frame (spans both columns)
@@ -180,6 +177,7 @@ class TimelineEditor(tk.Toplevel):
 
         # Left column
         self.left_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
+        self.left_frame.configure(width=250)  # Set fixed width for trial management
 
         # Right column
         self.right_frame.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
@@ -299,7 +297,7 @@ class TimelineEditor(tk.Toplevel):
         # Create dialog to select trial type
         dialog = tk.Toplevel(self)
         dialog.title("Add Trial")
-        dialog.geometry("380x240")
+        dialog.geometry("340x220")
         dialog.resizable(False, False)
         dialog.transient(self)
         dialog.grab_set()

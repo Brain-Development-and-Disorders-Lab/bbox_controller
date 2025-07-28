@@ -1,19 +1,30 @@
-import asyncio
-import threading
-import time
-import websockets
-import json
-import queue
+#!/usr/bin/env python3
+"""
+Device application for Behavior Box Controller
+Handles hardware control, display, and communication with control panel
+"""
+
 import pygame
+import json
+import time
+import threading
+import asyncio
+import websockets
+import queue
 from dataclasses import asdict
+
+# Import shared modules
+from shared import VERSION, MessageBuilder
+from shared.constants import *
+
+# Import device-specific modules
 from device.hardware.IOController import IOController
 from device.hardware.DisplayController import DisplayController
 from device.hardware.DataController import DataController
+from device.core.timeline_processor import TimelineProcessor
 from device.utils.logger import log, set_message_queue
 from device.utils.helpers import Randomness
-from device.core.timeline_processor import TimelineProcessor
-from shared.constants import TEST_COMMANDS, TEST_STATES, INPUT_TEST_TIMEOUT, DEFAULT_HOST, DEFAULT_PORT
-from shared.communication import MessageBuilder, MessageParser, CommandParser
+from shared.communication import MessageParser, CommandParser
 from shared.test_management import TestStateManager
 
 # Other variables
@@ -39,11 +50,12 @@ class Device:
 
     # Load config
     self.config = None
-    self.version = None
     with open("config.json") as config_file:
       config_data = json.load(config_file)
       self.config = config_data["task"]
-      self.version = config_data.get("version", "unknown")
+
+    # Set version from shared module
+    self.version = VERSION
 
     # Setup display state
     self._display_state = {
@@ -312,8 +324,8 @@ class Device:
 
     # Check for changes and update statistics
     if self._experiment_started:  # Only track during experiments
-      # Check for nose poke activation (transition from True to False)
-      if self._previous_input_states["nose_poke"] and not current_input_states["nose_poke"]:
+      # Check for nose poke activation (transition from False to True)
+      if not self._previous_input_states["nose_poke"] and current_input_states["nose_poke"]:
         self._statistics["nose_pokes"] += 1
 
       # Check for left lever press (transition from False to True)

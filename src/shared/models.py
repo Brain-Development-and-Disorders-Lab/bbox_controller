@@ -253,7 +253,7 @@ class TimelineManager:
 # Available trial types for validation
 AVAILABLE_TRIAL_TYPES = {
     "Stage1": {
-        "description": "Basic lever press training stage",
+        "description": "Basic nose poke training stage",
         "default_parameters": {
             "cue_duration": 5000,
             "response_limit": 1000,
@@ -261,7 +261,7 @@ AVAILABLE_TRIAL_TYPES = {
         }
     },
     "Stage2": {
-        "description": "Advanced lever press stage with visual cues",
+        "description": "Basic lever press training stage",
         "default_parameters": {
             "cue_duration": 5000,
             "response_limit": 1000,
@@ -269,7 +269,7 @@ AVAILABLE_TRIAL_TYPES = {
         }
     },
     "Stage3": {
-        "description": "Complex decision-making stage",
+        "description": "Nose poke and lever press training stage",
         "default_parameters": {
             "cue_duration": 5000,
             "response_limit": 1000,

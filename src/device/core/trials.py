@@ -327,11 +327,11 @@ class Stage1(Base):
 
 class Stage2(Base):
   """
-  Trial Stage 2: Nose port entry or lever press for reward
-  Description: At the beginning of each trial, lit up the nose port light and randomly display
-    the visual cue on one of the side screens. Either port entry or lever press will trigger
-    reward water delivery. Turn off the visual cue and nose port light upon mouse enters the
-    nose port. Start the ITI counting after the mouse exits the nose port.
+  Trial Stage 2: Lever press for reward
+  Description: At the beginning of each trial, randomly display the visual cue on one of the
+    side screens. Either lever press will trigger reward water delivery. Turn off the visual
+    cue upon lever press. Start the ITI counting after the mouse exits the nose port after
+    obtaining water reward.
   """
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -380,8 +380,8 @@ class Stage2(Base):
     current_time = pygame.time.get_ticks()
 
     # Condition for trial end
-    if self.water_delivery_complete and self.nose_port_exit:
-      log("Trial ended after water delivery and nose port exit", "success")
+    if self.reward_triggered and self.water_delivery_complete and self.nose_port_exit:
+      log("Trial ended after reward triggered, water delivery, and nose port exit", "success")
       self.add_data("trial_outcome", TrialOutcome.SUCCESS)
       return False
 
@@ -398,23 +398,22 @@ class Stage2(Base):
     # Track nose port state changes
     current_nose_state = self.get_input_states()["nose_poke"]
 
-    if not current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry (nose_poke = False means nose is IN)
-      self.nose_port_entry = True
-      self.reward_triggered = True
-      self.events.append({
-        "type": "nose_port_entry",
-        "timestamp": current_time
-      })
-      log("Nose port entry", "info")
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
-      # Detect nose port exit (nose_poke = True means nose is OUT)
-      self.nose_port_exit = True
-      self.events.append({
-        "type": "nose_port_exit",
-        "timestamp": current_time
-      })
-      log("Nose port exit", "info")
+    # Only consider nose port entry and exit if reward has been triggered
+    if self.reward_triggered:
+      if not current_nose_state and not self.nose_port_entry:
+        self.nose_port_entry = True
+        self.events.append({
+          "type": "nose_port_entry",
+          "timestamp": current_time
+        })
+        log("Nose port entry", "info")
+      elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+        self.nose_port_exit = True
+        self.events.append({
+          "type": "nose_port_exit",
+          "timestamp": current_time
+        })
+        log("Nose port exit", "info")
 
     # Track lever presses with minimum duration
     left_lever = self.get_input_states()["left_lever"]

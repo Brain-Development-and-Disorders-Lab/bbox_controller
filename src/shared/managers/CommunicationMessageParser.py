@@ -43,18 +43,4 @@ class CommunicationMessageParser:
         base_command = parts[0]
         parameters = {}
 
-        if base_command == "start_experiment":
-            if len(parts) > 1:
-                parameters["animal_id"] = parts[1]
-            if len(parts) > 2:
-                try:
-                    parameters["punishment_duration"] = int(parts[2])
-                except ValueError:
-                    pass
-            if len(parts) > 3:
-                try:
-                    parameters["water_delivery_duration"] = int(parts[3])
-                except ValueError:
-                    pass
-
         return base_command, parameters

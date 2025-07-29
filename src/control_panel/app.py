@@ -48,8 +48,6 @@ class ControlPanel(tk.Frame):
       self.port_var = tk.StringVar(self.master, "8765")
       self.animal_id_var = tk.StringVar(self.master, "")
       self.animal_id_var.trace_add("write", self.on_animal_id_change)
-      self.punishment_duration_var = tk.StringVar(self.master, "1000")
-      self.water_delivery_duration_var = tk.StringVar(self.master, "2000")
 
       # Test state management
       self.test_state_manager = TestStateManager()
@@ -343,54 +341,26 @@ class ControlPanel(tk.Frame):
     experiment_management_frame = tk.LabelFrame(experiment_frame, text="Experiment Management", padx=SECTION_PADDING, pady=SECTION_PADDING)
     experiment_management_frame.pack(side=tk.TOP, fill=tk.X)
 
-    # Variables section
-    variables_frame = tk.LabelFrame(experiment_management_frame, text="Variables", padx=8, pady=8)
-    variables_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
-
     # Animal ID input frame
-    animal_id_frame = tk.Frame(variables_frame)
+    animal_id_frame = tk.Frame(experiment_management_frame)
     animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
 
     tk.Label(animal_id_frame, text="Animal ID:").pack(side=tk.LEFT, pady=0)
     self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
     self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)
 
-    # Duration settings frame
-    duration_settings_frame = tk.Frame(variables_frame)
-    duration_settings_frame.pack(side=tk.TOP, fill=tk.X)
-
-    # Punishment duration input
-    punishment_frame = tk.Frame(duration_settings_frame)
-    punishment_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
-
-    tk.Label(punishment_frame, text="Punishment Duration (ms):").pack(side=tk.LEFT, pady=0)
-    self.punishment_duration_input = tk.Entry(punishment_frame, textvariable=self.punishment_duration_var, width=8, state=tk.DISABLED)
-    self.punishment_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
-
-    # Water delivery duration input
-    water_delivery_frame = tk.Frame(duration_settings_frame)
-    water_delivery_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
-
-    tk.Label(water_delivery_frame, text="Water Delivery Duration (ms):").pack(side=tk.LEFT, pady=0)
-    self.water_delivery_duration_input = tk.Entry(water_delivery_frame, textvariable=self.water_delivery_duration_var, width=8, state=tk.DISABLED)
-    self.water_delivery_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
-
-    # Experiment section
-    experiment_section_frame = tk.LabelFrame(experiment_management_frame, text="Experiment", padx=8, pady=8)
-    experiment_section_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
-
     # Experiment selection
-    experiment_selection_frame = tk.Frame(experiment_section_frame)
+    experiment_selection_frame = tk.Frame(experiment_management_frame)
     experiment_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
 
     tk.Label(experiment_selection_frame, text="Experiment:").pack(side=tk.LEFT, pady=0)
     self.experiment_var = tk.StringVar()
-    self.experiment_combo = ttk.Combobox(experiment_selection_frame, textvariable=self.experiment_var, state="readonly", width=18)
+    self.experiment_combo = ttk.Combobox(experiment_selection_frame, textvariable=self.experiment_var, state="readonly", width=32)
     self.experiment_combo.pack(side=tk.LEFT, pady=0, padx=(5, 0))
     self.experiment_combo.bind("<<ComboboxSelected>>", self.on_experiment_selected)
 
     # Experiment buttons
-    experiment_buttons_frame = tk.Frame(experiment_section_frame)
+    experiment_buttons_frame = tk.Frame(experiment_management_frame)
     experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
 
     self.new_experiment_button = tk.Button(
@@ -569,10 +539,18 @@ class ControlPanel(tk.Frame):
       # Disable Start button and enable Stop button
       self.start_experiment_button.config(state=tk.DISABLED)
       self.stop_experiment_button.config(state=tk.NORMAL)
+
+      # Disable the New Experiment and Edit Experiment buttons
+      self.experiment_editor_button.config(state=tk.DISABLED)
+      self.new_experiment_button.config(state=tk.DISABLED)
     else:
       # Enable Start button and disable Stop button
       self.start_experiment_button.config(state=tk.NORMAL)
       self.stop_experiment_button.config(state=tk.DISABLED)
+
+      # Enable the New Experiment and Edit Experiment buttons
+      self.experiment_editor_button.config(state=tk.NORMAL)
+      self.new_experiment_button.config(state=tk.NORMAL)
 
   def on_animal_id_change(self, *args):
     """
@@ -619,10 +597,6 @@ class ControlPanel(tk.Frame):
     # Animal ID input
     self.animal_id_input.config(state=tk.NORMAL)
 
-    # Duration inputs
-    self.punishment_duration_input.config(state=tk.NORMAL)
-    self.water_delivery_duration_input.config(state=tk.NORMAL)
-
     # Experiment buttons - always enabled for experiment management
     self.new_experiment_button.config(state=tk.NORMAL)
     self.experiment_editor_button.config(state=tk.NORMAL)
@@ -657,10 +631,6 @@ class ControlPanel(tk.Frame):
 
     # Animal ID input
     self.animal_id_input.config(state=tk.DISABLED)
-
-    # Duration inputs
-    self.punishment_duration_input.config(state=tk.DISABLED)
-    self.water_delivery_duration_input.config(state=tk.DISABLED)
 
     # Experiment buttons - keep enabled for experiment management
     self.new_experiment_button.config(state=tk.NORMAL)

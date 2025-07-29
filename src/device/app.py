@@ -48,15 +48,14 @@ class Device:
     # Randomness
     self.randomness = Randomness()
 
+    # Experiment config
+    self.config = None
+
     # Experiment processor
     self.experiment_processor = ExperimentProcessor(self)
 
     # Statistics manager
     self.statistics_controller = StatisticsManager()
-
-    # Experiment config (will be set when experiment starts)
-    self.config = None
-    self.default_config = Config()
 
     # Set version from shared module
     self.version = VERSION
@@ -118,9 +117,10 @@ class Device:
     self.screen.fill((0, 0, 0))
     self.font = pygame.font.SysFont("Arial", 64)
 
-    # Setup trials - start with no timeline
+    # Setup trials management
     self._current_trial = None
-    self._trials = []
+    self._trials = [] # Store original trials
+    self._trial_configs = [] # Store trial configs, reused for looped experiments
 
     # Experiment state
     self._experiment_started = False
@@ -131,20 +131,6 @@ class Device:
     # Experiment parameters (will be set when experiment starts)
     self._punishment_duration = 1000
     self._water_delivery_duration = 2000
-
-  def _reset_trials(self):
-    """Reset the trials list to its initial state"""
-    self._trials = []
-    for trial in self._trials:
-      trial.screen = self.screen
-      trial.font = self.font
-      trial.width = self.width
-      trial.height = self.height
-      trial.io = self.io
-      trial.display = self.display
-      trial.statistics = self.statistics_controller
-
-    log(f"Trials reset: {len(self._trials)} trials ready for next experiment", "info")
 
   def _render_waiting_screen(self):
     """Render the waiting screen with timeline upload message"""
@@ -255,14 +241,14 @@ class Device:
           _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
         else:
           # All trials completed - check if we should loop
-          if self._should_loop and self.default_config:
+          if self._should_loop:
             # Reset trials for next loop by creating new trial instances
             self._trials = []
-            for trial_config in self.default_config:
+            for config in self._trial_configs:
               # Create a new trial instance with the same parameters
-              new_trial = self.experiment_processor.trial_factory.create_trial(
-                trial_config["type"],  # Get the trial type name
-                trial_config["kwargs"],  # Use the original parameters
+              trial = self.experiment_processor.trial_factory.create_trial(
+                config["type"],  # Get the trial type name
+                config["kwargs"],  # Use the original parameters
                 screen=self.screen,
                 font=self.font,
                 width=self.width,
@@ -272,7 +258,7 @@ class Device:
                 statistics=self.statistics_controller,
                 config=self.config  # Use the current experiment config
               )
-              self._trials.append(new_trial)
+              self._trials.append(trial)
 
             self._current_trial = self._trials.pop(0)
             self._current_trial.on_enter()
@@ -293,8 +279,8 @@ class Device:
             self._current_trial = None
 
             # Clear trials - timeline must be re-uploaded for next experiment
+            self._trial_configs = []
             self._trials = []
-            self.default_config = None
             self._should_loop = False
             log("Experiment completed, timeline cleared, returning to waiting state", "info")
 
@@ -380,7 +366,7 @@ class Device:
 
     log("Experiment started", "info")
 
-  def start_experiment_with_timeline(self, animal_id, trials, config=None, loop=False, trial_configs=None):
+  def start_experiment(self, animal_id, trials, trial_configs, config=None, loop=False):
     """Start the experiment with a custom timeline"""
     if self._experiment_started:
       log("Experiment already running", "warning")
@@ -405,8 +391,8 @@ class Device:
     self._data.add_task_data({"config": asdict(config)})
 
     # Set trials from timeline
-    self._trials = trials.copy()
-    self._original_timeline_config = trial_configs or []  # Store original timeline configuration
+    self._trials = trials.copy() # Store original trials\
+    self._trial_configs = trial_configs.copy() # Store trial configs, reused for looped experiments
     self._should_loop = loop  # Set loop flag
 
     # Start first trial
@@ -428,8 +414,6 @@ class Device:
     # Stop the current experiment
     self._experiment_started = False
     self._current_trial = None
-
-    # Clear trials - timeline must be re-uploaded for next experiment
     self._trials = []
 
     # Save data if available (fallback for manual stopping)
@@ -672,41 +656,6 @@ class Device:
       else:
         self.test_displays()  # Use default duration
 
-  def run_experiment(self, command):
-    primary_command = command.split(" ")[0]
-    arguments = command.split(" ")[1:]
-
-    if primary_command == "start_experiment":
-      # Extract parameters from command string: "start_experiment <animal_id> <punishment_duration> <water_delivery_duration>"
-      animal_id = arguments[0] if len(arguments) > 0 else ""
-
-      # Parse duration parameters with defaults
-      punishment_duration = 1000  # Default 1000ms
-      water_delivery_duration = 2000  # Default 2000ms
-
-      if len(arguments) > 1:
-        try:
-          punishment_duration = int(arguments[1])
-        except ValueError:
-          log(f"Invalid punishment duration: {arguments[1]}, using default 1000ms", "warning")
-
-      if len(arguments) > 2:
-        try:
-          water_delivery_duration = int(arguments[2])
-        except ValueError:
-          log(f"Invalid water delivery duration: {arguments[2]}, using default 2000ms", "warning")
-
-      if animal_id:
-        # Use the existing start_experiment method which properly integrates with the device flow
-        self.start_experiment(animal_id, punishment_duration, water_delivery_duration)
-      else:
-        log("Missing animal ID for start_experiment command", "error")
-
-    elif primary_command == "stop_experiment":
-      self.stop_experiment()
-    else:
-      log(f"Unknown command: {command}", "error")
-
   def cleanup(self):
     """Clean up resources before shutdown"""
     # Stop any running experiment
@@ -779,10 +728,6 @@ async def handle_connection(websocket, device: Device):
         command = message.strip()
         if CommunicationMessageParser.parse_test_command(command)[0] in TEST_COMMANDS:
           device.run_test(command)
-        elif command.startswith("start_experiment"):
-          device.run_experiment(command)
-        elif command == "stop_experiment":
-          device.stop_experiment()
         else:
           log(f"Unknown command: {command}", "error")
       except Exception as e:

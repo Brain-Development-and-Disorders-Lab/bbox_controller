@@ -2,10 +2,11 @@
 Shared managers used across the device and control panel classes
 """
 
-from .experiment_manager import ExperimentManager
-from .test_manager import TestStateManager, TestCommandValidator, TestStateFormatter
-from .communication_manager import CommunicationMessageBuilder, CommunicationMessageParser
-from .statistics_manager import StatisticsManager
+from .ExperimentManager import ExperimentManager
+from .TestManager import TestStateManager, TestCommandValidator, TestStateFormatter
+from .CommunicationMessageBuilder import CommunicationMessageBuilder
+from .CommunicationMessageParser import CommunicationMessageParser
+from .StatisticsManager import StatisticsManager
 
 __all__ = [
     'ExperimentManager',

@@ -45,7 +45,7 @@ class ExperimentProcessor:
             trials = []
             trial_configs = []
             for trial_data in self.current_experiment.trials:
-                trial = self.trial_factory.create_trial(
+                trials.append(self.trial_factory.create_trial(
                     trial_data.type,
                     trial_data.parameters,
                     screen=self.device.screen,
@@ -56,8 +56,7 @@ class ExperimentProcessor:
                     display=self.device.display,
                     statistics=self.device.statistics_controller,
                     config=self.current_experiment.config
-                )
-                trials.append(trial)
+                ))
 
                 trial_configs.append({
                     "type": trial_data.type,
@@ -65,7 +64,7 @@ class ExperimentProcessor:
                 })
 
             # Start experiment with experiment
-            self.device.start_experiment_with_timeline(animal_id, trials, self.current_experiment.config, self.current_experiment.loop, trial_configs)
+            self.device.start_experiment(animal_id, trials, trial_configs, self.current_experiment.config, self.current_experiment.loop)
             return True, f"Experiment '{self.current_experiment.name}' started successfully"
 
         except Exception as e:

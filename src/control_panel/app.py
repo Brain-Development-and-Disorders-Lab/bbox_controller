@@ -39,7 +39,6 @@ class ControlPanel(tk.Frame):
       base_dir = os.path.dirname(os.path.abspath(__file__))
       self.experiment_manager = ExperimentManager(os.path.join(base_dir, "experiments"))
       self.current_experiment = None
-      self.experiment_uploaded_to_device = False
 
       # UI variables
       self.ip_address_var = tk.StringVar(self.master, "localhost")
@@ -733,10 +732,8 @@ class ControlPanel(tk.Frame):
         message = received_message.get("message", "")
         if success:
           self.log(f"Experiment validation: {message}", "success")
-          self.experiment_uploaded_to_device = True
         else:
           self.log(f"Experiment validation failed: {message}", "error")
-          self.experiment_uploaded_to_device = False
       elif received_message["type"] == "experiment_error":
         message = received_message.get("message", "")
         self.log(f"Experiment error: {message}", "error")
@@ -873,9 +870,6 @@ class ControlPanel(tk.Frame):
       "nose_light": False,
     }
 
-    # Reset experiment upload state
-    self.experiment_uploaded_to_device = False
-
     self.reset_tests()
 
   def run_websocket(self):
@@ -891,7 +885,6 @@ class ControlPanel(tk.Frame):
     elif not experiments:
       self.experiment_var.set("")
       self.current_experiment = None
-      self.experiment_uploaded_to_device = False
       self.experiment_editor_button.config(state=tk.DISABLED)
       self.on_animal_id_change()
 
@@ -901,12 +894,10 @@ class ControlPanel(tk.Frame):
     if selected_experiment:
       self.current_experiment = self.experiment_manager.load_experiment(selected_experiment)
       self.log(f"Selected experiment: {selected_experiment}", "info")
-      self.experiment_uploaded_to_device = False
       self.experiment_editor_button.config(state=tk.NORMAL)
       self.on_animal_id_change()
     else:
       self.current_experiment = None
-      self.experiment_uploaded_to_device = False
       self.experiment_editor_button.config(state=tk.DISABLED)
       self.start_experiment_button.config(state=tk.DISABLED)
 
@@ -958,29 +949,28 @@ class ControlPanel(tk.Frame):
       messagebox.showerror("No Experiment", "Please select an experiment to run.")
       return
 
-    # Automatically upload experiment if not already uploaded
-    if not self.experiment_uploaded_to_device:
-      self.log("Uploading experiment to device...", "info")
-      try:
-        # Validate experiment
-        is_valid, errors = self.current_experiment.validate()
-        if not is_valid:
-          error_msg = "Experiment validation failed:\n" + "\n".join(errors)
-          messagebox.showerror("Validation Error", error_msg)
-          return
-
-        # Send experiment upload message
-        message = {
-          "type": "experiment_upload",
-          "data": self.current_experiment.to_dict()
-        }
-        self.ws.send(json.dumps(message))
-
-        # The device will validate and store the experiment before starting
-        self.log("Experiment upload initiated, starting experiment...", "info")
-      except Exception as e:
-        messagebox.showerror("Upload Error", f"Failed to upload experiment: {str(e)}")
+    # Upload experiment to device, ensuring updated timeline and config is sent
+    self.log("Uploading experiment to device...", "info")
+    try:
+      # Validate experiment
+      is_valid, errors = self.current_experiment.validate()
+      if not is_valid:
+        error_msg = "Experiment validation failed:\n" + "\n".join(errors)
+        messagebox.showerror("Validation Error", error_msg)
         return
+
+      # Send experiment upload message
+      message = {
+        "type": "experiment_upload",
+        "data": self.current_experiment.to_dict()
+      }
+      self.ws.send(json.dumps(message))
+
+      # The device will validate and store the experiment before starting
+      self.log("Experiment upload initiated, starting experiment...", "info")
+    except Exception as e:
+      messagebox.showerror("Upload Error", f"Failed to upload experiment: {str(e)}")
+      return
 
     # Start experiment
     try:

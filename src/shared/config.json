@@ -5,8 +5,8 @@
     "response_limit": 1000,
     "cue_minimum": 5000,
     "cue_maximum": 10000,
-    "hold_minimum": 100,
-    "hold_maximum": 1000,
+    "hold_minimum": 2000,
+    "hold_maximum": 10000,
     "valve_open": 100,
     "punish_time": 1000
   }

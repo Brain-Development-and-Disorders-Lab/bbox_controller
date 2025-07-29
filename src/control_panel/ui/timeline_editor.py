@@ -10,17 +10,17 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from typing import Callable, Optional
 try:
-    from shared.models import (
-        ExperimentTimeline, TimelineManager, AVAILABLE_TRIAL_TYPES
-    )
+    from shared.models import ExperimentTimeline, ExperimentConfig
+    from shared.managers import TimelineManager, config_manager
+    from shared.constants import AVAILABLE_TRIAL_TYPES
 except ImportError:
     # Fallback for when running as standalone script
     import sys
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-    from shared.models import (
-        ExperimentTimeline, TimelineManager, AVAILABLE_TRIAL_TYPES
-    )
+    from shared.models import ExperimentTimeline, ExperimentConfig
+    from shared.managers import TimelineManager, config_manager
+    from shared.constants import AVAILABLE_TRIAL_TYPES
 
 class TimelineEditor(tk.Toplevel):
     """Timeline editor window for creating and editing experiment timelines"""
@@ -135,17 +135,27 @@ class TimelineEditor(tk.Toplevel):
             ("punish_time", "Punishment Time (ms):", 1000)
         ]
 
+        # Load current config values
+        current_config = config_manager.load_config()
+
         for i, (field, label, default) in enumerate(config_fields):
             ttk.Label(self.right_frame, text=label, font="Arial 10").grid(row=i, column=0, sticky="w", padx=(0, 10), pady=3)
-            var = tk.StringVar(value=str(default))
+            # Use current config value or default
+            current_value = current_config.get(field, default)
+            var = tk.StringVar(value=str(current_value))
             entry = ttk.Entry(self.right_frame, textvariable=var, width=15, font="Arial 10")
             entry.grid(row=i, column=1, sticky="w", padx=(0, 10), pady=3)
             self.config_widgets[field] = var
 
+        # Add save config button
+        ttk.Label(self.right_frame, text="", font="Arial 10").grid(row=len(config_fields), column=0, sticky="w", pady=(5, 0))
+        self.save_config_button = tk.Button(self.right_frame, text="Save Global Config", font="Arial 10", command=self.save_global_config, width=15)
+        self.save_config_button.grid(row=len(config_fields), column=1, sticky="w", padx=(0, 10), pady=(5, 0))
+
         # Validation section
-        ttk.Label(self.right_frame, text="Validation:", font="Arial 10 bold").grid(row=len(config_fields), column=0, sticky="w", pady=(10, 5))
+        ttk.Label(self.right_frame, text="Validation:", font="Arial 10 bold").grid(row=len(config_fields)+1, column=0, sticky="w", pady=(10, 5))
         self.validation_text = tk.Text(self.right_frame, height=4, wrap=tk.WORD, font="Arial 10")
-        self.validation_text.grid(row=len(config_fields)+1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        self.validation_text.grid(row=len(config_fields)+2, column=0, columnspan=2, sticky="ew", pady=(0, 5))
 
         # Bottom action buttons
         self.action_frame = ttk.Frame(self.main_frame)
@@ -191,7 +201,10 @@ class TimelineEditor(tk.Toplevel):
 
     def new_timeline(self):
         """Create a new timeline"""
-        self.current_timeline = ExperimentTimeline(name="New Timeline")
+        # Create timeline with current global config
+        current_config = config_manager.load_config()
+        config = ExperimentConfig(**current_config)
+        self.current_timeline = ExperimentTimeline(name="New Timeline", config=config)
         self.update_ui()
 
     def load_timeline(self):
@@ -357,8 +370,7 @@ class TimelineEditor(tk.Toplevel):
 
             # Add trial to timeline
             self.current_timeline.add_trial(trial_type, default_params, trial_id, description)
-            # Update timeline from UI to preserve user input before refreshing UI
-            self.update_timeline_from_ui()
+            # Update UI to reflect the new trial
             self.update_ui()
             dialog.destroy()
 
@@ -386,8 +398,7 @@ class TimelineEditor(tk.Toplevel):
             trial = self.current_timeline.trials[index]
             if messagebox.askyesno("Confirm", f"Remove trial '{trial.id}'?"):
                 self.current_timeline.remove_trial(trial.id)
-                # Update timeline from UI to preserve user input before refreshing UI
-                self.update_timeline_from_ui()
+                # Update UI to reflect the removed trial
                 self.update_ui()
 
     def move_trial_up(self):
@@ -403,8 +414,7 @@ class TimelineEditor(tk.Toplevel):
         if index > 0:
             trial = self.current_timeline.trials[index]
             self.current_timeline.move_trial(trial.id, index - 1)
-            # Update timeline from UI to preserve user input before refreshing UI
-            self.update_timeline_from_ui()
+            # Update UI to reflect the moved trial
             self.update_ui()
             self.trial_listbox.selection_set(index - 1)
 
@@ -421,8 +431,7 @@ class TimelineEditor(tk.Toplevel):
         if index < len(self.current_timeline.trials) - 1:
             trial = self.current_timeline.trials[index]
             self.current_timeline.move_trial(trial.id, index + 1)
-            # Update timeline from UI to preserve user input before refreshing UI
-            self.update_timeline_from_ui()
+            # Update UI to reflect the moved trial
             self.update_ui()
             self.trial_listbox.selection_set(index + 1)
 
@@ -472,6 +481,25 @@ class TimelineEditor(tk.Toplevel):
                 setattr(self.current_timeline.config, field, value)
             except ValueError:
                 pass  # Keep existing value if invalid
+
+    def save_global_config(self):
+        """Save the current configuration values to the global config file"""
+        try:
+            config = {}
+            for field, var in self.config_widgets.items():
+                try:
+                    value = int(var.get())
+                    config[field] = value
+                except ValueError:
+                    messagebox.showerror("Error", f"Invalid value for {field}: {var.get()}")
+                    return
+
+            if config_manager.save_config(config):
+                messagebox.showinfo("Success", "Global configuration saved successfully.")
+            else:
+                messagebox.showerror("Error", "Failed to save global configuration.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error saving configuration: {str(e)}")
 
     def update_validation(self):
         """Update the validation display"""

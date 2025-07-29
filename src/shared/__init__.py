@@ -5,8 +5,7 @@ Contains common constants, models, and utilities used by both control panel and 
 
 from .constants import *
 from .models import *
-from .communication import *
-from .test_management import *
+from .managers import *
 
 # Single source of truth for version number
 __version__ = "1.1.1"

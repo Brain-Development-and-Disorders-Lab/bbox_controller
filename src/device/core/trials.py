@@ -9,7 +9,7 @@ from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
 from device.hardware.IOController import IOController
 from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
-from shared.statistics import StatisticsController
+from shared.managers import StatisticsManager
 
 class Base:
   """
@@ -30,13 +30,14 @@ class Base:
     # Controllers
     self.io: IOController = kwargs.get('io')
     self.display: DisplayController = kwargs.get('display')
-    self.statistics: StatisticsController = kwargs.get('statistics')
+    self.statistics: StatisticsManager = kwargs.get('statistics')
 
     # All trial data
     self.data = {}
 
-    # Config
-    self.config = json.load(open("config.json", "r"))["task"]
+    # Config from shared module
+    from shared.managers import config_manager
+    self.config = config_manager.load_config()
 
     if SIMULATION_MODE:
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)

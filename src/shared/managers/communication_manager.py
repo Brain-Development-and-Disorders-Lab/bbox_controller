@@ -4,9 +4,9 @@ Shared communication utilities for bbox_controller project
 
 import json
 from typing import Dict, Any, Optional
-from .constants import TIMELINE_MESSAGE_TYPES
+from ..constants import TIMELINE_MESSAGE_TYPES
 
-class MessageBuilder:
+class CommunicationMessageBuilder:
     """Utility class for building standardized messages"""
 
     @staticmethod
@@ -115,7 +115,7 @@ class MessageBuilder:
         }
 
 
-class MessageParser:
+class CommunicationMessageParser:
     """Utility class for parsing and validating messages"""
 
     @staticmethod
@@ -153,7 +153,7 @@ class MessageParser:
         return True, ""
 
 
-class CommandParser:
+class CommunicationCommandParser:
     """Utility class for parsing command strings"""
 
     @staticmethod

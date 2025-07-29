@@ -14,7 +14,8 @@ import queue
 from dataclasses import asdict
 
 # Import shared modules
-from shared import VERSION, MessageBuilder
+from shared import VERSION
+from shared.managers import CommunicationMessageBuilder
 from shared.constants import *
 
 # Import device-specific modules
@@ -24,9 +25,7 @@ from device.hardware.DataController import DataController
 from device.core.timeline_processor import TimelineProcessor
 from device.utils.logger import log, set_message_queue
 from device.utils.helpers import Randomness
-from shared.communication import MessageParser, CommandParser
-from shared.test_management import TestStateManager
-from shared.statistics import StatisticsController
+from shared.managers import CommunicationMessageParser, CommunicationCommandParser, TestStateManager, StatisticsManager
 
 # Other variables
 HOST = DEFAULT_HOST
@@ -49,14 +48,12 @@ class Device:
     # Timeline processor
     self.timeline_processor = TimelineProcessor(self)
 
-    # Statistics controller
-    self.statistics_controller = StatisticsController()
+    # Statistics manager
+    self.statistics_controller = StatisticsManager()
 
-    # Load config
-    self.config = None
-    with open("config.json") as config_file:
-      config_data = json.load(config_file)
-      self.config = config_data["task"]
+    # Load config from shared module
+    from shared.managers import config_manager
+    self.config = config_manager.load_config()
 
     # Set version from shared module
     self.version = VERSION
@@ -246,14 +243,14 @@ class Device:
         log("Finished trial: " + self._current_trial.title, "info")
 
         # Send message about trial completion
-        _device_message_queue.put(MessageBuilder.trial_complete(self._current_trial.title, trial_data))
+        _device_message_queue.put(CommunicationMessageBuilder.trial_complete(self._current_trial.title, trial_data))
 
         if len(self._trials) > 0:
           self._current_trial = self._trials.pop(0)
           self._current_trial.on_enter()
 
           # Send message about new trial starting
-          _device_message_queue.put(MessageBuilder.trial_start(self._current_trial.title))
+          _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
         else:
           # All trials completed - check if we should loop
           if self._should_loop and self._original_timeline_config:
@@ -278,7 +275,7 @@ class Device:
             self._current_trial.on_enter()
 
             log("Timeline loop completed, starting next iteration", "info")
-            _device_message_queue.put(MessageBuilder.trial_start(self._current_trial.title))
+            _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
           else:
             # All trials completed - save data before resetting
             if self._data:
@@ -299,7 +296,7 @@ class Device:
             log("Experiment completed, timeline cleared, returning to waiting state", "info")
 
             # Send message that task is complete
-            _device_message_queue.put(MessageBuilder.task_status("completed"))
+            _device_message_queue.put(CommunicationMessageBuilder.task_status("completed"))
 
       # Render current trial
       if self._current_trial:
@@ -390,7 +387,7 @@ class Device:
     self._experiment_started = True
 
     # Send initial message that task has started
-    _device_message_queue.put(MessageBuilder.task_status("started", self._current_trial.title))
+    _device_message_queue.put(CommunicationMessageBuilder.task_status("started", self._current_trial.title))
 
     log("Experiment started", "info")
 
@@ -433,7 +430,7 @@ class Device:
     self._experiment_started = True
 
     # Send initial message that task has started
-    _device_message_queue.put(MessageBuilder.task_status("started", self._current_trial.title))
+    _device_message_queue.put(CommunicationMessageBuilder.task_status("started", self._current_trial.title))
 
     log("Timeline experiment started", "info")
 
@@ -460,7 +457,7 @@ class Device:
         log("Data saved", "success")
 
     # Send message that experiment has stopped
-    _device_message_queue.put(MessageBuilder.task_status("stopped"))
+    _device_message_queue.put(CommunicationMessageBuilder.task_status("stopped"))
 
     log("Experiment stopped", "info")
 
@@ -471,12 +468,12 @@ class Device:
       self.io.set_water_port(False)
     except Exception as e:
       self.test_state_manager.set_test_state("test_water_delivery", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log(f"Could not activate water delivery: {str(e)}", "error")
 
     if self.test_state_manager.get_test_state("test_water_delivery") == TEST_STATES["RUNNING"]:
       self.test_state_manager.set_test_state("test_water_delivery", TEST_STATES["PASSED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log(f"Test water delivery passed (duration: {duration_ms}ms)", "success")
 
   def test_water_delivery(self, duration_ms=2000):
@@ -498,13 +495,13 @@ class Device:
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
         self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
-        _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+        _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
         log("Left actuator input timed out", "error")
         return
 
     if input_state["left_lever"] != True:
       self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Left actuator did not move to 1.0", "error")
       return
 
@@ -523,13 +520,13 @@ class Device:
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
         self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
-        _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+        _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
         log("Right actuator input timed out", "error")
         return
 
     if input_state["right_lever"] != True:
       self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Right actuator did not move to 1.0", "error")
       return
 
@@ -538,7 +535,7 @@ class Device:
     # Set test to passed
     if self.test_state_manager.get_test_state("test_actuators") == TEST_STATES["RUNNING"]:
       self.test_state_manager.set_test_state("test_actuators", TEST_STATES["PASSED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Actuators test passed", "success")
 
   def test_actuators(self):
@@ -549,13 +546,13 @@ class Device:
     input_state = self.io.get_input_states()
     if input_state["left_lever"] != False:
       self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Left actuator did not default to 0.0", "error")
       return
 
     if input_state["right_lever"] != False:
       self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Right actuator did not default to 0.0", "error")
       return
 
@@ -578,20 +575,20 @@ class Device:
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
         self.test_state_manager.set_test_state("test_ir", TEST_STATES["FAILED"])
-        _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+        _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
         log("Timed out while waiting for IR input", "error")
         return
 
     if input_state["nose_poke"] != False:
       self.test_state_manager.set_test_state("test_ir", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("No IR input detected", "error")
       return
 
     # Set test to passed
     if self.test_state_manager.get_test_state("test_ir") == TEST_STATES["RUNNING"]:
       self.test_state_manager.set_test_state("test_ir", TEST_STATES["PASSED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("IR test passed", "success")
 
   def test_ir(self):
@@ -610,12 +607,12 @@ class Device:
       self.io.set_nose_light(False)
     except Exception as e:
       self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log(f"Could not control nose light: {str(e)}", "error")
 
     if self.test_state_manager.get_test_state("test_nose_light") == TEST_STATES["RUNNING"]:
       self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["PASSED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log(f"Nose light test passed (duration: {duration_ms}ms)", "success")
 
   def test_nose_light(self, duration_ms=2000):
@@ -632,12 +629,12 @@ class Device:
       self.display.clear_displays()
     except Exception as e:
       self.test_state_manager.set_test_state("test_displays", TEST_STATES["FAILED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log(f"Could not control displays: {str(e)}", "error")
 
     if self.test_state_manager.get_test_state("test_displays") == TEST_STATES["RUNNING"]:
       self.test_state_manager.set_test_state("test_displays", TEST_STATES["PASSED"])
-      _device_message_queue.put(MessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log(f"Display test passed (duration: {duration_ms}ms)", "success")
 
   def test_displays(self, duration_ms=2000):
@@ -766,12 +763,12 @@ async def send_state_message(websocket):
   """
   while True:
     try:
-      state_data = MessageBuilder.input_state(_device.io.get_input_states(), _device.version)
+      state_data = CommunicationMessageBuilder.input_state(_device.io.get_input_states(), _device.version)
       await websocket.send(json.dumps(state_data))
 
       # Also send statistics if experiment is running
       if _device._experiment_started:
-        stats_data = MessageBuilder.statistics(_device.get_statistics())
+        stats_data = CommunicationMessageBuilder.statistics(_device.get_statistics())
         await websocket.send(json.dumps(stats_data))
 
       await asyncio.sleep(0.05)
@@ -790,14 +787,14 @@ async def handle_connection(websocket, device: Device):
     async for message in websocket:
       try:
         # Try to parse as JSON first (for timeline messages)
-        message_data = MessageParser.parse_message(message)
+        message_data = CommunicationMessageParser.parse_message(message)
         if message_data and "type" in message_data:
           await handle_json_message(websocket, device, message_data)
           continue
 
         # Handle text commands (legacy)
         command = message.strip()
-        if CommandParser.parse_test_command(command)[0] in TEST_COMMANDS:
+        if CommunicationCommandParser.parse_test_command(command)[0] in TEST_COMMANDS:
           device.run_test(command)
         elif command.startswith("start_experiment"):
           device.run_experiment(command)
@@ -832,7 +829,7 @@ async def handle_json_message(websocket, device: Device, message_data: dict):
     success, message = device.timeline_processor.process_timeline_upload(timeline_data)
 
     # Send validation response
-    response = MessageBuilder.timeline_validation(success, message)
+    response = CommunicationMessageBuilder.timeline_validation(success, message)
     await websocket.send(json.dumps(response))
 
     if success:
@@ -844,16 +841,16 @@ async def handle_json_message(websocket, device: Device, message_data: dict):
     # Handle timeline experiment start
     animal_id = message_data.get("animal_id", "")
     if not animal_id:
-      response = MessageBuilder.timeline_error("Animal ID is required")
+      response = CommunicationMessageBuilder.timeline_error("Animal ID is required")
       await websocket.send(json.dumps(response))
       return
 
     success, message = device.timeline_processor.execute_timeline(animal_id)
 
     if success:
-      response = MessageBuilder.timeline_validation(success, message)
+      response = CommunicationMessageBuilder.timeline_validation(success, message)
     else:
-      response = MessageBuilder.timeline_error(message)
+      response = CommunicationMessageBuilder.timeline_error(message)
     await websocket.send(json.dumps(response))
 
     if success:

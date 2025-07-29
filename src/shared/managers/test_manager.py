@@ -3,7 +3,7 @@ Shared test management utilities for bbox_controller project
 """
 
 from typing import Dict, Any
-from .constants import TEST_COMMANDS, TEST_STATES
+from ..constants import TEST_COMMANDS, TEST_STATES
 
 class TestStateManager:
     """Manages test states across the application"""

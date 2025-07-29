@@ -4,8 +4,8 @@ Statistics management used with the device software, tracking inputs and number 
 
 from typing import Dict, Any
 
-class StatisticsController:
-    """Controller for managing experiment statistics"""
+class StatisticsManager:
+    """Manager for experiment statistics"""
 
     def __init__(self):
         self._statistics = {

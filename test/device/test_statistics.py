@@ -10,15 +10,15 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from device.app import Device
-from shared.communication import MessageBuilder
+from shared.managers import CommunicationMessageBuilder
 
 class TestStatistics(unittest.TestCase):
     """Test statistics tracking functionality"""
 
     def setUp(self):
         """Set up test fixtures"""
-        # Change to device directory to find config.json
-        device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'device')
+        # Change to shared directory to find config.json
+        device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared')
         original_dir = os.getcwd()
         os.chdir(device_dir)
 
@@ -74,14 +74,14 @@ class TestStatistics(unittest.TestCase):
             "water_deliveries": 8
         }
 
-        message = MessageBuilder.statistics(stats)
+        message = CommunicationMessageBuilder.statistics(stats)
         self.assertEqual(message["type"], "statistics")
         self.assertEqual(message["data"], stats)
 
     def test_trial_counting_on_exit(self):
         """Test that trial counting happens in on_exit method"""
-        # Change to device directory to find config.json
-        device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'device')
+        # Change to shared directory to find config.json
+        device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared')
         original_dir = os.getcwd()
         os.chdir(device_dir)
 

@@ -1,5 +1,5 @@
 """
-Shared models for bbox_controller project
+Shared dataclass models for bbox_controller project
 """
 
 import json
@@ -28,6 +28,23 @@ class ExperimentConfig:
     hold_maximum: int = 1000
     valve_open: int = 100
     punish_time: int = 1000
+
+    def __post_init__(self):
+        """Load configuration from file if not explicitly set"""
+        # Only load from global config if all values are still the original defaults
+        # This prevents overwriting values that were explicitly set (e.g., from JSON)
+        if (self.iti_minimum == 100 and self.iti_maximum == 1000 and
+            self.response_limit == 1000 and self.cue_minimum == 5000 and
+            self.cue_maximum == 10000 and self.hold_minimum == 100 and
+            self.hold_maximum == 1000 and self.valve_open == 100 and
+            self.punish_time == 1000):
+
+            # Import config_manager locally to avoid circular imports
+            from .managers.config_manager import config_manager
+            config = config_manager.load_config()
+            for key, value in config.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
 
 
 @dataclass
@@ -176,109 +193,3 @@ class ExperimentTimeline:
                 trial_ids.add(trial.id)
 
         return len(errors) == 0, errors
-
-
-class TimelineManager:
-    """Manages timeline storage and retrieval"""
-
-    def __init__(self, timelines_dir: str = "timelines"):
-        self.timelines_dir = timelines_dir
-        self._ensure_timelines_dir()
-        self._load_timelines()
-
-    def _ensure_timelines_dir(self):
-        """Ensure the timelines directory exists"""
-        import os
-        if not os.path.exists(self.timelines_dir):
-            os.makedirs(self.timelines_dir)
-
-    def _load_timelines(self):
-        """Load all timelines from the directory"""
-        import os
-        self.timelines = {}
-        if os.path.exists(self.timelines_dir):
-            for filename in os.listdir(self.timelines_dir):
-                if filename.endswith('.json'):
-                    name = filename[:-5]  # Remove .json extension
-                    try:
-                        with open(os.path.join(self.timelines_dir, filename), 'r') as f:
-                            timeline_data = json.load(f)
-                            self.timelines[name] = ExperimentTimeline.from_dict(timeline_data)
-                    except Exception as e:
-                        print(f"Error loading timeline {name}: {e}")
-
-    def save_timeline(self, timeline: ExperimentTimeline) -> bool:
-        """Save a timeline to disk"""
-        import os
-        try:
-            filename = os.path.join(self.timelines_dir, f"{timeline.name}.json")
-            with open(filename, 'w') as f:
-                f.write(timeline.to_json())
-            self.timelines[timeline.name] = timeline
-            return True
-        except Exception as e:
-            print(f"Error saving timeline {timeline.name}: {e}")
-            return False
-
-    def load_timeline(self, name: str) -> Optional[ExperimentTimeline]:
-        """Load a timeline by name"""
-        return self.timelines.get(name)
-
-    def delete_timeline(self, name: str) -> bool:
-        """Delete a timeline from disk and memory"""
-        import os
-        try:
-            filename = os.path.join(self.timelines_dir, f"{name}.json")
-            if os.path.exists(filename):
-                os.remove(filename)
-            if name in self.timelines:
-                del self.timelines[name]
-            return True
-        except Exception as e:
-            print(f"Error deleting timeline {name}: {e}")
-            return False
-
-    def list_timelines(self) -> List[str]:
-        """List all available timeline names"""
-        return list(self.timelines.keys())
-
-    def create_timeline(self, name: str, description: str = "") -> ExperimentTimeline:
-        """Create a new timeline"""
-        timeline = ExperimentTimeline(name=name, description=description)
-        self.timelines[name] = timeline
-        return timeline
-
-
-# Available trial types for validation
-AVAILABLE_TRIAL_TYPES = {
-    "Stage1": {
-        "description": "Basic nose poke training stage",
-        "default_parameters": {
-            "cue_duration": 5000,
-            "response_limit": 1000,
-            "water_delivery_duration": 2000
-        }
-    },
-    "Stage2": {
-        "description": "Basic lever press training stage",
-        "default_parameters": {
-            "cue_duration": 5000,
-            "response_limit": 1000,
-            "water_delivery_duration": 2000
-        }
-    },
-    "Stage3": {
-        "description": "Nose poke and lever press training stage",
-        "default_parameters": {
-            "cue_duration": 5000,
-            "response_limit": 1000,
-            "water_delivery_duration": 2000
-        }
-    },
-    "Interval": {
-        "description": "Inter-trial interval",
-        "default_parameters": {
-            "duration": 800
-        }
-    }
-}

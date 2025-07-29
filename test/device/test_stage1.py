@@ -10,8 +10,8 @@ import time
 import json
 import pygame
 
-# Change working directory to the device directory so config.json can be found
-os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'device'))
+# Change working directory to the shared directory so config.json can be found
+os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared'))
 
 # Initialize pygame for font support
 pygame.init()

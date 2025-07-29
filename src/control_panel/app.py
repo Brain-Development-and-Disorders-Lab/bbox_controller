@@ -18,9 +18,7 @@ from datetime import datetime
 # Import shared modules
 from shared import VERSION
 from shared.constants import *
-from shared.communication import MessageParser, CommandParser
-from shared.test_management import TestStateManager
-from shared.models import TimelineManager
+from shared.managers import CommunicationMessageParser, CommunicationCommandParser, TestStateManager, TimelineManager
 
 # Import UI components
 from .ui.timeline_editor import TimelineEditor
@@ -597,7 +595,7 @@ class ControlPanel(tk.Frame):
     Parameters:
     message (str): The message to parse.
     """
-    return MessageParser.parse_message(message)
+    return CommunicationMessageParser.parse_message(message)
 
   def on_connect(self):
     """
@@ -791,7 +789,7 @@ class ControlPanel(tk.Frame):
     command (str): The entire command to execute.
     """
     # Parse the command to determine its type
-    base_command, parameters = CommandParser.parse_test_command(command)
+    base_command, parameters = CommunicationCommandParser.parse_test_command(command)
 
     # Send the command to the device
     if base_command in TEST_COMMANDS:

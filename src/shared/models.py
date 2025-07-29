@@ -1,5 +1,9 @@
 """
-Shared dataclass models for bbox_controller project
+Filename: shared/models.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Shared '@dataclass' models for shared classes between the device and control panel
+License: MIT
 """
 
 import json

@@ -1,6 +1,9 @@
 """
-Shared library for bbox_controller project
-Contains common constants, models, and utilities used by both control panel and device
+Filename: shared/__init__.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Shared library for the bbox_controller project, contains common constants, models, and managers used by both the control panel and device
+License: MIT
 """
 
 from .constants import *

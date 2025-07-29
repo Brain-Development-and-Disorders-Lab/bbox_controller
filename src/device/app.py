@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Device application for Behavior Box Controller
-Handles hardware control, display, and communication with control panel
+Filename: device/app.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Main application for the device script, handles hardware control, display, and communication with control panel
+License: MIT
 """
 
 import pygame

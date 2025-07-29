@@ -1,5 +1,9 @@
 """
-Shared test management utilities for bbox_controller project
+Filename: shared/managers/TestManager.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Manager for test states, handles tracking the state of each test and validating test commands
+License: MIT
 """
 
 from typing import Dict, Any

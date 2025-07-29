@@ -1,5 +1,9 @@
 """
-Shared constants for bbox_controller project
+Filename: shared/constants.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Shared constants between the device and control panel
+License: MIT
 """
 
 # Test commands

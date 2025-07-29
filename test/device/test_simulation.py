@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Test script for simulation mode
-This script tests the extended simulation functionality
+Filename: test/device/test_simulation.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Test script for simulation mode, tests the extended simulation functionality
+License: MIT
 """
-
-import sys
-import os
 
 from device.hardware.IOController import IOController
 from device.utils.logger import log

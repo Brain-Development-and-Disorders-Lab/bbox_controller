@@ -1,5 +1,9 @@
+#!/usr/bin/env python3
 """
-Test for statistics tracking functionality
+Filename: test/device/test_statistics.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Test for statistics tracking functionality
 """
 
 import unittest
@@ -86,11 +90,7 @@ class TestStatistics(unittest.TestCase):
         os.chdir(device_dir)
 
         try:
-            # Create a trial with statistics controller
-            from device.core.trials import Interval
-
-
-            # Create statistics manager
+            from device.core.Trials import Interval
             from shared.managers import StatisticsManager
             stats_controller = StatisticsManager()
 

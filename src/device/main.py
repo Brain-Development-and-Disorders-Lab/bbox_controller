@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Main entry point for the device application
+Filename: device/main.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Entry point for the device script, executed directly from the command line
+License: MIT
 """
 
 from device.app import main

@@ -1,6 +1,13 @@
+"""
+Filename: shared/managers/CommunicationMessageParser.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Utility class for parsing and validating messages for communication between the device and control panel
+License: MIT
+"""
+
 import json
 from typing import Any, Dict, Optional
-
 
 class CommunicationMessageParser:
     """Utility class for parsing and validating messages"""

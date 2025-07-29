@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Control Panel for Behavior Box Controller
-Provides a web interface for controlling and monitoring the device
+Filename: control_panel/app.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Main application for the control panel script, provides a GUI for controlling and monitoring the device
+License: MIT
 """
 
 import tkinter as tk

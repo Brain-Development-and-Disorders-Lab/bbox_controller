@@ -1,5 +1,9 @@
 """
-Device Hardware Controllers
+Filename: device/hardware/__init__.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Exports for the device hardware controllers
+License: MIT
 """
 
 from .IOController import IOController

@@ -1,11 +1,18 @@
+"""
+Filename: device/core/ExperimentProcessor.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Class for receiving an experiment file from the control panel and executing the experiment on the device
+License: MIT
+"""
+
 from typing import Any, Dict, Optional
 
 from device.core.TrialFactory import TrialFactory
 from shared.models import Experiment
 
-
 class ExperimentProcessor:
-    """Processor for receiving an experiment file and executing the timeline on the device"""
+    """Class for receiving an experiment file from the control panel and executing the experiment on the device"""
 
     def __init__(self, device):
         self.device = device
@@ -15,19 +22,13 @@ class ExperimentProcessor:
     def process_experiment_upload(self, experiment_data: Dict[str, Any]) -> tuple[bool, str]:
         """Process an experiment upload from the control panel"""
         try:
-            # Create experiment from data
             experiment = Experiment.from_dict(experiment_data)
-
-            # Validate experiment
             is_valid, errors = experiment.validate()
             if not is_valid:
                 error_msg = "Experiment validation failed: " + "; ".join(errors)
                 return False, error_msg
 
-            # Store experiment
             self.current_experiment = experiment
-
-            # Update device's experiment config to match the new experiment
             self.device.config = experiment.config
 
             return True, "Experiment validated and stored successfully"
@@ -41,7 +42,7 @@ class ExperimentProcessor:
             return False, "No experiment available for execution"
 
         try:
-            # Convert experiment to trial objects
+            # Convert experiment trials to usable trial objects
             trials = []
             trial_configs = []
             for trial_data in self.current_experiment.trials:
@@ -57,13 +58,11 @@ class ExperimentProcessor:
                     statistics=self.device.statistics_controller,
                     config=self.current_experiment.config
                 ))
-
                 trial_configs.append({
                     "type": trial_data.type,
                     "kwargs": trial_data.parameters
                 })
 
-            # Start experiment with experiment
             self.device.start_experiment(animal_id, trials, trial_configs, self.current_experiment.config, self.current_experiment.loop)
             return True, f"Experiment '{self.current_experiment.name}' started successfully"
 

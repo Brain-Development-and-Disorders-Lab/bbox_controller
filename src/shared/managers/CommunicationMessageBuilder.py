@@ -1,5 +1,9 @@
 """
-Shared communication utilities for bbox_controller project
+Filename: shared/managers/CommunicationMessageBuilder.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Utility class for building standardized messages for communication between the device and control panel
+License: MIT
 """
 
 from typing import Dict, Any

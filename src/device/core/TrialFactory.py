@@ -1,13 +1,12 @@
 """
-Filename: timeline_models.py
+Filename: device/core/TrialFactory.py
 Author: Henry Burgess
-Date: 2025-03-07
-Description: Timeline models for device-side experiment execution
+Date: 2025-07-29
+Description: Factory for creating trial objects from timeline data
 License: MIT
 """
 
-from typing import Dict, Any, Optional
-from shared.models import Experiment
+from typing import Dict, Any
 
 class TrialFactory:
     """Factory for creating trial objects from timeline data"""
@@ -25,13 +24,13 @@ class TrialFactory:
             raise ValueError(f"Unknown trial type: {trial_type}")
 
         if trial_type == "Stage1":
-            from device.core.trials import Stage1
+            from device.core.Trials import Stage1
             return Stage1(**parameters, **kwargs)
         elif trial_type == "Stage2":
-            from device.core.trials import Stage2
+            from device.core.Trials import Stage2
             return Stage2(**parameters, **kwargs)
         elif trial_type == "Interval":
-            from device.core.trials import Interval
+            from device.core.Trials import Interval
             return Interval(**parameters, **kwargs)
         else:
             raise ValueError(f"Unsupported trial type: {trial_type}")

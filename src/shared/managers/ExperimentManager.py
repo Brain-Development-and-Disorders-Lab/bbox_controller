@@ -1,5 +1,9 @@
 """
-Experiment management for bbox_controller project
+Filename: shared/managers/ExperimentManager.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Manager for experiments, handles saving and loading experiments from the 'experiments' directory
+License: MIT
 """
 
 import json

@@ -1,7 +1,7 @@
 """
-Filename: DisplayController.py
+Filename: device/hardware/DisplayController.py
 Author: Matt Gaidica, Henry Burgess
-Date: 2025-03-07
+Date: 2025-07-29
 Description: Handles the display of information on the behavior box
 License: MIT
 """
@@ -48,13 +48,12 @@ class DisplayController:
       # Initialize simulation mode displays
       self._init_simulation()
 
-    # Load a font - modified for cross-platform compatibility
     try:
       # Try system fonts in different locations
       font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
-        "/System/Library/Fonts/Helvetica.ttc",  # macOS
-        "C:/Windows/Fonts/arial.ttf"  # Windows
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", # Linux
+        "/System/Library/Fonts/Helvetica.ttc", # macOS
+        "C:/Windows/Fonts/arial.ttf" # Windows
       ]
       for path in font_paths:
         if os.path.exists(path):

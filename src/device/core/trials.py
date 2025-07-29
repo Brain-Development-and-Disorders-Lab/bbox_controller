@@ -1,5 +1,9 @@
 """
-Trial base class and all following trials.
+Filename: device/core/trials.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Base Trial class and all following trials for the device
+License: MIT
 """
 
 import random
@@ -10,7 +14,7 @@ from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
 from shared.managers import StatisticsManager
 
-class Base:
+class Trial:
   """
   Base interface for all experiment trials.
   Each trial should implement update() and render() methods.
@@ -99,7 +103,7 @@ class Base:
         }
     return self.io.get_input_states()
 
-class Interval(Base):
+class Interval(Trial):
   """
   Stage ITI: Inter-trial interval
   Description: After each trial, the mouse is given an ITI of variable duration.
@@ -155,7 +159,7 @@ class Interval(Base):
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))
       self.screen.blit(text_surface, text_rect)
 
-class Stage1(Base):
+class Stage1(Trial):
   """
   Trial Stage 1: Nose port entry and lever press
   Description: At the beginning of each trial, lit up the nose port light and deliver water.
@@ -332,7 +336,7 @@ class Stage1(Base):
     # Run post-render tasks
     self._post_render_tasks()
 
-class Stage2(Base):
+class Stage2(Trial):
   """
   Trial Stage 2: Lever press for reward
   Description: At the beginning of each trial, randomly display the visual cue on one of the
@@ -523,7 +527,7 @@ class Stage2(Base):
     # Run post-render tasks
     self._post_render_tasks()
 
-class Stage3(Base):
+class Stage3(Trial):
   """
   Trial Stage 3: Nose port entry followed by lever press for reward
   Description: At the beginning of each trial, lit up the nose port light. Upon the mouse entering

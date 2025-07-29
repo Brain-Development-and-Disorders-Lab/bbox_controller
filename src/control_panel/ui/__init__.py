@@ -1,7 +1,11 @@
 """
-Control Panel UI Components
+Filename: control_panel/ui/__init__.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Exports for the control panel UI components
+License: MIT
 """
 
-from .timeline_editor import TimelineEditor
+from .experiment_editor import ExperimentEditor
 
-__all__ = ['TimelineEditor']
+__all__ = ['ExperimentEditor']

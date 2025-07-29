@@ -1,3 +1,11 @@
+"""
+Filename: device/utils/logger.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Logger for the device script, handles logging to the console and message queue
+License: MIT
+"""
+
 import datetime
 
 # Log states

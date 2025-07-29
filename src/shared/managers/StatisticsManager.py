@@ -1,11 +1,15 @@
 """
-Statistics management used with the device software, tracking inputs and number of trials completed
+Filename: shared/managers/StatisticsManager.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Manager for experiment statistics, tracking inputs and number of trials completed
+License: MIT
 """
 
 from typing import Dict, Any
 
-class StatisticsController:
-    """Controller for managing experiment statistics"""
+class StatisticsManager:
+    """Manager for experiment statistics"""
 
     def __init__(self):
         self._statistics = {

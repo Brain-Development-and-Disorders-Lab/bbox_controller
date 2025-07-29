@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-Main entry point for the control panel application
+Filename: control_panel/main.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Entry point for the control panel script, executed directly from the command line
+License: MIT
 """
 
 import sys
 import os
 
-# Add the src directory to Python path to enable imports
+# Add the 'src' directory to Python path to enable imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.dirname(script_dir)
 if src_dir not in sys.path:

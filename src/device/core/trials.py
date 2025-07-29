@@ -1,17 +1,20 @@
 """
-Trial base class and all following trials.
+Filename: device/core/trials.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Base Trial class and all following trials for the device
+License: MIT
 """
 
 import random
 import pygame
-import json
 from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
 from device.hardware.IOController import IOController
 from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
-from shared.statistics import StatisticsController
+from shared.managers import StatisticsManager
 
-class Base:
+class Trial:
   """
   Base interface for all experiment trials.
   Each trial should implement update() and render() methods.
@@ -30,13 +33,17 @@ class Base:
     # Controllers
     self.io: IOController = kwargs.get('io')
     self.display: DisplayController = kwargs.get('display')
-    self.statistics: StatisticsController = kwargs.get('statistics')
+    self.statistics: StatisticsManager = kwargs.get('statistics')
 
     # All trial data
     self.data = {}
 
-    # Config
-    self.config = json.load(open("config.json", "r"))["task"]
+    # Config from experiment (or default if not provided)
+    self.config = kwargs.get('config')
+    if self.config is None:
+        # Fallback to default config if not provided
+        from shared.models import Config
+        self.config = Config()
 
     if SIMULATION_MODE:
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
@@ -96,7 +103,7 @@ class Base:
         }
     return self.io.get_input_states()
 
-class Interval(Base):
+class Interval(Trial):
   """
   Stage ITI: Inter-trial interval
   Description: After each trial, the mouse is given an ITI of variable duration.
@@ -152,7 +159,7 @@ class Interval(Base):
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))
       self.screen.blit(text_surface, text_rect)
 
-class Stage1(Base):
+class Stage1(Trial):
   """
   Trial Stage 1: Nose port entry and lever press
   Description: At the beginning of each trial, lit up the nose port light and deliver water.
@@ -218,7 +225,7 @@ class Stage1(Base):
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
-      if current_time - self.water_start_time >= self.config["valve_open"]:
+      if current_time - self.water_start_time >= self.config.valve_open:
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
@@ -329,7 +336,7 @@ class Stage1(Base):
     # Run post-render tasks
     self._post_render_tasks()
 
-class Stage2(Base):
+class Stage2(Trial):
   """
   Trial Stage 2: Lever press for reward
   Description: At the beginning of each trial, randomly display the visual cue on one of the
@@ -433,7 +440,7 @@ class Stage2(Base):
       self.lever_press_start_time = None
       log("Lever press released before minimum duration", "info")
     elif self.is_lever_pressed and not self.reward_triggered:
-      if current_time - self.lever_press_start_time >= self.config["hold_minimum"]:
+      if current_time - self.lever_press_start_time >= self.config.hold_minimum:
         self.reward_triggered = True
         self.is_lever_pressed = False
         self.lever_press_start_time = None
@@ -467,7 +474,7 @@ class Stage2(Base):
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
-      if current_time - self.water_start_time >= self.config["valve_open"]:
+      if current_time - self.water_start_time >= self.config.valve_open:
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
@@ -520,7 +527,7 @@ class Stage2(Base):
     # Run post-render tasks
     self._post_render_tasks()
 
-class Stage3(Base):
+class Stage3(Trial):
   """
   Trial Stage 3: Nose port entry followed by lever press for reward
   Description: At the beginning of each trial, lit up the nose port light. Upon the mouse entering
@@ -553,8 +560,8 @@ class Stage3(Base):
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
     self.cue_duration = random.randint(
-      self.config["cue_minimum"],
-      self.config["cue_maximum"]
+      self.config.cue_minimum,
+      self.config.cue_maximum
     )
 
     # Trial events
@@ -644,7 +651,7 @@ class Stage3(Base):
       self.lever_press_start_time = None
       log("Lever press released before minimum duration", "info")
     elif self.is_lever_pressed and not self.reward_triggered:
-      if current_time - self.lever_press_start_time >= self.config["hold_minimum"]:
+      if current_time - self.lever_press_start_time >= self.config.hold_minimum:
         self.reward_triggered = True
         self.visual_cue = False
         if left_lever:
@@ -697,7 +704,7 @@ class Stage3(Base):
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
-      if current_time - self.water_start_time >= self.config["valve_open"]:
+      if current_time - self.water_start_time >= self.config.valve_open:
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")

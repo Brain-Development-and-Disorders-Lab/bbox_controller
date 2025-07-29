@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate Stage1 nose port exit fix
-This script shows that Stage1 now properly waits for nose port exit before ending
+Filename: test/device/test_stage1.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Test script to demonstrate Stage1 nose port exit fix, shows that Stage1 now properly waits for nose port exit before ending
 """
 
-import sys
 import os
 import time
-import json
 import pygame
 
-# Change working directory to the device directory so config.json can be found
-os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'device'))
+# Change working directory to the shared directory
+os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared'))
 
 # Initialize pygame for font support
 pygame.init()
 
-from device.core.trials import Stage1
+from device.core.Trials import Stage1
 from device.hardware.IOController import IOController
-from device.utils.logger import log
 
 def test_stage1_nose_port_exit():
     """Test that Stage1 properly waits for nose port exit"""
@@ -45,7 +44,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port entry
     print("\n1. Simulating nose port entry...")
-    io.simulate_nose_poke(True)
+    io.simulate_nose_poke(False)  # False means nose is IN (entry)
 
     # Update trial
     trial.update([])
@@ -67,7 +66,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port exit
     print("\n3. Simulating nose port exit...")
-    io.simulate_nose_poke(False)
+    io.simulate_nose_poke(True)  # True means nose is OUT (exit)
 
     # Update trial
     should_continue = trial.update([])

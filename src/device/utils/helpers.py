@@ -1,3 +1,11 @@
+"""
+Filename: device/utils/helpers.py
+Author: Henry Burgess
+Date: 2025-07-29
+Description: Helper functions for the device script, including trial outcome codes and random number generation
+License: MIT
+"""
+
 from enum import Enum
 import random
 from typing import Optional

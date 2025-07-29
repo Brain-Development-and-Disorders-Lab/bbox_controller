@@ -13,7 +13,6 @@ TEST_COMMANDS = [
 
 # Experiment commands
 EXPERIMENT_COMMANDS = [
-    "start_experiment",
     "stop_experiment"
 ]
 

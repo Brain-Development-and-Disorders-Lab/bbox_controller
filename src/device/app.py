@@ -26,6 +26,7 @@ from device.utils.logger import log, set_message_queue
 from device.utils.helpers import Randomness
 from shared.communication import MessageParser, CommandParser
 from shared.test_management import TestStateManager
+from shared.statistics import StatisticsController
 
 # Other variables
 HOST = DEFAULT_HOST
@@ -47,6 +48,9 @@ class Device:
 
     # Timeline processor
     self.timeline_processor = TimelineProcessor(self)
+
+    # Statistics controller
+    self.statistics_controller = StatisticsController()
 
     # Load config
     self.config = None
@@ -76,15 +80,6 @@ class Device:
       "nose_poke": False,
       "water_port": False,
       "nose_light": False,
-    }
-
-    # Statistics tracking
-    self._statistics = {
-      "nose_pokes": 0,
-      "left_lever_presses": 0,
-      "right_lever_presses": 0,
-      "trial_count": 0,
-      "water_deliveries": 0
     }
 
     # Track previous input states for detecting changes
@@ -148,6 +143,7 @@ class Device:
       trial.height = self.height
       trial.io = self.io
       trial.display = self.display
+      trial.statistics = self.statistics_controller
 
     log(f"Trials reset: {len(self._trials)} trials ready for next experiment", "info")
 
@@ -242,9 +238,6 @@ class Device:
         # Trial is complete, move to next trial
         self._current_trial.on_exit()
 
-        # Increment trial count
-        self._statistics["trial_count"] += 1
-
         # Save trial data
         trial_data = self._current_trial.get_data()
         if trial_data and self._data:
@@ -276,7 +269,8 @@ class Device:
                 width=self.width,
                 height=self.height,
                 io=self.io,
-                display=self.display
+                display=self.display,
+                statistics=self.statistics_controller
               )
               self._trials.append(new_trial)
 
@@ -326,36 +320,30 @@ class Device:
     if self._experiment_started:  # Only track during experiments
       # Check for nose poke activation (transition from False to True)
       if not self._previous_input_states["nose_poke"] and current_input_states["nose_poke"]:
-        self._statistics["nose_pokes"] += 1
+        self.statistics_controller.increment_stat("nose_pokes")
 
       # Check for left lever press (transition from False to True)
       if not self._previous_input_states["left_lever"] and current_input_states["left_lever"]:
-        self._statistics["left_lever_presses"] += 1
+        self.statistics_controller.increment_stat("left_lever_presses")
 
       # Check for right lever press (transition from False to True)
       if not self._previous_input_states["right_lever"] and current_input_states["right_lever"]:
-        self._statistics["right_lever_presses"] += 1
+        self.statistics_controller.increment_stat("right_lever_presses")
 
       # Check for water delivery (transition from False to True)
       if not self._previous_input_states["water_port"] and current_input_states["water_port"]:
-        self._statistics["water_deliveries"] += 1
+        self.statistics_controller.increment_stat("water_deliveries")
 
     # Update previous states for next comparison
     self._previous_input_states = current_input_states.copy()
 
   def get_statistics(self):
     """Get current statistics"""
-    return self._statistics.copy()
+    return self.statistics_controller.get_all_stats()
 
   def reset_statistics(self):
     """Reset all statistics to zero"""
-    self._statistics = {
-      "nose_pokes": 0,
-      "left_lever_presses": 0,
-      "right_lever_presses": 0,
-      "trial_count": 0,
-      "water_deliveries": 0
-    }
+    self.statistics_controller.reset_all_stats()
 
   def start_experiment(self, animal_id, punishment_duration=1000, water_delivery_duration=2000):
     """Start the experiment with the given animal ID and duration parameters"""

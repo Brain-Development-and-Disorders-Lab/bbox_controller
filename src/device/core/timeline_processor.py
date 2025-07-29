@@ -90,7 +90,8 @@ class TimelineProcessor:
                     width=self.device.width,
                     height=self.device.height,
                     io=self.device.io,
-                    display=self.device.display
+                    display=self.device.display,
+                    statistics=self.device.statistics_controller
                 )
                 trials.append(trial)
 

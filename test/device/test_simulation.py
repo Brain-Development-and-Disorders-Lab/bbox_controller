@@ -8,7 +8,6 @@ License: MIT
 """
 
 from device.hardware.IOController import IOController
-from device.utils.logger import log
 
 def test_simulation():
     """Test the simulation mode functionality"""

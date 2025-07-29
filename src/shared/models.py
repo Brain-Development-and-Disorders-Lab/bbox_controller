@@ -11,7 +11,6 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
-
 @dataclass
 class Trial:
     """A single trial in the experiment timeline"""
@@ -28,7 +27,6 @@ class Trial:
     def from_dict(cls, data: Dict[str, Any]) -> 'Trial':
         """Create trial from dictionary"""
         return cls(**data)
-
 
 @dataclass
 class Timeline:
@@ -88,7 +86,6 @@ class Timeline:
         trials = [Trial.from_dict(trial_data) for trial_data in data.get("trials", [])]
         return cls(trials=trials)
 
-
 @dataclass
 class Config:
     """Experiment-wide configuration parameters"""
@@ -110,7 +107,6 @@ class Config:
     def from_dict(cls, data: Dict[str, Any]) -> 'Config':
         """Create config from dictionary"""
         return cls(**data)
-
 
 @dataclass
 class Experiment:

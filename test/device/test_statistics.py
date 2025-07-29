@@ -75,9 +75,84 @@ class TestStatistics(unittest.TestCase):
         }
 
         message = MessageBuilder.statistics(stats)
-
         self.assertEqual(message["type"], "statistics")
         self.assertEqual(message["data"], stats)
+
+    def test_trial_counting_on_exit(self):
+        """Test that trial counting happens in on_exit method"""
+        # Change to device directory to find config.json
+        device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'device')
+        original_dir = os.getcwd()
+        os.chdir(device_dir)
+
+        try:
+            # Create a trial with statistics controller
+            from device.core.trials import Interval
+            from shared.statistics import StatisticsController
+
+            # Create statistics controller
+            stats_controller = StatisticsController()
+
+            # Create trial with statistics controller
+            trial = Interval(statistics=stats_controller)
+
+            # Verify initial trial count
+            initial_count = stats_controller.get_statistics()["trial_count"]
+
+            # Call on_exit to simulate trial completion
+            trial.on_exit()
+
+            # Verify trial count was incremented
+            final_count = stats_controller.get_statistics()["trial_count"]
+            self.assertEqual(final_count, initial_count + 1)
+        finally:
+            os.chdir(original_dir)
+
+    def test_statistics_controller(self):
+        """Test the StatisticsController functionality"""
+        from shared.statistics import StatisticsController
+
+        # Create statistics controller
+        stats = StatisticsController()
+
+        # Test initial state
+        initial_stats = stats.get_statistics()
+        self.assertEqual(initial_stats["trial_count"], 0)
+        self.assertEqual(initial_stats["nose_pokes"], 0)
+        self.assertEqual(initial_stats["left_lever_presses"], 0)
+        self.assertEqual(initial_stats["right_lever_presses"], 0)
+        self.assertEqual(initial_stats["water_deliveries"], 0)
+
+        # Test incrementing
+        stats.increment_trial_count()
+        stats.increment_nose_pokes()
+        stats.increment_left_lever_presses()
+        stats.increment_right_lever_presses()
+        stats.increment_water_deliveries()
+
+        # Verify increments
+        updated_stats = stats.get_statistics()
+        self.assertEqual(updated_stats["trial_count"], 1)
+        self.assertEqual(updated_stats["nose_pokes"], 1)
+        self.assertEqual(updated_stats["left_lever_presses"], 1)
+        self.assertEqual(updated_stats["right_lever_presses"], 1)
+        self.assertEqual(updated_stats["water_deliveries"], 1)
+
+        # Test reset
+        stats.reset_statistics()
+        reset_stats = stats.get_statistics()
+        self.assertEqual(reset_stats["trial_count"], 0)
+        self.assertEqual(reset_stats["nose_pokes"], 0)
+        self.assertEqual(reset_stats["left_lever_presses"], 0)
+        self.assertEqual(reset_stats["right_lever_presses"], 0)
+        self.assertEqual(reset_stats["water_deliveries"], 0)
+
+        # Test generic increment method
+        stats.increment_stat("trial_count")
+        stats.increment_stat("nose_pokes")
+        generic_stats = stats.get_statistics()
+        self.assertEqual(generic_stats["trial_count"], 1)
+        self.assertEqual(generic_stats["nose_pokes"], 1)
 
     def tearDown(self):
         """Clean up after tests"""

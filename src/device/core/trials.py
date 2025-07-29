@@ -9,6 +9,7 @@ from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
 from device.hardware.IOController import IOController
 from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
+from shared.statistics import StatisticsController
 
 class Base:
   """
@@ -29,6 +30,7 @@ class Base:
     # Controllers
     self.io: IOController = kwargs.get('io')
     self.display: DisplayController = kwargs.get('display')
+    self.statistics: StatisticsController = kwargs.get('statistics')
 
     # All trial data
     self.data = {}
@@ -65,7 +67,9 @@ class Base:
     """
     Called when trial is being exited
     """
-    pass
+    # Increment trial count if statistics controller is available
+    if hasattr(self, 'statistics') and self.statistics is not None:
+      self.statistics.increment_trial_count()
 
   def add_data(self, key, value):
     """Add data to the trial's internal storage"""

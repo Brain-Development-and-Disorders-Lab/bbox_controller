@@ -7,7 +7,7 @@ License: MIT
 """
 
 from typing import Dict, Any, Optional
-from shared.models import TrialConfig, ExperimentConfig, ExperimentTimeline
+from shared.models import ExperimentTimeline
 
 class TrialFactory:
     """Factory for creating trial objects from timeline data"""
@@ -90,7 +90,8 @@ class TimelineProcessor:
                     width=self.device.width,
                     height=self.device.height,
                     io=self.device.io,
-                    display=self.device.display
+                    display=self.device.display,
+                    statistics=self.device.statistics_controller
                 )
                 trials.append(trial)
 

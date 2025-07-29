@@ -10,7 +10,7 @@ import time
 import json
 import pygame
 
-# Change working directory to the shared directory so config.json can be found
+# Change working directory to the shared directory
 os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared'))
 
 # Initialize pygame for font support
@@ -45,7 +45,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port entry
     print("\n1. Simulating nose port entry...")
-    io.simulate_nose_poke(True)
+    io.simulate_nose_poke(False)  # False means nose is IN (entry)
 
     # Update trial
     trial.update([])
@@ -67,7 +67,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port exit
     print("\n3. Simulating nose port exit...")
-    io.simulate_nose_poke(False)
+    io.simulate_nose_poke(True)  # True means nose is OUT (exit)
 
     # Update trial
     should_continue = trial.update([])

@@ -17,7 +17,7 @@ class TestStatistics(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures"""
-        # Change to shared directory to find config.json
+        # Change to shared directory
         device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared')
         original_dir = os.getcwd()
         os.chdir(device_dir)
@@ -80,7 +80,7 @@ class TestStatistics(unittest.TestCase):
 
     def test_trial_counting_on_exit(self):
         """Test that trial counting happens in on_exit method"""
-        # Change to shared directory to find config.json
+        # Change to shared directory
         device_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared')
         original_dir = os.getcwd()
         os.chdir(device_dir)
@@ -88,12 +88,13 @@ class TestStatistics(unittest.TestCase):
         try:
             # Create a trial with statistics controller
             from device.core.trials import Interval
-            from shared.statistics import StatisticsController
 
-            # Create statistics controller
-            stats_controller = StatisticsController()
 
-            # Create trial with statistics controller
+            # Create statistics manager
+            from shared.managers import StatisticsManager
+            stats_controller = StatisticsManager()
+
+            # Create trial with statistics manager
             trial = Interval(statistics=stats_controller)
 
             # Verify initial trial count
@@ -109,11 +110,11 @@ class TestStatistics(unittest.TestCase):
             os.chdir(original_dir)
 
     def test_statistics_controller(self):
-        """Test the StatisticsController functionality"""
-        from shared.statistics import StatisticsController
+        """Test the StatisticsManager functionality"""
+        from shared.managers import StatisticsManager
 
-        # Create statistics controller
-        stats = StatisticsController()
+        # Create statistics manager
+        stats = StatisticsManager()
 
         # Test initial state
         initial_stats = stats.get_statistics()

@@ -115,7 +115,7 @@ Datasets follow this format:
 
 ### Version Tracking
 
-The device code includes version tracking to help identify which version is running on the device. The version is stored in `src/device/config.json` and is displayed on the device screen and logged in the control panel.
+The device code includes version tracking to help identify which version is running on the device. The version is stored in the shared module and is displayed on the device screen and logged in the control panel.
 
 - Displayed on the device's waiting screen
 - Sent to the control panel via WebSocket

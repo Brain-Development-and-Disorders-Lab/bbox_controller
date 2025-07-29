@@ -2,7 +2,8 @@
 Device Core Logic
 """
 
-from .timeline_processor import TimelineProcessor
+from .ExperimentProcessor import ExperimentProcessor
+from .TrialFactory import TrialFactory
 from .trials import *
 
-__all__ = ['TimelineProcessor']
+__all__ = ['ExperimentProcessor', 'TrialFactory']

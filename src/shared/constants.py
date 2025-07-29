@@ -17,16 +17,6 @@ EXPERIMENT_COMMANDS = [
     "stop_experiment"
 ]
 
-# Timeline message types
-TIMELINE_MESSAGE_TYPES = [
-    "timeline_upload",
-    "timeline_validation",
-    "timeline_ready",
-    "timeline_error",
-    "timeline_progress",
-    "timeline_complete"
-]
-
 # Test states
 TEST_STATES = {
     "NOT_TESTED": 0,

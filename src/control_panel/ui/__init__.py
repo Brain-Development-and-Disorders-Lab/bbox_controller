@@ -2,6 +2,6 @@
 Control Panel UI Components
 """
 
-from .timeline_editor import TimelineEditor
+from .experiment_editor import ExperimentEditor
 
-__all__ = ['TimelineEditor']
+__all__ = ['ExperimentEditor']

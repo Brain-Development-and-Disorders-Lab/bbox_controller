@@ -18,14 +18,17 @@ from shared import VERSION
 from shared.managers import CommunicationMessageBuilder
 from shared.constants import *
 
+# Import shared models
+from shared.models import Config
+
 # Import device-specific modules
 from device.hardware.IOController import IOController
 from device.hardware.DisplayController import DisplayController
 from device.hardware.DataController import DataController
-from device.core.timeline_processor import TimelineProcessor
+from device.core.ExperimentProcessor import ExperimentProcessor
 from device.utils.logger import log, set_message_queue
 from device.utils.helpers import Randomness
-from shared.managers import CommunicationMessageParser, CommunicationCommandParser, TestStateManager, StatisticsManager
+from shared.managers import CommunicationMessageParser, TestStateManager, StatisticsManager
 
 # Other variables
 HOST = DEFAULT_HOST
@@ -45,15 +48,15 @@ class Device:
     # Randomness
     self.randomness = Randomness()
 
-    # Timeline processor
-    self.timeline_processor = TimelineProcessor(self)
+    # Experiment processor
+    self.experiment_processor = ExperimentProcessor(self)
 
     # Statistics manager
     self.statistics_controller = StatisticsManager()
 
-    # Load config from shared module
-    from shared.managers import config_manager
-    self.config = config_manager.load_config()
+    # Experiment config (will be set when experiment starts)
+    self.config = None
+    self.default_config = Config()
 
     # Set version from shared module
     self.version = VERSION
@@ -123,7 +126,6 @@ class Device:
     self._experiment_started = False
     self._running = True
     self._websocket_server = None  # Store reference to websocket server
-    self._original_timeline_config = None  # Store original timeline configuration for looping
     self._should_loop = False  # Whether the timeline should loop
 
     # Experiment parameters (will be set when experiment starts)
@@ -253,12 +255,12 @@ class Device:
           _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
         else:
           # All trials completed - check if we should loop
-          if self._should_loop and self._original_timeline_config:
+          if self._should_loop and self.default_config:
             # Reset trials for next loop by creating new trial instances
             self._trials = []
-            for trial_config in self._original_timeline_config:
+            for trial_config in self.default_config:
               # Create a new trial instance with the same parameters
-              new_trial = self.timeline_processor.trial_factory.create_trial(
+              new_trial = self.experiment_processor.trial_factory.create_trial(
                 trial_config["type"],  # Get the trial type name
                 trial_config["kwargs"],  # Use the original parameters
                 screen=self.screen,
@@ -267,7 +269,8 @@ class Device:
                 height=self.height,
                 io=self.io,
                 display=self.display,
-                statistics=self.statistics_controller
+                statistics=self.statistics_controller,
+                config=self.config  # Use the current experiment config
               )
               self._trials.append(new_trial)
 
@@ -291,12 +294,12 @@ class Device:
 
             # Clear trials - timeline must be re-uploaded for next experiment
             self._trials = []
-            self._original_timeline_config = None
+            self.default_config = None
             self._should_loop = False
             log("Experiment completed, timeline cleared, returning to waiting state", "info")
 
             # Send message that task is complete
-            _device_message_queue.put(CommunicationMessageBuilder.task_status("completed"))
+            _device_message_queue.put(CommunicationMessageBuilder.experiment_status("completed"))
 
       # Render current trial
       if self._current_trial:
@@ -342,8 +345,8 @@ class Device:
     """Reset all statistics to zero"""
     self.statistics_controller.reset_all_stats()
 
-  def start_experiment(self, animal_id, punishment_duration=1000, water_delivery_duration=2000):
-    """Start the experiment with the given animal ID and duration parameters"""
+  def start_experiment(self, animal_id):
+    """Start the experiment with the given animal ID"""
     if self._experiment_started:
       log("Experiment already running", "warning")
       return
@@ -356,30 +359,16 @@ class Device:
     # Reset statistics for new experiment
     self.reset_statistics()
 
-    # Store the experiment parameters
-    self._punishment_duration = punishment_duration
-    self._water_delivery_duration = water_delivery_duration
-
     # Log the parameters
-    log(f"Starting experiment with animal ID: {animal_id}, punishment duration: {punishment_duration}ms, water delivery duration: {water_delivery_duration}ms", "info")
+    log(f"Starting experiment with animal ID: {animal_id}", "info")
 
     # Initialize data controller with animal ID
     self._data = DataController(animal_id)
 
-    # Convert ExperimentConfig to dictionary for JSON serialization
-    if hasattr(self.config, '__dataclass_fields__'):
-      # It's a dataclass (ExperimentConfig), convert to dict
-      config_dict = asdict(self.config)
-    else:
-      # It's already a dict or other type
-      config_dict = self.config
-
+    # Create a basic config for simple experiments
+    self.config = Config()
+    config_dict = asdict(self.config)
     self._data.add_task_data({"config": config_dict})
-
-    # Add punishment duration to ITI trials
-    for trial in self._trials:
-      if trial.title == "trial_iti":
-        trial.set_duration(trial.duration + self._punishment_duration)
 
     # Start first trial
     self._current_trial = self._trials.pop(0)
@@ -387,7 +376,7 @@ class Device:
     self._experiment_started = True
 
     # Send initial message that task has started
-    _device_message_queue.put(CommunicationMessageBuilder.task_status("started", self._current_trial.title))
+    _device_message_queue.put(CommunicationMessageBuilder.experiment_status("started", self._current_trial.title))
 
     log("Experiment started", "info")
 
@@ -406,18 +395,14 @@ class Device:
     # Initialize data controller with animal ID
     self._data = DataController(animal_id)
 
-    # Use provided config or fall back to default
-    experiment_config = config or self.config
+    # Use provided config or create default
+    if config is None:
+        log("Warning: No experiment config provided, using default values", "warning")
+        config = Config()
 
-    # Convert ExperimentConfig to dictionary for JSON serialization
-    if hasattr(experiment_config, '__dataclass_fields__'):
-      # It's a dataclass (ExperimentConfig), convert to dict
-      config_dict = asdict(experiment_config)
-    else:
-      # It's already a dict or other type
-      config_dict = experiment_config
-
-    self._data.add_task_data({"config": config_dict})
+    # Store the experiment config
+    self.experiment_config = config
+    self._data.add_task_data({"config": asdict(config)})
 
     # Set trials from timeline
     self._trials = trials.copy()
@@ -430,7 +415,7 @@ class Device:
     self._experiment_started = True
 
     # Send initial message that task has started
-    _device_message_queue.put(CommunicationMessageBuilder.task_status("started", self._current_trial.title))
+    _device_message_queue.put(CommunicationMessageBuilder.experiment_status("started", self._current_trial.title))
 
     log("Timeline experiment started", "info")
 
@@ -457,7 +442,7 @@ class Device:
         log("Data saved", "success")
 
     # Send message that experiment has stopped
-    _device_message_queue.put(CommunicationMessageBuilder.task_status("stopped"))
+    _device_message_queue.put(CommunicationMessageBuilder.experiment_status("stopped"))
 
     log("Experiment stopped", "info")
 
@@ -786,15 +771,13 @@ async def handle_connection(websocket, device: Device):
     # Handle incoming messages
     async for message in websocket:
       try:
-        # Try to parse as JSON first (for timeline messages)
         message_data = CommunicationMessageParser.parse_message(message)
         if message_data and "type" in message_data:
           await handle_json_message(websocket, device, message_data)
           continue
 
-        # Handle text commands (legacy)
         command = message.strip()
-        if CommunicationCommandParser.parse_test_command(command)[0] in TEST_COMMANDS:
+        if CommunicationMessageParser.parse_test_command(command)[0] in TEST_COMMANDS:
           device.run_test(command)
         elif command.startswith("start_experiment"):
           device.run_experiment(command)
@@ -823,40 +806,40 @@ async def handle_json_message(websocket, device: Device, message_data: dict):
   """Handle JSON messages from the control panel"""
   message_type = message_data.get("type")
 
-  if message_type == "timeline_upload":
-    # Handle timeline upload
-    timeline_data = message_data.get("data", {})
-    success, message = device.timeline_processor.process_timeline_upload(timeline_data)
+  if message_type == "experiment_upload":
+    # Handle experiment upload
+    experiment_data = message_data.get("data", {})
+    success, message = device.experiment_processor.process_experiment_upload(experiment_data)
 
     # Send validation response
-    response = CommunicationMessageBuilder.timeline_validation(success, message)
+    response = CommunicationMessageBuilder.experiment_validation(success, message)
     await websocket.send(json.dumps(response))
 
     if success:
-      log(f"Timeline uploaded successfully: {message}", "success")
+      log(f"Experiment uploaded successfully: {message}", "success")
     else:
-      log(f"Timeline upload failed: {message}", "error")
+      log(f"Experiment upload failed: {message}", "error")
 
-  elif message_type == "start_timeline_experiment":
-    # Handle timeline experiment start
+  elif message_type == "start_experiment":
+    # Handle experiment start
     animal_id = message_data.get("animal_id", "")
     if not animal_id:
-      response = CommunicationMessageBuilder.timeline_error("Animal ID is required")
+      response = CommunicationMessageBuilder.experiment_error("Animal ID is required")
       await websocket.send(json.dumps(response))
       return
 
-    success, message = device.timeline_processor.execute_timeline(animal_id)
+    success, message = device.experiment_processor.execute_experiment(animal_id)
 
     if success:
-      response = CommunicationMessageBuilder.timeline_validation(success, message)
+      response = CommunicationMessageBuilder.experiment_validation(success, message)
     else:
-      response = CommunicationMessageBuilder.timeline_error(message)
+      response = CommunicationMessageBuilder.experiment_error(message)
     await websocket.send(json.dumps(response))
 
     if success:
-      log(f"Timeline experiment started: {message}", "success")
+      log(f"Experiment started: {message}", "success")
     else:
-      log(f"Timeline experiment failed: {message}", "error")
+      log(f"Experiment failed: {message}", "error")
 
   else:
     log(f"Unknown JSON message type: {message_type}", "warning")

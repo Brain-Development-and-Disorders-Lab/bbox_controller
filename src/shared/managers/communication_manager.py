@@ -4,7 +4,6 @@ Shared communication utilities for bbox_controller project
 
 import json
 from typing import Dict, Any, Optional
-from ..constants import TIMELINE_MESSAGE_TYPES
 
 class CommunicationMessageBuilder:
     """Utility class for building standardized messages"""
@@ -27,10 +26,10 @@ class CommunicationMessageBuilder:
         }
 
     @staticmethod
-    def task_status(status: str, trial: str = None) -> Dict[str, Any]:
-        """Build a task status message"""
+    def experiment_status(status: str, trial: str = None) -> Dict[str, Any]:
+        """Build a experiment status message"""
         message = {
-            "type": "task_status",
+            "type": "experiment_status",
             "data": {
                 "status": status
             }
@@ -74,35 +73,35 @@ class CommunicationMessageBuilder:
         }
 
     @staticmethod
-    def timeline_upload(timeline_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Build a timeline upload message"""
+    def experiment_upload(experiment_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a experiment upload message"""
         return {
-            "type": "timeline_upload",
-            "data": timeline_data
+            "type": "experiment_upload",
+            "data": experiment_data
         }
 
     @staticmethod
-    def timeline_validation(success: bool, message: str) -> Dict[str, Any]:
-        """Build a timeline validation message"""
+    def experiment_validation(success: bool, message: str) -> Dict[str, Any]:
+        """Build a experiment validation message"""
         return {
-            "type": "timeline_validation",
+            "type": "experiment_validation",
             "success": success,
             "message": message
         }
 
     @staticmethod
-    def timeline_error(message: str) -> Dict[str, Any]:
-        """Build a timeline error message"""
+    def experiment_error(message: str) -> Dict[str, Any]:
+        """Build a experiment error message"""
         return {
-            "type": "timeline_error",
+            "type": "experiment_error",
             "message": message
         }
 
     @staticmethod
-    def start_timeline_experiment(animal_id: str) -> Dict[str, Any]:
-        """Build a start timeline experiment message"""
+    def start_experiment(animal_id: str) -> Dict[str, Any]:
+        """Build a start experiment message"""
         return {
-            "type": "start_timeline_experiment",
+            "type": "start_experiment",
             "animal_id": animal_id
         }
 
@@ -125,36 +124,6 @@ class CommunicationMessageParser:
             return json.loads(message)
         except json.JSONDecodeError:
             return None
-
-    @staticmethod
-    def is_timeline_message(message_data: Dict[str, Any]) -> bool:
-        """Check if a message is a timeline-related message"""
-        message_type = message_data.get("type", "")
-        return message_type in TIMELINE_MESSAGE_TYPES
-
-    @staticmethod
-    def is_command_message(message: str) -> bool:
-        """Check if a message is a command (non-JSON)"""
-        try:
-            json.loads(message)
-            return False
-        except json.JSONDecodeError:
-            return True
-
-    @staticmethod
-    def validate_message_structure(message_data: Dict[str, Any]) -> tuple[bool, str]:
-        """Validate that a message has the required structure"""
-        if not isinstance(message_data, dict):
-            return False, "Message must be a dictionary"
-
-        if "type" not in message_data:
-            return False, "Message must have a 'type' field"
-
-        return True, ""
-
-
-class CommunicationCommandParser:
-    """Utility class for parsing command strings"""
 
     @staticmethod
     def parse_test_command(command: str) -> tuple[str, Dict[str, Any]]:

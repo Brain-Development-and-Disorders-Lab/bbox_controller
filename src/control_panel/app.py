@@ -18,10 +18,10 @@ from datetime import datetime
 # Import shared modules
 from shared import VERSION
 from shared.constants import *
-from shared.managers import CommunicationMessageParser, CommunicationCommandParser, TestStateManager, TimelineManager
+from shared.managers import CommunicationMessageParser, TestStateManager, ExperimentManager
 
 # Import UI components
-from .ui.timeline_editor import TimelineEditor
+from .ui.experiment_editor import ExperimentEditor
 
 class ControlPanel(tk.Frame):
   def __init__(self, master=None):
@@ -35,10 +35,11 @@ class ControlPanel(tk.Frame):
       self.is_connected = False
       self.device_version = "unknown"
 
-      # Timeline management
-      self.timeline_manager = TimelineManager()
-      self.current_timeline = None
-      self.timeline_uploaded_to_device = False  # Track if timeline is uploaded to device
+      # Experiment management
+      base_dir = os.path.dirname(os.path.abspath(__file__))
+      self.experiment_manager = ExperimentManager(os.path.join(base_dir, "experiments"))
+      self.current_experiment = None
+      self.experiment_uploaded_to_device = False
 
       # UI variables
       self.ip_address_var = tk.StringVar(self.master, "localhost")
@@ -77,9 +78,9 @@ class ControlPanel(tk.Frame):
 
       # Configure source-specific colors
       self.source_colors = {
-        "UI": "#0066CC",      # Blue for UI logs
-        "DEVICE": "#CC6600",  # Orange for device logs
-        "SYSTEM": "#666666"   # Gray for system logs
+        "UI": "#0066CC",
+        "DEVICE": "#CC6600",
+        "SYSTEM": "#666666"
       }
 
       # Track which sources are enabled for logging
@@ -98,8 +99,8 @@ class ControlPanel(tk.Frame):
       # Create the layout
       self.create_layout()
 
-      # Initialize timeline list after UI is created
-      self.update_timeline_list()
+      # Initialize experiment list after UI is created
+      self.update_experiment_list()
 
       # Configure log text tags for different states and sources
       self.console.tag_configure("info", foreground="#E0E0E0")  # Light gray for info
@@ -372,43 +373,41 @@ class ControlPanel(tk.Frame):
     self.water_delivery_duration_input = tk.Entry(water_delivery_frame, textvariable=self.water_delivery_duration_var, width=8, state=tk.DISABLED)
     self.water_delivery_duration_input.pack(side=tk.LEFT, pady=0, padx=(5, 0))
 
-    # Timeline section
-    timeline_section_frame = tk.LabelFrame(experiment_management_frame, text="Timeline", padx=8, pady=8)
-    timeline_section_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+    # Experiment section
+    experiment_section_frame = tk.LabelFrame(experiment_management_frame, text="Experiment", padx=8, pady=8)
+    experiment_section_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
-    # Timeline selection
-    timeline_selection_frame = tk.Frame(timeline_section_frame)
-    timeline_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+    # Experiment selection
+    experiment_selection_frame = tk.Frame(experiment_section_frame)
+    experiment_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
 
-    tk.Label(timeline_selection_frame, text="Timeline:").pack(side=tk.LEFT, pady=0)
-    self.timeline_var = tk.StringVar()
-    self.timeline_combo = ttk.Combobox(timeline_selection_frame, textvariable=self.timeline_var, state="readonly", width=18)
-    self.timeline_combo.pack(side=tk.LEFT, pady=0, padx=(5, 0))
-    self.timeline_combo.bind("<<ComboboxSelected>>", self.on_timeline_selected)
+    tk.Label(experiment_selection_frame, text="Experiment:").pack(side=tk.LEFT, pady=0)
+    self.experiment_var = tk.StringVar()
+    self.experiment_combo = ttk.Combobox(experiment_selection_frame, textvariable=self.experiment_var, state="readonly", width=18)
+    self.experiment_combo.pack(side=tk.LEFT, pady=0, padx=(5, 0))
+    self.experiment_combo.bind("<<ComboboxSelected>>", self.on_experiment_selected)
 
-    # Timeline buttons
-    timeline_buttons_frame = tk.Frame(timeline_section_frame)
-    timeline_buttons_frame.pack(side=tk.TOP, fill=tk.X)
+    # Experiment buttons
+    experiment_buttons_frame = tk.Frame(experiment_section_frame)
+    experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
 
-    self.new_timeline_button = tk.Button(
-      timeline_buttons_frame,
-      text="New Timeline",
+    self.new_experiment_button = tk.Button(
+      experiment_buttons_frame,
+      text="New Experiment",
       font="Arial 10",
-      command=self.create_new_timeline,
+      command=self.create_new_experiment,
       state=tk.NORMAL
     )
-    self.new_timeline_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+    self.new_experiment_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
 
-    self.timeline_editor_button = tk.Button(
-      timeline_buttons_frame,
-      text="Edit Timeline",
+    self.experiment_editor_button = tk.Button(
+      experiment_buttons_frame,
+      text="Edit Experiment",
       font="Arial 10",
-      command=self.open_timeline_editor,
+      command=self.open_experiment_editor,
       state=tk.DISABLED
     )
-    self.timeline_editor_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
-
-
+    self.experiment_editor_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
 
     # Experiment buttons frame
     experiment_buttons_frame = tk.Frame(experiment_management_frame)
@@ -575,15 +574,15 @@ class ControlPanel(tk.Frame):
 
   def on_animal_id_change(self, *args):
     """
-    Enables the start experiment button only if animal_id_input is not empty and timeline is selected.
+    Enables the start experiment button only if animal_id_input is not empty and experiment is selected.
     """
     animal_id = self.animal_id_var.get().strip()
     if animal_id and self.is_connected:
-      # For timeline experiments, require both animal ID and a timeline to be selected
-      if self.current_timeline:
+      # For experiment experiments, require both animal ID and a experiment to be selected
+      if self.current_experiment:
         self.start_experiment_button.config(state=tk.NORMAL)
       else:
-        # No timeline selected, disable start button
+        # No experiment selected, disable start button
         self.start_experiment_button.config(state=tk.DISABLED)
     else:
       self.start_experiment_button.config(state=tk.DISABLED)
@@ -622,10 +621,10 @@ class ControlPanel(tk.Frame):
     self.punishment_duration_input.config(state=tk.NORMAL)
     self.water_delivery_duration_input.config(state=tk.NORMAL)
 
-    # Timeline buttons - always enabled for timeline management
-    self.new_timeline_button.config(state=tk.NORMAL)
-    self.timeline_editor_button.config(state=tk.NORMAL)
-    self.update_timeline_list()
+    # Experiment buttons - always enabled for experiment management
+    self.new_experiment_button.config(state=tk.NORMAL)
+    self.experiment_editor_button.config(state=tk.NORMAL)
+    self.update_experiment_list()
 
     # Disconnect button
     self.disconnect_button.config(state=tk.NORMAL)
@@ -661,9 +660,9 @@ class ControlPanel(tk.Frame):
     self.punishment_duration_input.config(state=tk.DISABLED)
     self.water_delivery_duration_input.config(state=tk.DISABLED)
 
-    # Timeline buttons - keep enabled for timeline management
-    self.new_timeline_button.config(state=tk.NORMAL)
-    self.timeline_editor_button.config(state=tk.NORMAL)
+    # Experiment buttons - keep enabled for experiment management
+    self.new_experiment_button.config(state=tk.NORMAL)
+    self.experiment_editor_button.config(state=tk.NORMAL)
 
     # Experiment buttons
     self.start_experiment_button.config(state=tk.DISABLED)
@@ -685,57 +684,62 @@ class ControlPanel(tk.Frame):
     """
     received_message = self.parse_message(message)
     if received_message:
+      # Check if the device version has changed
+      if "version" in received_message:
+        new_version = received_message["version"]
+        if new_version != self.device_version:
+          self.device_version = new_version
+          self.device_version_label.config(text=f"Device: {self.device_version}")
+          self.log(f"Device version: {self.device_version}", "info", "SYSTEM")
+
+      # Handle other message types
       if received_message["type"] == "input_state":
+        # Update input states
         self.input_states = received_message["data"]
-        # Update device version if provided
-        if "version" in received_message:
-          new_version = received_message["version"]
-          if new_version != self.device_version:
-            self.device_version = new_version
-            self.device_version_label.config(text=f"Device: {self.device_version}")
-            self.log(f"Device version: {self.device_version}", "info", "SYSTEM")
         self.update_state_labels()
       elif received_message["type"] == "statistics":
-        # Update statistics display
+        # Update statistics
         self.statistics = received_message["data"]
         self.update_statistics(self.statistics)
       elif received_message["type"] == "test_state":
-        # Update only the specific test states that changed
+        # Update test states
         for test_name, test_data in received_message["data"].items():
           if test_name in self.test_state_manager.get_all_test_states():
             self.test_state_manager.set_test_state(test_name, test_data["state"])
-            # If any tests have completed, re-enable the test buttons
             if test_data["state"] in [TEST_STATES["PASSED"], TEST_STATES["FAILED"]]:
               self.set_test_buttons_disabled(False)
         self.update_test_state_indicators()
-      elif received_message["type"] == "task_status":
+      elif received_message["type"] == "experiment_status":
+        # Update experiment status
         status = received_message["data"]["status"]
-        self.log(f"Task status: {status}", "info")
-        # Update experiment buttons based on task status
+        self.log(f"Experiment status: {status}", "info")
         if status == "started":
           self.set_experiment_buttons_disabled(True)
-          self.reset_statistics_display() # Reset statistics when experiment starts
+          self.reset_statistics_display()
         elif status == "completed" or status == "stopped":
           self.set_experiment_buttons_disabled(False)
       elif received_message["type"] == "trial_start":
+        # Update trial start
         self.log(f"Trial start: {received_message['data']['trial']}", "info")
       elif received_message["type"] == "trial_complete":
+        # Update trial complete
         self.log(f"Trial complete: {received_message['data']['trial']}", "success")
       elif received_message["type"] == "device_log":
+        # Update device log
         self.log(received_message["data"]["message"], received_message["data"]["state"], "device")
-      elif received_message["type"] == "timeline_validation":
+      elif received_message["type"] == "experiment_validation":
+        # Update experiment validation
         success = received_message.get("success", False)
         message = received_message.get("message", "")
         if success:
-          self.log(f"Timeline validation: {message}", "success")
-          # Mark timeline as uploaded to device
-          self.timeline_uploaded_to_device = True
+          self.log(f"Experiment validation: {message}", "success")
+          self.experiment_uploaded_to_device = True
         else:
-          self.log(f"Timeline validation failed: {message}", "error")
-          self.timeline_uploaded_to_device = False
-      elif received_message["type"] == "timeline_error":
+          self.log(f"Experiment validation failed: {message}", "error")
+          self.experiment_uploaded_to_device = False
+      elif received_message["type"] == "experiment_error":
         message = received_message.get("message", "")
-        self.log(f"Timeline error: {message}", "error")
+        self.log(f"Experiment error: {message}", "error")
       else:
         self.log(f"Received unhandled message: {received_message}", "warning")
 
@@ -788,10 +792,8 @@ class ControlPanel(tk.Frame):
     Parameters:
     command (str): The entire command to execute.
     """
-    # Parse the command to determine its type
-    base_command, parameters = CommunicationCommandParser.parse_test_command(command)
+    base_command, parameters = CommunicationMessageParser.parse_test_command(command)
 
-    # Send the command to the device
     if base_command in TEST_COMMANDS:
       self.send_command(command)
       self.update_test_state(base_command, TEST_STATES["RUNNING"])
@@ -799,10 +801,8 @@ class ControlPanel(tk.Frame):
     elif base_command in EXPERIMENT_COMMANDS:
       self.send_command(command)
       if base_command == "stop_experiment":
-        # For stop_experiment, immediately re-enable start button and disable stop button
         self.set_experiment_buttons_disabled(False)
       else:
-        # For start_experiment, disable start button and enable stop button
         self.set_experiment_buttons_disabled(True)
     else:
       self.log(f"Invalid command: {command}", "error")
@@ -838,16 +838,10 @@ class ControlPanel(tk.Frame):
     """
     Disconnects from the device.
     """
-    # Disable disconnect button immediately to prevent multiple clicks
     self.disconnect_button.config(state=tk.DISABLED)
-
-    # Disable animal ID input
     self.animal_id_input.config(state=tk.DISABLED)
 
-    # Reset tests before disconnecting
     self.reset_tests()
-
-    # Invoke the close method, which will trigger the on_close method
     self.ws.close()
 
     self.log("Disconnected from the device", "success")
@@ -879,85 +873,77 @@ class ControlPanel(tk.Frame):
       "nose_light": False,
     }
 
-    # Reset timeline upload state
-    self.timeline_uploaded_to_device = False
+    # Reset experiment upload state
+    self.experiment_uploaded_to_device = False
 
     self.reset_tests()
 
   def run_websocket(self):
     self.ws.run_forever()
 
-  def update_timeline_list(self):
-    """Update the timeline dropdown with available timelines"""
-    timelines = self.timeline_manager.list_timelines()
-    self.timeline_combo['values'] = timelines
-    if timelines and not self.timeline_var.get():
-      # Set default value and actually load the timeline
-      self.timeline_var.set(timelines[0])
-      self.on_timeline_selected()  # This will load the timeline and update button states
-    elif not timelines:
-      # Clear selection if no timelines available
-      self.timeline_var.set("")
-      self.current_timeline = None
-      self.timeline_uploaded_to_device = False
-      self.timeline_editor_button.config(state=tk.DISABLED)
+  def update_experiment_list(self):
+    """Update the experiment dropdown with available experiments"""
+    experiments = self.experiment_manager.list_experiments()
+    self.experiment_combo['values'] = experiments
+    if experiments and not self.experiment_var.get():
+      self.experiment_var.set(experiments[0])
+      self.on_experiment_selected()
+    elif not experiments:
+      self.experiment_var.set("")
+      self.current_experiment = None
+      self.experiment_uploaded_to_device = False
+      self.experiment_editor_button.config(state=tk.DISABLED)
       self.on_animal_id_change()
 
-  def on_timeline_selected(self, event=None):
-    """Handle timeline selection"""
-    selected_timeline = self.timeline_var.get()
-    if selected_timeline:
-      self.current_timeline = self.timeline_manager.load_timeline(selected_timeline)
-      self.log(f"Selected timeline: {selected_timeline}", "info")
-      # Reset upload state when timeline changes
-      self.timeline_uploaded_to_device = False
-      # Enable edit button when timeline is selected
-      self.timeline_editor_button.config(state=tk.NORMAL)
-      # Update start button state
+  def on_experiment_selected(self, event=None):
+    """Handle experiment selection"""
+    selected_experiment = self.experiment_var.get()
+    if selected_experiment:
+      self.current_experiment = self.experiment_manager.load_experiment(selected_experiment)
+      self.log(f"Selected experiment: {selected_experiment}", "info")
+      self.experiment_uploaded_to_device = False
+      self.experiment_editor_button.config(state=tk.NORMAL)
       self.on_animal_id_change()
     else:
-      self.current_timeline = None
-      self.timeline_uploaded_to_device = False
-      # Disable edit and start buttons when no timeline is selected
-      self.timeline_editor_button.config(state=tk.DISABLED)
+      self.current_experiment = None
+      self.experiment_uploaded_to_device = False
+      self.experiment_editor_button.config(state=tk.DISABLED)
       self.start_experiment_button.config(state=tk.DISABLED)
 
-  def create_new_timeline(self):
-    """Create a new timeline and open it in the editor"""
-    # Create a new timeline with a default name
-    timeline = self.timeline_manager.create_timeline("New Timeline")
+  def create_new_experiment(self):
+    """Create a new experiment and open it in the editor"""
+    # Create a new experiment with a default name
+    experiment = self.experiment_manager.create_experiment("New Experiment")
 
-    # Open the editor with the new timeline
-    editor = TimelineEditor(self.master, self.timeline_manager, self.on_timeline_saved)
-    editor.current_timeline = timeline
+    # Open the editor with the new experiment
+    editor = ExperimentEditor(self.master, self.experiment_manager, self.on_experiment_saved)
+    editor.current_experiment = experiment
     editor.update_ui()
     editor.grab_set()  # Make modal
 
-  def open_timeline_editor(self):
-    """Open the timeline editor window with the selected timeline"""
-    if not self.current_timeline:
-      messagebox.showerror("No Timeline", "Please select a timeline to edit.")
+  def open_experiment_editor(self):
+    """Open the experiment editor window with the selected experiment"""
+    if not self.current_experiment:
+      messagebox.showerror("No Experiment", "Please select an experiment to edit.")
       return
 
-    editor = TimelineEditor(self.master, self.timeline_manager, self.on_timeline_saved)
-    editor.current_timeline = self.current_timeline
+    editor = ExperimentEditor(self.master, self.experiment_manager, self.on_experiment_saved)
+    editor.current_experiment = self.current_experiment
     editor.update_ui()
     editor.grab_set()  # Make modal
 
-  def on_timeline_saved(self, timeline):
-    """Handle timeline save from editor"""
-    self.update_timeline_list()
-    if timeline.name == self.timeline_var.get():
-      self.current_timeline = timeline
-    self.log(f"Timeline '{timeline.name}' saved", "success")
+  def on_experiment_saved(self, experiment):
+    """Handle experiment save from editor"""
+    self.update_experiment_list()
+    if experiment.name == self.experiment_var.get():
+      self.current_experiment = experiment
+    self.log(f"Experiment '{experiment.name}' saved", "success")
 
     # Update button states
     self.on_animal_id_change()
 
-
-
   def start_experiment(self):
-    """Start an experiment (basic or timeline-based)"""
+    """Start an experiment"""
     if not self.is_connected:
       messagebox.showerror("Not Connected", "Please connect to the device first.")
       return
@@ -967,55 +953,46 @@ class ControlPanel(tk.Frame):
       messagebox.showerror("No Animal ID", "Please enter an animal ID.")
       return
 
-    # Check if we have a timeline selected (additional safety check)
-    if not self.current_timeline:
-      messagebox.showerror("No Timeline", "Please select a timeline to run an experiment.")
+    # Check if we have a experiment selected (additional safety check)
+    if not self.current_experiment:
+      messagebox.showerror("No Experiment", "Please select an experiment to run.")
       return
 
-    # Check if we have a timeline selected
-    if self.current_timeline:
-      # Automatically upload timeline if not already uploaded
-      if not self.timeline_uploaded_to_device:
-        self.log("Uploading timeline to device...", "info")
-        try:
-          # Validate timeline
-          is_valid, errors = self.current_timeline.validate()
-          if not is_valid:
-            error_msg = "Timeline validation failed:\n" + "\n".join(errors)
-            messagebox.showerror("Validation Error", error_msg)
-            return
-
-          # Send timeline upload message
-          message = {
-            "type": "timeline_upload",
-            "data": self.current_timeline.to_dict()
-          }
-          self.ws.send(json.dumps(message))
-
-          # The device will validate and store the timeline before starting
-          self.log("Timeline upload initiated, starting experiment...", "info")
-        except Exception as e:
-          messagebox.showerror("Upload Error", f"Failed to upload timeline: {str(e)}")
+    # Automatically upload experiment if not already uploaded
+    if not self.experiment_uploaded_to_device:
+      self.log("Uploading experiment to device...", "info")
+      try:
+        # Validate experiment
+        is_valid, errors = self.current_experiment.validate()
+        if not is_valid:
+          error_msg = "Experiment validation failed:\n" + "\n".join(errors)
+          messagebox.showerror("Validation Error", error_msg)
           return
 
-      # Start timeline experiment
-      try:
-        # Send timeline experiment start message
+        # Send experiment upload message
         message = {
-          "type": "start_timeline_experiment",
-          "animal_id": animal_id
+          "type": "experiment_upload",
+          "data": self.current_experiment.to_dict()
         }
         self.ws.send(json.dumps(message))
-        self.log(f"Starting timeline experiment with animal ID: {animal_id}", "info")
+
+        # The device will validate and store the experiment before starting
+        self.log("Experiment upload initiated, starting experiment...", "info")
       except Exception as e:
-        messagebox.showerror("Start Error", f"Failed to start timeline experiment: {str(e)}")
-    else:
-      # Start basic experiment
-      try:
-        command = f"start_experiment {animal_id} {self.punishment_duration_var.get()} {self.water_delivery_duration_var.get()}"
-        self.execute_command(command)
-      except Exception as e:
-        messagebox.showerror("Start Error", f"Failed to start basic experiment: {str(e)}")
+        messagebox.showerror("Upload Error", f"Failed to upload experiment: {str(e)}")
+        return
+
+    # Start experiment
+    try:
+      # Send experiment start message
+      message = {
+        "type": "start_experiment",
+        "animal_id": animal_id
+      }
+      self.ws.send(json.dumps(message))
+      self.log(f"Starting experiment with animal ID: {animal_id}", "info")
+    except Exception as e:
+      messagebox.showerror("Start Error", f"Failed to start experiment: {str(e)}")
 
   def create_statistics_display(self, parent):
     """

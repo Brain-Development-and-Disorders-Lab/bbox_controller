@@ -1,22 +1,18 @@
 """
-Manager classes for bbox_controller project
+Shared managers used across the device and control panel classes
 """
 
-from .config_manager import ConfigManager, config_manager
-from .timeline_manager import TimelineManager
+from .experiment_manager import ExperimentManager
 from .test_manager import TestStateManager, TestCommandValidator, TestStateFormatter
-from .communication_manager import CommunicationMessageBuilder, CommunicationMessageParser, CommunicationCommandParser
+from .communication_manager import CommunicationMessageBuilder, CommunicationMessageParser
 from .statistics_manager import StatisticsManager
 
 __all__ = [
-    'ConfigManager',
-    'config_manager',
-    'TimelineManager',
+    'ExperimentManager',
     'TestStateManager',
     'TestCommandValidator',
     'TestStateFormatter',
     'CommunicationMessageBuilder',
     'CommunicationMessageParser',
-    'CommunicationCommandParser',
     'StatisticsManager'
 ]

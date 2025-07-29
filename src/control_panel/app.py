@@ -1097,7 +1097,7 @@ def main():
     icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.png")
     icon = tk.PhotoImage(file=icon_path)
     root.iconphoto(True, icon)
-  except Exception as e:
+  except Exception:
     pass
 
   view = ControlPanel(root)

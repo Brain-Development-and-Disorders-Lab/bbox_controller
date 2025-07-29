@@ -7,7 +7,7 @@ License: MIT
 """
 
 from typing import Dict, Any, Optional
-from shared.models import TrialConfig, ExperimentConfig, ExperimentTimeline
+from shared.models import ExperimentTimeline
 
 class TrialFactory:
     """Factory for creating trial objects from timeline data"""

@@ -906,8 +906,8 @@ async def main_loop(device):
         for websocket in active_connections:
           try:
             await asyncio.wait_for(websocket.close(), timeout=0.5)
-          except (asyncio.TimeoutError, Exception) as e:
-            log(f"Error closing connection, connection may already be closed", "warning")
+          except (asyncio.TimeoutError, Exception):
+            log("Error closing connection, connection may already be closed", "warning")
 
       # Close the server immediately
       device._websocket_server.close()

@@ -6,7 +6,6 @@ import json
 from typing import Dict, Any, Optional
 from .constants import TIMELINE_MESSAGE_TYPES
 
-
 class MessageBuilder:
     """Utility class for building standardized messages"""
 

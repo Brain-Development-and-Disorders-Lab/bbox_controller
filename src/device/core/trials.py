@@ -426,29 +426,23 @@ class Stage2(Trial):
         })
         log("Nose port exit", "info")
 
-    # Track lever presses with minimum duration
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
-
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
-    elif self.is_lever_pressed and not (left_lever or right_lever):
-      # Check for lever release or minimum duration
-      self.is_lever_pressed = False
-      self.lever_press_start_time = None
-      log("Lever press released before minimum duration", "info")
-    elif self.is_lever_pressed and not self.reward_triggered:
-      if current_time - self.lever_press_start_time >= self.config.hold_minimum:
-        self.reward_triggered = True
-        self.is_lever_pressed = False
-        self.lever_press_start_time = None
-        log("Lever press held for minimum duration - reward triggered", "success")
-        self.events.append({
-          "type": "lever_press_reward",
-          "timestamp": current_time
-        })
+
+      # Disable the nose port light during lever press
+      self.nose_port_light = False
+
+      # Trigger the reward
+      self.reward_triggered = True
+      log("Lever press reward triggered", "success")
+      self.events.append({
+        "type": "lever_press_reward",
+        "timestamp": current_time
+      })
 
     # Update water delivery
     self._update_water_delivery()

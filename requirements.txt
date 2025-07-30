@@ -1,19 +1,20 @@
 # Core Python packages
-pygame>=2.0.0
-websockets>=10.0
-websocket-client>=1.0.0
-numpy>=1.20.0
+pygame
+websockets
+websocket-client
+numpy
 
 # Image processing and display
-Pillow>=8.0.0
+Pillow
 
 # GUI framework (for tkinter)
 tk
 
 # Raspberry Pi specific requirements (only install on Linux/Raspberry Pi)
-gpiozero>=2.0.0; platform_system == "Linux"
-adafruit-circuitpython-ssd1306>=3.0.0; platform_system == "Linux"
-adafruit-blinka>=8.0.0; platform_system == "Linux"
+gpiozero; platform_system == "Linux"
+adafruit-circuitpython-ssd1306; platform_system == "Linux"
+adafruit-blinka; platform_system == "Linux"
+lgpio; platform_system == "Linux"
 
 # Development and testing (optional)
-pytest>=6.0.0
+pytest

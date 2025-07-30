@@ -311,8 +311,7 @@ class Stage1(Trial):
 
   def _update_nose_port_light(self):
     # Update nose port light
-    if not SIMULATION_MODE:
-      self.io.set_nose_light(self.nose_port_light)
+    self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -444,6 +443,13 @@ class Stage2(Trial):
         "timestamp": current_time
       })
 
+    # Check for lever release and turn light back on
+    if self.is_lever_pressed and not (left_lever or right_lever):
+      self.is_lever_pressed = False
+      self.nose_port_light = True
+      log("Lever released, nose port light turned back on", "info")
+
+
     # Update water delivery
     self._update_water_delivery()
     self._update_nose_port_state()
@@ -493,8 +499,7 @@ class Stage2(Trial):
 
   def _update_nose_port_light(self):
     # Update nose port light
-    if not SIMULATION_MODE:
-      self.io.set_nose_light(self.nose_port_light)
+    self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -723,8 +728,7 @@ class Stage3(Trial):
 
   def _update_nose_port_light(self):
     # Update nose port light
-    if not SIMULATION_MODE:
-      self.io.set_nose_light(self.nose_port_light)
+    self.io.set_nose_light(self.nose_port_light)
 
   def _pre_render_tasks(self):
     # Clear screen

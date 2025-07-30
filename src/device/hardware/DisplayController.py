@@ -131,7 +131,7 @@ class DisplayController:
     circle_center_x = self.width // 2
     circle_center_y = self.height // 2
     circle_radius = 25
-    num_stripes = 32
+    num_stripes = 16
     stripe_width = self.width // num_stripes
 
     if side in ["left", "both"]:

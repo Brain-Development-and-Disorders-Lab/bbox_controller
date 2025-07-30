@@ -11,7 +11,7 @@ from .models import *
 from .managers import *
 
 # Single source of truth for version number
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 # Version info for easy access
 VERSION = __version__

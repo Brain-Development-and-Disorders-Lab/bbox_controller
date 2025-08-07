@@ -385,9 +385,12 @@ class Stage2(Trial):
     self.start_time = pygame.time.get_ticks()
 
     # Setup trial
-    # Activate the nose port light and visual cue
-    self.nose_port_light = True
     self.visual_cue = True
+
+    # Setup the lights
+    self.nose_port_light = False
+    self.left_lever_light = False
+    self.right_lever_light = False
 
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:

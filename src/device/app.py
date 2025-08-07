@@ -351,10 +351,10 @@ class Device:
     self.test_state_manager.set_test_state("test_water_delivery", TEST_STATES["RUNNING"])
     asyncio.create_task(self._test_water_delivery(duration_ms))
 
-  def _test_actuators(self):
-    # Step 2: Test that the left actuator can be moved to 1.0
-    log("Testing left actuator", "start")
-    log("Waiting for left actuator input...", "info")
+  def _test_levers(self):
+    # Step 2: Test that the left lever can be moved to 1.0
+    log("Testing left lever", "start")
+    log("Waiting for left lever input...", "info")
     running_input_test = True
     running_input_test_start_time = time.time()
     while running_input_test:
@@ -364,24 +364,24 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
+        self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
         _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-        log("Left actuator input timed out", "error")
+        log("Left lever input timed out", "error")
         return
 
     if input_state["left_lever"] != True:
-      self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log("Left actuator did not move to 1.0", "error")
+      log("Left lever did not move to 1.0", "error")
       return
 
-    log("Left actuator test passed", "success")
+    log("Left lever test passed", "success")
 
-    # Step 3: Test that the right actuator can be moved to 1.0
+    # Step 3: Test that the right lever can be moved to 1.0
     running_input_test = True
     running_input_test_start_time = time.time()
-    log("Testing right actuator", "start")
-    log("Waiting for right actuator input...", "info")
+    log("Testing right lever", "start")
+    log("Waiting for right lever input...", "info")
     while running_input_test:
       input_state = self.io.get_input_states()
       if input_state["right_lever"] == True:
@@ -389,46 +389,46 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
+        self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
         _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-        log("Right actuator input timed out", "error")
+        log("Right lever input timed out", "error")
         return
 
     if input_state["right_lever"] != True:
-      self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log("Right actuator did not move to 1.0", "error")
+      log("Right lever did not move to 1.0", "error")
       return
 
-    log("Right actuator test passed", "success")
-    if self.test_state_manager.get_test_state("test_actuators") == TEST_STATES["RUNNING"]:
-      self.test_state_manager.set_test_state("test_actuators", TEST_STATES["PASSED"])
+    log("Right lever test passed", "success")
+    if self.test_state_manager.get_test_state("test_levers") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_levers", TEST_STATES["PASSED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log("Actuators test passed", "success")
+      log("Levers test passed", "success")
 
-  def test_actuators(self):
-    log("Testing actuators", "start")
-    self.test_state_manager.set_test_state("test_actuators", TEST_STATES["RUNNING"])
+  def test_levers(self):
+    log("Testing levers", "start")
+    self.test_state_manager.set_test_state("test_levers", TEST_STATES["RUNNING"])
 
-    # Step 1: Test that both actuators default to 0.0
+    # Step 1: Test that both levers default to 0.0
     input_state = self.io.get_input_states()
     if input_state["left_lever"] != False:
-      self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log("Left actuator did not default to 0.0", "error")
+      log("Left lever did not default to 0.0", "error")
       return
 
     if input_state["right_lever"] != False:
-      self.test_state_manager.set_test_state("test_actuators", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log("Right actuator did not default to 0.0", "error")
+      log("Right lever did not default to 0.0", "error")
       return
 
-    log("Actuators defaulted to 0.0", "success")
+    log("Levers defaulted to 0.0", "success")
 
     # Run the test in a separate thread
-    actuator_test_thread = threading.Thread(target=self._test_actuators)
-    actuator_test_thread.start()
+    lever_test_thread = threading.Thread(target=self._test_levers)
+    lever_test_thread.start()
 
   def _test_ir(self):
     # Step 1: Test that the IR is broken
@@ -546,8 +546,8 @@ class Device:
           log(f"Invalid duration for water delivery test: {parts[1]}", "error")
       else:
         self.test_water_delivery()
-    elif command == "test_actuators":
-      self.test_actuators()
+    elif command == "test_levers":
+      self.test_levers()
     elif command == "test_ir":
       self.test_ir()
     elif command == "test_nose_light":

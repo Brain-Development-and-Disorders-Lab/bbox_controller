@@ -17,7 +17,7 @@ class TestStateManager:
             "test_water_delivery": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
-            "test_actuators": {
+            "test_levers": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
             "test_ir": {

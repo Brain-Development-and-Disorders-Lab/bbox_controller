@@ -311,12 +311,12 @@ class ControlPanel(tk.Frame):
     input_status_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
 
     # Create input indicators
-    self.create_state_indicator(input_status_frame, "Left Actuator", self.input_label_states["left_lever"])
-    self.create_state_indicator(input_status_frame, "Right Actuator", self.input_label_states["right_lever"])
+    self.create_state_indicator(input_status_frame, "Left Lever", self.input_label_states["left_lever"])
+    self.create_state_indicator(input_status_frame, "Left Lever Light", self.input_label_states["left_lever_light"])
+    self.create_state_indicator(input_status_frame, "Right Lever", self.input_label_states["right_lever"])
+    self.create_state_indicator(input_status_frame, "Right Lever Light", self.input_label_states["right_lever_light"])
     self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["nose_poke"])
     self.create_state_indicator(input_status_frame, "Nose Light", self.input_label_states["nose_light"])
-    self.create_state_indicator(input_status_frame, "Left Lever Light", self.input_label_states["left_lever_light"])
-    self.create_state_indicator(input_status_frame, "Right Lever Light", self.input_label_states["right_lever_light"])
 
     # Test Status section
     test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -324,10 +324,10 @@ class ControlPanel(tk.Frame):
 
     # Create test rows
     self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery", True)
-    self.create_test_row(test_status_frame, "Test Actuators", "test_actuators", False)
+    self.create_test_row(test_status_frame, "Test Levers", "test_levers", False)
+    self.create_test_row(test_status_frame, "Test Lever Lights", "test_lever_lights", True)
     self.create_test_row(test_status_frame, "Test IR", "test_ir", False)
     self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light", True)
-    self.create_test_row(test_status_frame, "Test Lever Lights", "test_lever_lights", True)
     self.create_test_row(test_status_frame, "Test Displays", "test_displays", True)
 
     # Reset button
@@ -422,7 +422,7 @@ class ControlPanel(tk.Frame):
 
     # Store references to test buttons for later use
     self.test_water_delivery_button = self.test_indicators["test_water_delivery"]["button"]
-    self.test_actuators_button = self.test_indicators["test_actuators"]["button"]
+    self.test_levers_button = self.test_indicators["test_levers"]["button"]
     self.test_ir_button = self.test_indicators["test_ir"]["button"]
     self.test_nose_light_button = self.test_indicators["test_nose_light"]["button"]
     self.test_displays_button = self.test_indicators["test_displays"]["button"]
@@ -509,7 +509,7 @@ class ControlPanel(tk.Frame):
     # Disable test buttons
     if disabled:
       self.test_ir_button.config(state=tk.DISABLED)
-      self.test_actuators_button.config(state=tk.DISABLED)
+      self.test_levers_button.config(state=tk.DISABLED)
       self.test_water_delivery_button.config(state=tk.DISABLED)
       self.test_nose_light_button.config(state=tk.DISABLED)
       self.test_displays_button.config(state=tk.DISABLED)
@@ -527,7 +527,7 @@ class ControlPanel(tk.Frame):
     else:
       # Enable test buttons
       self.test_ir_button.config(state=tk.NORMAL)
-      self.test_actuators_button.config(state=tk.NORMAL)
+      self.test_levers_button.config(state=tk.NORMAL)
       self.test_water_delivery_button.config(state=tk.NORMAL)
       self.test_nose_light_button.config(state=tk.NORMAL)
       self.test_displays_button.config(state=tk.NORMAL)
@@ -604,7 +604,7 @@ class ControlPanel(tk.Frame):
 
     # Test buttons
     self.test_water_delivery_button.config(state=tk.NORMAL)
-    self.test_actuators_button.config(state=tk.NORMAL)
+    self.test_levers_button.config(state=tk.NORMAL)
     self.test_ir_button.config(state=tk.NORMAL)
     self.test_nose_light_button.config(state=tk.NORMAL)
     self.test_displays_button.config(state=tk.NORMAL)
@@ -640,7 +640,7 @@ class ControlPanel(tk.Frame):
 
     # Test buttons
     self.test_water_delivery_button.config(state=tk.DISABLED)
-    self.test_actuators_button.config(state=tk.DISABLED)
+    self.test_levers_button.config(state=tk.DISABLED)
     self.test_ir_button.config(state=tk.DISABLED)
     self.test_nose_light_button.config(state=tk.DISABLED)
     self.test_displays_button.config(state=tk.DISABLED)

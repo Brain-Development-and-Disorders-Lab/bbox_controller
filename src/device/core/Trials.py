@@ -450,8 +450,8 @@ class Stage2(Trial):
       self.right_lever_light = not right_lever
       # Nose port light until reward is triggered
       self.nose_port_light = False
-    else:
-      # Lever lights stay off after reward is triggered
+    elif self.reward_triggered and not self.is_lever_pressed:
+      # Lever lights stay off after reward is triggered, only if lever is not pressed
       self.left_lever_light = False
       self.right_lever_light = False
       # Nose port light is on after reward is triggered, only if nose port is not in

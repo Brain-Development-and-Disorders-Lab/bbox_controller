@@ -280,8 +280,8 @@ class Stage1(Trial):
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
-    self.left_lever_light = not left_lever
-    self.right_lever_light = not right_lever
+    self.left_lever_light = False # Lever lights off by default
+    self.right_lever_light = False # Lever lights off by default
 
     if left_lever:
       self.events.append({
@@ -442,16 +442,26 @@ class Stage2(Trial):
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
-    self.left_lever_light = not left_lever
-    self.right_lever_light = not right_lever
+
+    # Update lights
+    if not self.reward_triggered:
+      # Lever lights have normal behavior until reward is triggered
+      self.left_lever_light = not left_lever
+      self.right_lever_light = not right_lever
+      # Nose port light until reward is triggered
+      self.nose_port_light = False
+    else:
+      # Lever lights stay off after reward is triggered
+      self.left_lever_light = False
+      self.right_lever_light = False
+      # Nose port light is on after reward is triggered, only if nose port is not in
+      if not self.nose_port_entry:
+        self.nose_port_light = True
 
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
-
-      # Disable the nose port light during lever press
-      self.nose_port_light = False
 
       # Trigger the reward
       self.reward_triggered = True
@@ -461,14 +471,12 @@ class Stage2(Trial):
         "timestamp": current_time
       })
 
-    # Check for lever release and turn light back on
+    # Check for lever release
     if self.is_lever_pressed and not (left_lever or right_lever):
       self.is_lever_pressed = False
-      self.nose_port_light = True
-      log("Lever released, nose port light turned back on", "info")
+      log("Lever released", "info")
 
-
-    # Update water delivery
+    # Update tasks
     self._update_water_delivery()
     self._update_nose_port_state()
     self._update_nose_port_light()

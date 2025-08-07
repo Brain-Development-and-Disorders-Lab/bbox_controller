@@ -21,6 +21,8 @@ class IOController:
     self.PIN_NOSE_POKE = 17
     self.PIN_WATER = 25
     self.PIN_NOSE_LIGHT = 27
+    self.PIN_LEFT_LEVER_LIGHT = 22
+    self.PIN_RIGHT_LEVER_LIGHT = 26
 
     if not SIMULATION_MODE:
       try:
@@ -29,9 +31,13 @@ class IOController:
         self.lever_left = Button(self.PIN_LEVER_LEFT)
         self.nose_poke = Button(self.PIN_NOSE_POKE)
 
-        # Setup water port and nose light outputs
+        # Setup water port
         self.water_port = DigitalOutputDevice(self.PIN_WATER, initial_value=False)
+
+        # Setup LED outputs
         self.nose_light = DigitalOutputDevice(self.PIN_NOSE_LIGHT, initial_value=False)
+        self.left_lever_light = DigitalOutputDevice(self.PIN_LEFT_LEVER_LIGHT, initial_value=False)
+        self.right_lever_light = DigitalOutputDevice(self.PIN_RIGHT_LEVER_LIGHT, initial_value=False)
 
         self._simulated_inputs = False
         print("GPIO inputs and outputs initialized successfully")
@@ -51,7 +57,9 @@ class IOController:
       "left_lever": False,
       "nose_poke": False,
       "water_port": False,
-      "nose_light": False
+      "nose_light": False,
+      "left_lever_light": False,
+      "right_lever_light": False
     }
 
   def _init_simulation(self):
@@ -65,7 +73,9 @@ class IOController:
         "left_lever": self.lever_left.is_pressed,
         "nose_poke": self.nose_poke.is_pressed,
         "water_port": self.water_port.value,
-        "nose_light": self.nose_light.value
+        "nose_light": self.nose_light.value,
+        "left_lever_light": self.left_lever_light.value,
+        "right_lever_light": self.right_lever_light.value
       }
     else:
       return self._simulated_states
@@ -83,6 +93,20 @@ class IOController:
       self.nose_light.value = state
     else:
       self._simulated_states["nose_light"] = state
+
+  def set_left_lever_light(self, state):
+    """Control left lever light LED state"""
+    if not hasattr(self, "_simulated_inputs") or not self._simulated_inputs:
+      self.left_lever_light.value = state
+    else:
+      self._simulated_states["left_lever_light"] = state
+
+  def set_right_lever_light(self, state):
+    """Control right lever light LED state"""
+    if not hasattr(self, "_simulated_inputs") or not self._simulated_inputs:
+      self.right_lever_light.value = state
+    else:
+      self._simulated_states["right_lever_light"] = state
 
   def simulate_left_lever(self, state):
     """Simulate left lever press/release"""
@@ -103,6 +127,16 @@ class IOController:
     """Simulate nose light state"""
     if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
       self._simulated_states["nose_light"] = state
+
+  def simulate_left_lever_light(self, state):
+    """Simulate left lever light state"""
+    if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
+      self._simulated_states["left_lever_light"] = state
+
+  def simulate_right_lever_light(self, state):
+    """Simulate right lever light state"""
+    if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
+      self._simulated_states["right_lever_light"] = state
 
   def __del__(self):
     """Cleanup GPIO on object destruction"""

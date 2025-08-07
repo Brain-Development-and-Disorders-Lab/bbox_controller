@@ -458,23 +458,23 @@ class Stage2(Trial):
       if not self.nose_port_entry:
         self.nose_port_light = True
 
+    # Update lever state
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
+    elif not (left_lever or right_lever) and self.is_lever_pressed and not self.reward_triggered:
+      # Check for lever release
+      self.is_lever_pressed = False
+      log("Lever released", "info")
 
-      # Trigger the reward
+      # Trigger the reward only if lever is released
       self.reward_triggered = True
       log("Lever press reward triggered", "success")
       self.events.append({
         "type": "lever_press_reward",
         "timestamp": current_time
       })
-
-    # Check for lever release
-    if self.is_lever_pressed and not (left_lever or right_lever):
-      self.is_lever_pressed = False
-      log("Lever released", "info")
 
     # Update tasks
     self._update_water_delivery()

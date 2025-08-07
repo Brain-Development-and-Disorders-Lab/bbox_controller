@@ -9,10 +9,11 @@ License: MIT
 # Test commands
 TEST_COMMANDS = [
     "test_water_delivery",
-    "test_actuators",
+    "test_levers",
     "test_ir",
     "test_nose_light",
     "test_displays",
+    "test_lever_lights",
 ]
 
 # Experiment commands

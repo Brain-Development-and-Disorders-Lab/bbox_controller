@@ -6,7 +6,7 @@ This repository contains the code to control a behavior box utilizing IO and dis
 
 The control panel facilitates wireless monitoring and control via Websockets. To launch the control panel, run `./start.sh`, located in the `control_panel` directory.
 
-Use the *Connection* frame to connect to the device using an IP address and port number. The *Console* frame shows the live console output from the device. The *Input Status* frame shows the current state of the device IO with low latency. The *Test Status* frame allows the IO to be tested, specifically the water deliver, actuators, and the IR beam.
+Use the *Connection* frame to connect to the device using an IP address and port number. The *Console* frame shows the live console output from the device. The *Input Status* frame shows the current state of the device IO with low latency. The *Test Status* frame allows the IO to be tested, specifically the water delivery, levers, and the IR beam.
 
 ### Experiment Management
 
@@ -31,6 +31,9 @@ You can run the device in simulation mode for development and testing without ph
 - **2**: Right Lever (hold to press)
 - **3**: Nose Poke (hold to activate)
 - **Space**: Nose Poke (alternative)
+- **J**: Left Lever Light
+- **K**: Nose Poke Light
+- **L**: Left Lever Light
 - **ESC**: Exit
 
 ### Hardware Usage

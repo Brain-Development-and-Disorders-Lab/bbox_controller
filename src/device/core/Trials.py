@@ -100,6 +100,8 @@ class Trial:
             "nose_poke": False,
             "water_port": False,
             "nose_light": False,
+            "left_lever_light": False,
+            "right_lever_light": False,
         }
     return self.io.get_input_states()
 
@@ -197,6 +199,8 @@ class Stage1(Trial):
     # Setup trial
     # Activate the nose port light
     self.nose_port_light = True
+    self.left_lever_light = True
+    self.right_lever_light = True
     self.visual_cue = True
 
     # Clear the displays and randomly select the display to show the visual cue
@@ -273,9 +277,11 @@ class Stage1(Trial):
       })
       log("Nose port exit detected", "info")
 
-    # Track lever presses
+    # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
+    self.left_lever_light = False # Lever lights off by default
+    self.right_lever_light = False # Lever lights off by default
 
     if left_lever:
       self.events.append({
@@ -298,6 +304,7 @@ class Stage1(Trial):
     # Update nose port state and light
     self._update_nose_port_state()
     self._update_nose_port_light()
+    self._update_lever_lights()
 
     return True
 
@@ -312,6 +319,11 @@ class Stage1(Trial):
   def _update_nose_port_light(self):
     # Update nose port light
     self.io.set_nose_light(self.nose_port_light)
+
+  def _update_lever_lights(self):
+    # Update lever lights
+    self.io.set_left_lever_light(self.left_lever_light)
+    self.io.set_right_lever_light(self.right_lever_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -352,6 +364,8 @@ class Stage2(Trial):
 
     # Trial state
     self.nose_port_light = False
+    self.left_lever_light = False
+    self.right_lever_light = False
     self.delivered_water = False
     self.water_delivery_complete = False
     self.visual_cue = False
@@ -371,9 +385,12 @@ class Stage2(Trial):
     self.start_time = pygame.time.get_ticks()
 
     # Setup trial
-    # Activate the nose port light and visual cue
-    self.nose_port_light = True
     self.visual_cue = True
+
+    # Setup the lights
+    self.nose_port_light = False
+    self.left_lever_light = False
+    self.right_lever_light = False
 
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
@@ -425,17 +442,36 @@ class Stage2(Trial):
         })
         log("Nose port exit", "info")
 
+    # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
+
+    # Update lights
+    if not self.reward_triggered:
+      # Lever lights have normal behavior until reward is triggered
+      self.left_lever_light = not (left_lever or right_lever)
+      self.right_lever_light = not (left_lever or right_lever)
+      # Nose port light until reward is triggered
+      self.nose_port_light = False
+    elif self.reward_triggered and not self.is_lever_pressed:
+      # Lever lights stay off after reward is triggered, only if lever is not pressed
+      self.left_lever_light = False
+      self.right_lever_light = False
+      # Nose port light is on after reward is triggered, only if nose port is not in
+      if not self.nose_port_entry:
+        self.nose_port_light = True
+
+    # Update lever state
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
+    elif not (left_lever or right_lever) and self.is_lever_pressed and not self.reward_triggered:
+      # Check for lever release
+      self.is_lever_pressed = False
+      log("Lever released", "info")
 
-      # Disable the nose port light during lever press
-      self.nose_port_light = False
-
-      # Trigger the reward
+      # Trigger the reward only if lever is released
       self.reward_triggered = True
       log("Lever press reward triggered", "success")
       self.events.append({
@@ -443,17 +479,11 @@ class Stage2(Trial):
         "timestamp": current_time
       })
 
-    # Check for lever release and turn light back on
-    if self.is_lever_pressed and not (left_lever or right_lever):
-      self.is_lever_pressed = False
-      self.nose_port_light = True
-      log("Lever released, nose port light turned back on", "info")
-
-
-    # Update water delivery
+    # Update tasks
     self._update_water_delivery()
     self._update_nose_port_state()
     self._update_nose_port_light()
+    self._update_lever_lights()
     self._update_visual_cue()
 
     return True
@@ -501,6 +531,11 @@ class Stage2(Trial):
     # Update nose port light
     self.io.set_nose_light(self.nose_port_light)
 
+  def _update_lever_lights(self):
+    # Update lever lights
+    self.io.set_left_lever_light(self.left_lever_light)
+    self.io.set_right_lever_light(self.right_lever_light)
+
   def _pre_render_tasks(self):
     # Clear screen
     self.screen.fill((0, 0, 0))
@@ -522,6 +557,7 @@ class Stage2(Trial):
     self._update_nose_port_state()
     self._update_visual_cue()
     self._update_nose_port_light()
+    self._update_lever_lights()
 
     # Run post-render tasks
     self._post_render_tasks()
@@ -636,7 +672,7 @@ class Stage3(Trial):
       })
       log("Nose port exit", "info")
 
-    # Track lever presses with minimum duration
+    # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
 

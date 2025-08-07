@@ -446,8 +446,8 @@ class Stage2(Trial):
     # Update lights
     if not self.reward_triggered:
       # Lever lights have normal behavior until reward is triggered
-      self.left_lever_light = not left_lever
-      self.right_lever_light = not right_lever
+      self.left_lever_light = not (left_lever or right_lever)
+      self.right_lever_light = not (left_lever or right_lever)
       # Nose port light until reward is triggered
       self.nose_port_light = False
     elif self.reward_triggered and not self.is_lever_pressed:

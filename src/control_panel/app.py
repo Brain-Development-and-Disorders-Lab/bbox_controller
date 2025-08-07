@@ -58,6 +58,8 @@ class ControlPanel(tk.Frame):
         "nose_poke": False,
         "water_port": False,
         "nose_light": False,
+        "left_lever_light": False,
+        "right_lever_light": False,
       }
 
       self.input_label_states = {
@@ -65,6 +67,8 @@ class ControlPanel(tk.Frame):
         "right_lever": tk.BooleanVar(self.master, False),
         "nose_poke": tk.BooleanVar(self.master, False),
         "nose_light": tk.BooleanVar(self.master, False),
+        "left_lever_light": tk.BooleanVar(self.master, False),
+        "right_lever_light": tk.BooleanVar(self.master, False),
       }
 
       # Statistics tracking
@@ -311,6 +315,8 @@ class ControlPanel(tk.Frame):
     self.create_state_indicator(input_status_frame, "Right Actuator", self.input_label_states["right_lever"])
     self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["nose_poke"])
     self.create_state_indicator(input_status_frame, "Nose Light", self.input_label_states["nose_light"])
+    self.create_state_indicator(input_status_frame, "Left Lever Light", self.input_label_states["left_lever_light"])
+    self.create_state_indicator(input_status_frame, "Right Lever Light", self.input_label_states["right_lever_light"])
 
     # Test Status section
     test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -321,6 +327,7 @@ class ControlPanel(tk.Frame):
     self.create_test_row(test_status_frame, "Test Actuators", "test_actuators", False)
     self.create_test_row(test_status_frame, "Test IR", "test_ir", False)
     self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light", True)
+    self.create_test_row(test_status_frame, "Test Lever Lights", "test_lever_lights", True)
     self.create_test_row(test_status_frame, "Test Displays", "test_displays", True)
 
     # Reset button
@@ -419,6 +426,7 @@ class ControlPanel(tk.Frame):
     self.test_ir_button = self.test_indicators["test_ir"]["button"]
     self.test_nose_light_button = self.test_indicators["test_nose_light"]["button"]
     self.test_displays_button = self.test_indicators["test_displays"]["button"]
+    self.test_lever_lights_button = self.test_indicators["test_lever_lights"]["button"]
 
   def log(self, message, state="info", source="UI"):
     """
@@ -469,6 +477,8 @@ class ControlPanel(tk.Frame):
     self.input_label_states["right_lever"].set(self.input_states["right_lever"])
     self.input_label_states["nose_poke"].set(self.input_states["nose_poke"])
     self.input_label_states["nose_light"].set(self.input_states["nose_light"])
+    self.input_label_states["left_lever_light"].set(self.input_states["left_lever_light"])
+    self.input_label_states["right_lever_light"].set(self.input_states["right_lever_light"])
 
   def update_test_state(self, command_name, state):
       """
@@ -503,6 +513,7 @@ class ControlPanel(tk.Frame):
       self.test_water_delivery_button.config(state=tk.DISABLED)
       self.test_nose_light_button.config(state=tk.DISABLED)
       self.test_displays_button.config(state=tk.DISABLED)
+      self.test_lever_lights_button.config(state=tk.DISABLED)
 
       # Disable duration inputs
       if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
@@ -511,6 +522,8 @@ class ControlPanel(tk.Frame):
         self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.DISABLED)
       if "test_displays" in self.test_indicators and "duration_entry" in self.test_indicators["test_displays"]:
         self.test_indicators["test_displays"]["duration_entry"].config(state=tk.DISABLED)
+      if "test_lever_lights" in self.test_indicators and "duration_entry" in self.test_indicators["test_lever_lights"]:
+        self.test_indicators["test_lever_lights"]["duration_entry"].config(state=tk.DISABLED)
     else:
       # Enable test buttons
       self.test_ir_button.config(state=tk.NORMAL)
@@ -518,6 +531,7 @@ class ControlPanel(tk.Frame):
       self.test_water_delivery_button.config(state=tk.NORMAL)
       self.test_nose_light_button.config(state=tk.NORMAL)
       self.test_displays_button.config(state=tk.NORMAL)
+      self.test_lever_lights_button.config(state=tk.NORMAL)
 
       # Enable duration inputs
       if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
@@ -526,6 +540,8 @@ class ControlPanel(tk.Frame):
         self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.NORMAL)
       if "test_displays" in self.test_indicators and "duration_entry" in self.test_indicators["test_displays"]:
         self.test_indicators["test_displays"]["duration_entry"].config(state=tk.NORMAL)
+      if "test_lever_lights" in self.test_indicators and "duration_entry" in self.test_indicators["test_lever_lights"]:
+        self.test_indicators["test_lever_lights"]["duration_entry"].config(state=tk.NORMAL)
 
   def set_experiment_buttons_disabled(self, disabled):
     """
@@ -592,6 +608,7 @@ class ControlPanel(tk.Frame):
     self.test_ir_button.config(state=tk.NORMAL)
     self.test_nose_light_button.config(state=tk.NORMAL)
     self.test_displays_button.config(state=tk.NORMAL)
+    self.test_lever_lights_button.config(state=tk.NORMAL)
     self.reset_tests_button.config(state=tk.NORMAL)  # Enable reset button
 
     # Animal ID input
@@ -627,6 +644,7 @@ class ControlPanel(tk.Frame):
     self.test_ir_button.config(state=tk.DISABLED)
     self.test_nose_light_button.config(state=tk.DISABLED)
     self.test_displays_button.config(state=tk.DISABLED)
+    self.test_lever_lights_button.config(state=tk.DISABLED)
     self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
 
     # Animal ID input
@@ -841,6 +859,8 @@ class ControlPanel(tk.Frame):
       "nose_poke": False,
       "water_port": False,
       "nose_light": False,
+      "left_lever_light": False,
+      "right_lever_light": False,
     }
 
     self.reset_tests()
@@ -1027,7 +1047,7 @@ class ControlPanel(tk.Frame):
 def main():
   root = tk.Tk()
   root.title("Behavior Box: Control Panel")
-  root.geometry("864x672")
+  root.geometry("864x760")
   root.resizable(False, False)
 
   # Set window icon

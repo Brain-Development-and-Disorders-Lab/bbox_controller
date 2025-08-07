@@ -13,6 +13,7 @@ TEST_COMMANDS = [
     "test_ir",
     "test_nose_light",
     "test_displays",
+    "test_lever_lights",
 ]
 
 # Experiment commands

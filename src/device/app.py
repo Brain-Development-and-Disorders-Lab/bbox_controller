@@ -57,6 +57,8 @@ class Device:
       "nose_poke": False,
       "water_port": False,
       "nose_light": False,
+      "left_lever_light": False,
+      "right_lever_light": False,
     }
     self._previous_input_states = {
       "left_lever": False,
@@ -64,6 +66,8 @@ class Device:
       "nose_poke": False,
       "water_port": False,
       "nose_light": False,
+      "left_lever_light": False,
+      "right_lever_light": False,
     }
 
     # Initialize pygame
@@ -119,7 +123,10 @@ class Device:
         f"Left Lever: {'PRESSED' if input_states['left_lever'] else 'RELEASED'}",
         f"Right Lever: {'PRESSED' if input_states['right_lever'] else 'RELEASED'}",
         f"Nose Poke: {'ACTIVE' if input_states['nose_poke'] else 'INACTIVE'}",
-        f"Water Port: {'ON' if input_states['water_port'] else 'OFF'}"
+        f"Water Port: {'ON' if input_states['water_port'] else 'OFF'}",
+        f"Nose Light: {'ON' if input_states['nose_light'] else 'OFF'}",
+        f"Left Lever Light: {'ON' if input_states['left_lever_light'] else 'OFF'}",
+        f"Right Lever Light: {'ON' if input_states['right_lever_light'] else 'OFF'}"
       ]
 
       for i, line in enumerate(state_text):
@@ -469,6 +476,29 @@ class Device:
     self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["RUNNING"])
     asyncio.create_task(self._test_nose_light(duration_ms))
 
+  async def _test_lever_lights(self, duration_ms=2000):
+    try:
+      # Turn on the lever lights
+      self.io.set_left_lever_light(True)
+      self.io.set_right_lever_light(True)
+      await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
+      self.io.set_left_lever_light(False)
+      self.io.set_right_lever_light(False)
+    except Exception as e:
+      self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["FAILED"])
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      log(f"Could not control lever lights: {str(e)}", "error")
+
+    if self.test_state_manager.get_test_state("test_lever_lights") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["PASSED"])
+      _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
+      log(f"Lever lights test passed (duration: {duration_ms}ms)", "success")
+
+  def test_lever_lights(self, duration_ms=2000):
+    log(f"Testing lever lights for {duration_ms}ms", "start")
+    self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["RUNNING"])
+    asyncio.create_task(self._test_lever_lights(duration_ms))
+
   async def _test_displays(self, duration_ms=2000):
     try:
       # Draw test pattern on both displays
@@ -521,6 +551,19 @@ class Device:
           log(f"Invalid duration for nose light test: {parts[1]}", "error")
       else:
         self.test_nose_light()
+    elif command == "test_lever_lights":
+      self.test_lever_lights()
+    elif command.startswith("test_lever_lights"):
+      # Parse duration from command: "test_lever_lights <duration_ms>"
+      parts = command.split(" ")
+      if len(parts) > 1:
+        try:
+          duration_ms = int(parts[1])
+          self.test_lever_lights(duration_ms)
+        except ValueError:
+          log(f"Invalid duration for lever lights test: {parts[1]}", "error")
+      else:
+        self.test_lever_lights()
     elif command == "test_displays":
       self.test_displays()
     elif command.startswith("test_displays"):

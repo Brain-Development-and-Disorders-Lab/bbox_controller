@@ -100,6 +100,8 @@ class Trial:
             "nose_poke": False,
             "water_port": False,
             "nose_light": False,
+            "left_lever_light": False,
+            "right_lever_light": False,
         }
     return self.io.get_input_states()
 
@@ -197,6 +199,8 @@ class Stage1(Trial):
     # Setup trial
     # Activate the nose port light
     self.nose_port_light = True
+    self.left_lever_light = True
+    self.right_lever_light = True
     self.visual_cue = True
 
     # Clear the displays and randomly select the display to show the visual cue
@@ -273,9 +277,11 @@ class Stage1(Trial):
       })
       log("Nose port exit detected", "info")
 
-    # Track lever presses
+    # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
+    self.left_lever_light = not left_lever
+    self.right_lever_light = not right_lever
 
     if left_lever:
       self.events.append({
@@ -298,6 +304,7 @@ class Stage1(Trial):
     # Update nose port state and light
     self._update_nose_port_state()
     self._update_nose_port_light()
+    self._update_lever_lights()
 
     return True
 
@@ -312,6 +319,11 @@ class Stage1(Trial):
   def _update_nose_port_light(self):
     # Update nose port light
     self.io.set_nose_light(self.nose_port_light)
+
+  def _update_lever_lights(self):
+    # Update lever lights
+    self.io.set_left_lever_light(self.left_lever_light)
+    self.io.set_right_lever_light(self.right_lever_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -352,6 +364,8 @@ class Stage2(Trial):
 
     # Trial state
     self.nose_port_light = False
+    self.left_lever_light = False
+    self.right_lever_light = False
     self.delivered_water = False
     self.water_delivery_complete = False
     self.visual_cue = False
@@ -425,8 +439,12 @@ class Stage2(Trial):
         })
         log("Nose port exit", "info")
 
+    # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
+    self.left_lever_light = not left_lever
+    self.right_lever_light = not right_lever
+
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
@@ -454,6 +472,7 @@ class Stage2(Trial):
     self._update_water_delivery()
     self._update_nose_port_state()
     self._update_nose_port_light()
+    self._update_lever_lights()
     self._update_visual_cue()
 
     return True
@@ -501,6 +520,11 @@ class Stage2(Trial):
     # Update nose port light
     self.io.set_nose_light(self.nose_port_light)
 
+  def _update_lever_lights(self):
+    # Update lever lights
+    self.io.set_left_lever_light(self.left_lever_light)
+    self.io.set_right_lever_light(self.right_lever_light)
+
   def _pre_render_tasks(self):
     # Clear screen
     self.screen.fill((0, 0, 0))
@@ -522,6 +546,7 @@ class Stage2(Trial):
     self._update_nose_port_state()
     self._update_visual_cue()
     self._update_nose_port_light()
+    self._update_lever_lights()
 
     # Run post-render tasks
     self._post_render_tasks()
@@ -636,7 +661,7 @@ class Stage3(Trial):
       })
       log("Nose port exit", "info")
 
-    # Track lever presses with minimum duration
+    # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
 

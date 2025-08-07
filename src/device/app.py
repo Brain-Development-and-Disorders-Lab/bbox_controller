@@ -124,8 +124,8 @@ class Device:
         f"Right Lever: {'PRESSED' if input_states['right_lever'] else 'RELEASED'}",
         f"Nose Poke: {'ACTIVE' if input_states['nose_poke'] else 'INACTIVE'}",
         f"Water Port: {'ON' if input_states['water_port'] else 'OFF'}",
-        f"Nose Light: {'ON' if input_states['nose_light'] else 'OFF'}",
         f"Left Lever Light: {'ON' if input_states['left_lever_light'] else 'OFF'}",
+        f"Nose Light: {'ON' if input_states['nose_light'] else 'OFF'}",
         f"Right Lever Light: {'ON' if input_states['right_lever_light'] else 'OFF'}"
       ]
 
@@ -164,6 +164,12 @@ class Device:
             self.io.simulate_nose_poke(False)
           elif event.key == pygame.K_SPACE: # Nose poke entry (existing)
             self.io.simulate_nose_poke(False)
+          elif event.key == pygame.K_j: # Left lever light
+            self.io.simulate_left_lever_light(True)
+          elif event.key == pygame.K_k: # Nose light
+            self.io.simulate_nose_light(True)
+          elif event.key == pygame.K_l: # Right lever light
+            self.io.simulate_right_lever_light(True)
       elif event.type == pygame.KEYUP:
         if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
           if event.key == pygame.K_1: # Left lever release
@@ -174,6 +180,12 @@ class Device:
             self.io.simulate_nose_poke(True)
           elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
             self.io.simulate_nose_poke(True)
+          elif event.key == pygame.K_j: # Left lever light
+            self.io.simulate_left_lever_light(False)
+          elif event.key == pygame.K_k: # Nose light
+            self.io.simulate_nose_light(False)
+          elif event.key == pygame.K_l: # Right lever light
+            self.io.simulate_right_lever_light(False)
 
     self._update_input_states_and_statistics()
 

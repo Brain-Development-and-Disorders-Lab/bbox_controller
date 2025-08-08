@@ -445,39 +445,35 @@ class Stage2(Trial):
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
-
-    # Update lights
-    if not self.reward_triggered:
-      # Lever lights have normal behavior until reward is triggered
-      self.left_lever_light = not (left_lever or right_lever)
-      self.right_lever_light = not (left_lever or right_lever)
-      # Nose port light until reward is triggered
-      self.nose_port_light = False
-    elif self.reward_triggered and not self.is_lever_pressed:
-      # Lever lights stay off after reward is triggered, only if lever is not pressed
-      self.left_lever_light = False
-      self.right_lever_light = False
-      # Nose port light is on after reward is triggered, only if nose port is not in
-      if not self.nose_port_entry:
-        self.nose_port_light = True
-
-    # Update lever state
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
-    elif not (left_lever or right_lever) and self.is_lever_pressed and not self.reward_triggered:
-      # Check for lever release
-      self.is_lever_pressed = False
-      log("Lever released", "info")
 
-      # Trigger the reward only if lever is released
+      # Trigger the reward only if lever is pressed
       self.reward_triggered = True
       log("Lever press reward triggered", "success")
       self.events.append({
         "type": "lever_press_reward",
         "timestamp": current_time
       })
+    elif not (left_lever or right_lever) and self.is_lever_pressed and self.reward_triggered:
+      # Check for lever release
+      self.is_lever_pressed = False
+      log("Lever released", "info")
+
+    # Update lights
+    if not self.reward_triggered:
+      # Lever lights have normal behavior until reward is triggered
+      self.left_lever_light = not (left_lever or right_lever)
+      self.right_lever_light = not (left_lever or right_lever)
+    elif self.reward_triggered:
+      # Lever lights stay off after reward is triggered, only if lever is not pressed
+      self.left_lever_light = False
+      self.right_lever_light = False
+      # Nose port light is on after reward is triggered, only if nose port is not in
+      if not self.nose_port_entry:
+        self.nose_port_light = True
 
     # Update tasks
     self._update_water_delivery()

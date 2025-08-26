@@ -626,13 +626,16 @@ class Stage3(Trial):
         self.nose_port_entry
         and not self.nose_port_exit
         and self.get_input_states()["nose_poke"]
-        and not self.water_delivery_complete
+        and not self.reward_triggered
     ):
       log("Error: Premature nose withdrawal", "error")
       # Update lights
       self.left_lever_light = False
       self.right_lever_light = False
       self.nose_port_light = False
+
+      # Update visual cue
+      self.visual_cue = False
 
       # Update trial state and end trial
       self.is_error_trial = True
@@ -661,12 +664,20 @@ class Stage3(Trial):
     if not current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
-      self.cue_start_time = current_time
       self.events.append({
         "type": "nose_port_entry",
         "timestamp": current_time
       })
       log("Nose port entry", "info")
+
+      # Update cue display
+      self.cue_start_time = current_time
+      self.visual_cue = True
+
+      # Update lights
+      self.left_lever_light = True
+      self.right_lever_light = True
+      self.nose_port_light = False
     elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
@@ -685,6 +696,11 @@ class Stage3(Trial):
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
 
+      # Trigger reward
+      self.reward_triggered = True
+      self.visual_cue = False
+
+      # Store data
       if left_lever:
         self.events.append({
           "type": "left_lever_press",
@@ -700,15 +716,7 @@ class Stage3(Trial):
     elif self.is_lever_pressed and not (left_lever or right_lever) and not self.reward_triggered:
       # Check for lever release
       log("Lever press released", "info")
-      # Update lights
-      self.left_lever_light = True
-      self.right_lever_light = True
-      self.nose_port_light = False
-
-      # Update trial state
       self.is_lever_pressed = False
-      self.reward_triggered = True
-      self.visual_cue = False
 
     # Update water delivery and other tasks
     self._update_water_delivery()

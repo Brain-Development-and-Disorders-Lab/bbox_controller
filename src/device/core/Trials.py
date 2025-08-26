@@ -782,7 +782,6 @@ class Stage3(Trial):
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""
     if self.nose_port_entry:
-      self.visual_cue = False
       self.nose_port_light = False
 
   def _update_visual_cue(self):

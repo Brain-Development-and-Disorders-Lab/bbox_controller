@@ -99,7 +99,6 @@ class Device:
     self._should_loop = False
 
     # Experiment state
-    self._experiment_blocked = False
     self._experiment_started = False
     self._running = True
     self._websocket_server = None
@@ -205,20 +204,11 @@ class Device:
         # Send message about trial completion
         _device_message_queue.put(CommunicationMessageBuilder.trial_complete(self._current_trial.title, trial_data))
 
-        # Check if experiment should be blocked
-        if self._check_experiment_blocked() and not self._experiment_blocked:
-          log("Experiment blocked by active nose poke or lever press", "warning")
-          self._experiment_blocked = True
-          self._current_trial = None
-        elif not self._check_experiment_blocked() and self._experiment_blocked:
-          self._experiment_blocked = False
-          log("Experiment unblocked", "success")
-
-        if len(self._trials) > 0 and not self._experiment_blocked:
+        if len(self._trials) > 0:
           self._current_trial = self._trials.pop(0)
           self._current_trial.on_enter()
           _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
-        elif not self._experiment_blocked:
+        else:
           if self._should_loop:
             # Reset trials for next loop by creating new trial instances
             self._trials = []
@@ -319,14 +309,6 @@ class Device:
 
     _device_message_queue.put(CommunicationMessageBuilder.experiment_status("started", self._current_trial.title))
     log("Timeline experiment started", "info")
-
-  def _check_experiment_blocked(self):
-    """Check if the experiment should be blocked due to active nose poke or lever press"""
-    if self.io.get_input_states()["left_lever"] or self.io.get_input_states()["right_lever"]:
-      return True
-    elif not self.io.get_input_states()["nose_poke"]:
-      return True
-    return False
 
   def stop_experiment(self):
     """Stop the current experiment"""

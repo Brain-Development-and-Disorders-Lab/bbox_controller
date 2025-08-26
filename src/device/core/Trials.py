@@ -130,6 +130,13 @@ class Interval(Trial):
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
 
+    # Reset the IO outputs
+    self.io.set_water_port(False)
+    self.io.set_nose_light(False)
+    self.io.set_left_lever_light(False)
+    self.io.set_right_lever_light(False)
+    self.display.clear_displays()
+
   def update(self, events):
     # Check if the ITI duration has passed
     if pygame.time.get_ticks() - self.start_time > self.duration:

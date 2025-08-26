@@ -626,7 +626,7 @@ class Stage3(Trial):
         self.nose_port_entry
         and not self.nose_port_exit
         and self.get_input_states()["nose_poke"]
-        and not self.reward_triggered
+        and not self.water_delivery_complete
     ):
       log("Error: Premature nose withdrawal", "error")
       # Update lights
@@ -679,6 +679,7 @@ class Stage3(Trial):
       log("Nose port entry", "info")
 
       # Update cue display
+      log("Cue display started", "info")
       self.cue_start_time = current_time
       self.visual_cue = True
 

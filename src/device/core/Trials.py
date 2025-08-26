@@ -578,6 +578,8 @@ class Stage3(Trial):
 
     # Trial state
     self.nose_port_light = False
+    self.left_lever_light = False
+    self.right_lever_light = False
     self.delivered_water = False
     self.water_delivery_complete = False
     self.visual_cue = False
@@ -676,33 +678,32 @@ class Stage3(Trial):
       # Check for lever press start
       self.is_lever_pressed = True
       self.lever_press_start_time = current_time
-    elif self.is_lever_pressed and not (left_lever or right_lever):
-      # Check for lever release or minimum duration
+
+      if left_lever:
+        self.events.append({
+          "type": "left_lever_press",
+          "timestamp": current_time,
+          "duration": current_time - self.lever_press_start_time
+        })
+      if right_lever:
+        self.events.append({
+          "type": "right_lever_press",
+          "timestamp": current_time,
+          "duration": current_time - self.lever_press_start_time
+        })
+    elif self.is_lever_pressed and not (left_lever or right_lever) and not self.reward_triggered:
+      # Check for lever release
       self.is_lever_pressed = False
-      self.lever_press_start_time = None
-      log("Lever press released before minimum duration", "info")
-    elif self.is_lever_pressed and not self.reward_triggered:
-      if current_time - self.lever_press_start_time >= self.config.hold_minimum:
-        self.reward_triggered = True
-        self.visual_cue = False
-        if left_lever:
-          self.events.append({
-            "type": "left_lever_press",
-            "timestamp": current_time,
-            "duration": current_time - self.lever_press_start_time
-          })
-        if right_lever:
-          self.events.append({
-            "type": "right_lever_press",
-            "timestamp": current_time,
-            "duration": current_time - self.lever_press_start_time
-          })
+      log("Lever press released", "info")
+      self.reward_triggered = True
+      self.visual_cue = False
 
     # Update water delivery and other tasks
     self._update_water_delivery()
     self._update_nose_port_state()
     self._update_visual_cue()
     self._update_nose_port_light()
+    self._update_lever_lights()
 
     # Check if cue duration has elapsed without lever press
     if self.nose_port_entry and not self.reward_triggered and self.cue_start_time:
@@ -761,6 +762,11 @@ class Stage3(Trial):
   def _update_nose_port_light(self):
     # Update nose port light
     self.io.set_nose_light(self.nose_port_light)
+
+  def _update_lever_lights(self):
+    # Update lever lights
+    self.io.set_left_lever_light(self.left_lever_light)
+    self.io.set_right_lever_light(self.right_lever_light)
 
   def _pre_render_tasks(self):
     # Clear screen

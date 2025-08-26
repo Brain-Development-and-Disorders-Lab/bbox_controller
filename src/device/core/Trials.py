@@ -370,6 +370,7 @@ class Stage2(Trial):
     self.lever_press_start_time = None
 
     # Trial state
+    self.trial_blocked = False
     self.nose_port_light = False
     self.left_lever_light = False
     self.right_lever_light = False
@@ -399,6 +400,11 @@ class Stage2(Trial):
     self.left_lever_light = False
     self.right_lever_light = False
 
+    # Check if the trial should be blocked
+    if self._check_trial_blocked():
+      self.trial_blocked = True
+      log("Trial blocked by active nose poke or lever press", "warning")
+
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
       self.display.clear_displays()
@@ -412,6 +418,12 @@ class Stage2(Trial):
 
   def update(self, events):
     current_time = pygame.time.get_ticks()
+
+    # Halt the trial if it is blocked
+    if self.trial_blocked and self._check_trial_blocked():
+      return True
+    else:
+      self.trial_blocked = False
 
     # Condition for trial end
     if self.reward_triggered and self.water_delivery_complete and self.nose_port_exit:
@@ -470,7 +482,7 @@ class Stage2(Trial):
       log("Lever released", "info")
 
     # Update lights
-    if not self.reward_triggered:
+    if not self.reward_triggered and not self.trial_blocked:
       # Lever lights have normal behavior until reward is triggered
       self.left_lever_light = not (left_lever or right_lever)
       self.right_lever_light = not (left_lever or right_lever)
@@ -490,6 +502,14 @@ class Stage2(Trial):
     self._update_visual_cue()
 
     return True
+
+  def _check_trial_blocked(self):
+    """Check if the trial should be blocked due to active nose poke or lever press"""
+    if self.get_input_states()["left_lever"] or self.get_input_states()["right_lever"]:
+      return True
+    elif not self.get_input_states()["nose_poke"]:
+      return True
+    return False
 
   def _update_water_delivery(self):
     current_time = pygame.time.get_ticks()

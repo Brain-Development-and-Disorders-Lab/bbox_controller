@@ -584,6 +584,7 @@ class Stage3(Trial):
     self.lever_press_start_time = None
 
     # Trial state
+    self.trial_blocked = False
     self.nose_port_light = False
     self.left_lever_light = False
     self.right_lever_light = False
@@ -614,6 +615,11 @@ class Stage3(Trial):
     # Activate the nose port light
     self.nose_port_light = True
 
+    # Check if the trial should be blocked
+    if self._check_trial_blocked():
+      self.trial_blocked = True
+      log("Trial blocked by active nose poke or lever press", "warning")
+
     # Clear the displays
     if not SIMULATION_MODE:
       self.display.clear_displays()
@@ -627,6 +633,12 @@ class Stage3(Trial):
 
   def update(self, events):
     current_time = pygame.time.get_ticks()
+
+    # Halt the trial if it is blocked
+    if self.trial_blocked and self._check_trial_blocked():
+      return True
+    else:
+      self.trial_blocked = False
 
     # Condition for trial end - premature nose withdrawal
     if (
@@ -760,6 +772,14 @@ class Stage3(Trial):
         return False
 
     return True
+
+  def _check_trial_blocked(self):
+    """Check if the trial should be blocked due to active nose poke or lever press"""
+    if self.get_input_states()["left_lever"] or self.get_input_states()["right_lever"]:
+      return True
+    elif not self.get_input_states()["nose_poke"]:
+      return True
+    return False
 
   def _update_water_delivery(self):
     current_time = pygame.time.get_ticks()

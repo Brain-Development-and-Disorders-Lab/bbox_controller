@@ -392,9 +392,6 @@ class Stage2(Trial):
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
 
-    # Setup trial
-    self.visual_cue = True
-
     # Setup the lights
     self.nose_port_light = False
     self.left_lever_light = False
@@ -404,6 +401,9 @@ class Stage2(Trial):
     if self._check_trial_blocked():
       self.trial_blocked = True
       log("Trial blocked by active nose poke or lever press", "warning")
+    else:
+      # Activate the visual cue
+      self.visual_cue = True
 
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
@@ -424,6 +424,9 @@ class Stage2(Trial):
       return True
     else:
       self.trial_blocked = False
+
+      # Activate the visual cue
+      self.visual_cue = True
 
     # Condition for trial end
     if self.reward_triggered and self.water_delivery_complete and self.nose_port_exit:

@@ -397,6 +397,10 @@ class Stage2(Trial):
     self.left_lever_light = False
     self.right_lever_light = False
 
+    # Clear the displays
+    if not SIMULATION_MODE:
+      self.display.clear_displays()
+
     # Check if the trial should be blocked
     if self._check_trial_blocked():
       self.trial_blocked = True
@@ -404,12 +408,6 @@ class Stage2(Trial):
     else:
       # Activate the visual cue
       self.visual_cue = True
-
-    # Clear the displays and randomly select the display to show the visual cue
-    if not SIMULATION_MODE:
-      self.display.clear_displays()
-      self.display.draw_alternating_pattern(self.cue_side)
-      log("Visual cue displayed on the " + self.cue_side + " side", "success")
 
     log("Trial started", "info")
 

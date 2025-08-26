@@ -138,6 +138,13 @@ class IOController:
     if hasattr(self, "_simulated_inputs") and self._simulated_inputs:
       self._simulated_states["right_lever_light"] = state
 
+  def reset_all_outputs(self):
+    """Reset all output devices to off state"""
+    self.set_water_port(False)
+    self.set_nose_light(False)
+    self.set_left_lever_light(False)
+    self.set_right_lever_light(False)
+
   def __del__(self):
     """Cleanup GPIO on object destruction"""
     if not SIMULATION_MODE and not hasattr(self, "_simulated_inputs"):

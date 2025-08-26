@@ -316,6 +316,10 @@ class Device:
       log("No experiment running", "warning")
       return
 
+    # Reset all output IO
+    self.io.reset_all_outputs()
+    self.display.clear_displays()
+
     # Stop the current experiment
     self._experiment_started = False
     self._current_trial = None

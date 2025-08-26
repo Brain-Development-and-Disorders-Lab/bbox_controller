@@ -15,6 +15,7 @@ class TrialFactory:
         self.trial_types = {
             "Stage1": "Stage1",
             "Stage2": "Stage2",
+            "Stage3": "Stage3",
             "Interval": "Interval"
         }
 
@@ -29,6 +30,9 @@ class TrialFactory:
         elif trial_type == "Stage2":
             from device.core.Trials import Stage2
             return Stage2(**parameters, **kwargs)
+        elif trial_type == "Stage3":
+            from device.core.Trials import Stage3
+            return Stage3(**parameters, **kwargs)
         elif trial_type == "Interval":
             from device.core.Trials import Interval
             return Interval(**parameters, **kwargs)

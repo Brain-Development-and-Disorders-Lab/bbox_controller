@@ -621,15 +621,21 @@ class Stage3(Trial):
   def update(self, events):
     current_time = pygame.time.get_ticks()
 
-    # Handle error trial condition - premature nose withdrawal
+    # Condition for trial end - premature nose withdrawal
     if (
         self.nose_port_entry
         and not self.nose_port_exit
         and self.get_input_states()["nose_poke"]
         and not self.water_delivery_complete
     ):
-      self.is_error_trial = True
       log("Error: Premature nose withdrawal", "error")
+      # Update lights
+      self.left_lever_light = False
+      self.right_lever_light = False
+      self.nose_port_light = False
+
+      # Update trial state and end trial
+      self.is_error_trial = True
       self.add_data("trial_outcome", TrialOutcome.FAILURE_NOSEPORT)
       return False
 
@@ -653,7 +659,7 @@ class Stage3(Trial):
     current_nose_state = self.get_input_states()["nose_poke"]
 
     if not current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry (nose_poke = False means nose is IN)
+      # Detect nose port entry
       self.nose_port_entry = True
       self.cue_start_time = current_time
       self.events.append({
@@ -693,8 +699,14 @@ class Stage3(Trial):
         })
     elif self.is_lever_pressed and not (left_lever or right_lever) and not self.reward_triggered:
       # Check for lever release
-      self.is_lever_pressed = False
       log("Lever press released", "info")
+      # Update lights
+      self.left_lever_light = True
+      self.right_lever_light = True
+      self.nose_port_light = False
+
+      # Update trial state
+      self.is_lever_pressed = False
       self.reward_triggered = True
       self.visual_cue = False
 

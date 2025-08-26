@@ -646,6 +646,14 @@ class Stage3(Trial):
     if self.water_delivery_complete and self.nose_port_exit:
       log("Trial ended after water delivery and nose port exit", "success")
       self.add_data("trial_outcome", TrialOutcome.SUCCESS)
+
+      # Update lights
+      self.left_lever_light = False
+      self.right_lever_light = False
+      self.nose_port_light = False
+
+      # Update visual cue
+      self.visual_cue = False
       return False
 
     # Handle any PyGame events
@@ -699,6 +707,11 @@ class Stage3(Trial):
       # Trigger reward
       self.reward_triggered = True
       self.visual_cue = False
+
+      # Update lights
+      self.left_lever_light = False
+      self.right_lever_light = False
+      self.nose_port_light = False
 
       # Store data
       if left_lever:

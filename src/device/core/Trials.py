@@ -611,14 +611,13 @@ class Stage3(Trial):
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
 
-    # Setup trial
-    # Activate the nose port light
-    self.nose_port_light = True
-
     # Check if the trial should be blocked
     if self._check_trial_blocked():
       self.trial_blocked = True
       log("Trial blocked by active nose poke or lever press", "warning")
+    else:
+      # Activate the nose port light
+      self.nose_port_light = True
 
     # Clear the displays
     if not SIMULATION_MODE:
@@ -639,6 +638,9 @@ class Stage3(Trial):
       return True
     else:
       self.trial_blocked = False
+
+      # Activate the nose port light
+      self.nose_port_light = True
 
     # Condition for trial end - premature nose withdrawal
     if (

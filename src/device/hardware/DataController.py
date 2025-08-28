@@ -15,14 +15,13 @@ class DataController:
   def __init__(self, animal_id):
     self.animal_id = animal_id
     self.data = {
-      "metadata": {
+      "experiment_metadata": {
         "animal_id": animal_id,
-        "start_time": datetime.now().isoformat(),
-        "end_time": None,
-        "trials": []
+        "experiment_start": datetime.now().isoformat(),
+        "experiment_end": None
       },
-      "trials": [],
-      "task": {}
+      "experiment_trials": [],
+      "experiment_statistics": {}
     }
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,28 +39,28 @@ class DataController:
 
   def add_trial_data(self, screen_name, data):
     """Add data for a specific screen"""
-    data["timestamp"] = datetime.now().isoformat()
+    # Preserve trial_start and trial_end if they exist, otherwise use current time
+    if "trial_start" not in data:
+      data["trial_start"] = datetime.now().isoformat()
+    if "trial_end" not in data:
+      data["trial_end"] = datetime.now().isoformat()
+
     data["trial_type"] = screen_name
 
-    self.data["trials"].append(data)
-    self.data["metadata"]["trials"].append({
-      "name": screen_name,
-      "timestamp": data["timestamp"]
-    })
+    self.data["experiment_trials"].append(data)
 
   def add_task_data(self, data):
     """Add task-level data"""
-    data["timestamp"] = datetime.now().isoformat()
-    self.data["task"].update(data)
+    self.data["experiment_metadata"]["config"] = data
 
   def add_statistics(self, statistics):
     """Add statistics data"""
-    self.data["statistics"] = statistics
+    self.data["experiment_statistics"] = statistics
 
   def save(self) -> bool:
     """Save the current data to file"""
     try:
-      self.data["metadata"]["end_time"] = datetime.now().isoformat()
+      self.data["experiment_metadata"]["experiment_end"] = datetime.now().isoformat()
 
       if not os.path.exists(self.data_dir):
         log(f"Data directory does not exist: {self.data_dir}", "error")
@@ -73,7 +72,7 @@ class DataController:
         return False
 
       # Log data summary for debugging
-      log(f"Data summary - Animal ID: {self.animal_id}, Trials: {len(self.data['trials'])}", "info")
+      log(f"Data summary - Animal ID: {self.animal_id}, Trials: {len(self.data['experiment_trials'])}", "info")
       log(f"Attempting to save data to: {self.filename}", "info")
       with open(self.filename, "w") as f:
         json.dump(self.data, f, indent=2)

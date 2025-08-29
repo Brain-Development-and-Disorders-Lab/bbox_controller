@@ -10,6 +10,7 @@ import json
 import os
 from datetime import datetime
 from device.utils.logger import log
+from shared import VERSION
 
 class DataController:
   def __init__(self, animal_id):
@@ -18,7 +19,8 @@ class DataController:
       "experiment_metadata": {
         "animal_id": animal_id,
         "experiment_start": datetime.now().isoformat(),
-        "experiment_end": None
+        "experiment_end": None,
+        "experiment_version": VERSION
       },
       "experiment_trials": [],
       "experiment_statistics": {}

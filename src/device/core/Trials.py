@@ -262,7 +262,7 @@ class Stage1(Trial):
       self.io.set_water_port(True)
       self.delivered_water = True
       log("Water delivery started", "success")
-      self.add_event("water_delivery_start")
+      self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
@@ -270,7 +270,7 @@ class Stage1(Trial):
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
-        self.add_event("water_delivery_complete")
+        self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
 
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""
@@ -394,21 +394,32 @@ class Stage2(Trial):
     self.title = "trial_stage_2"
     self.start_time = None
     self.water_start_time = None
-    self.lever_press_start_time = None
 
     # Trial state
     self.trial_blocked = False
+    self.reward_triggered = False
+
+    # Light state
     self.nose_port_light = False
     self.left_lever_light = False
     self.right_lever_light = False
+
+    # Water delivery state
     self.delivered_water = False
     self.water_delivery_complete = False
+
+    # Visual cue state
+    self.visual_cue_active = False # To aid in tracking the visual cue state
     self.visual_cue = False
+
+    # Nose port state
     self.nose_port_entry = False
     self.nose_port_exit = False
-    self.lever_press = False
-    self.reward_triggered = False
+
+    # Lever state
     self.is_lever_pressed = False
+    self.left_lever_pressed = False
+    self.right_lever_pressed = False
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -436,6 +447,8 @@ class Stage2(Trial):
     else:
       # Activate the visual cue
       self.visual_cue = True
+      self.visual_cue_active = True
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     log("Trial started", "info")
 
@@ -444,16 +457,17 @@ class Stage2(Trial):
     self.add_data("events", self.events)
 
   def update(self, events):
-    current_time = pygame.time.get_ticks()
-
     # Halt the trial if it is blocked
     if self.trial_blocked and self._check_trial_blocked():
       return True
     else:
       self.trial_blocked = False
 
-      # Activate the visual cue
-      self.visual_cue = True
+      # Activate the visual cue if not already activated
+      if not self.visual_cue and not self.visual_cue_active:
+        self.visual_cue = True
+        self.visual_cue_active = True
+        self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     # Condition for trial end
     if self.reward_triggered and self.water_delivery_complete and self.nose_port_exit:
@@ -478,29 +492,52 @@ class Stage2(Trial):
     if self.reward_triggered:
       if not current_nose_state and not self.nose_port_entry:
         self.nose_port_entry = True
-        self.add_event("nose_port_entry")
+        self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
         log("Nose port entry", "info")
       elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
         self.nose_port_exit = True
-        self.add_event("nose_port_exit")
+        self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
         log("Nose port exit", "info")
 
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
+
+    # Capture lever press events
+    if left_lever and not self.left_lever_pressed:
+      self.left_lever_pressed = True
+      log("Left lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_PRESS"])
+    elif not left_lever and self.left_lever_pressed:
+      self.left_lever_pressed = False
+      log("Left lever released", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_RELEASE"])
+
+    if right_lever and not self.right_lever_pressed:
+      self.right_lever_pressed = True
+      log("Right lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_PRESS"])
+    elif not right_lever and self.right_lever_pressed:
+      self.right_lever_pressed = False
+      log("Right lever released", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_RELEASE"])
+
+    # Handle lever press events
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
-      self.lever_press_start_time = current_time
 
       # Trigger the reward only if lever is pressed
       self.reward_triggered = True
       log("Lever press reward triggered", "success")
-      self.add_event("lever_press_reward")
+      self.add_event(TRIAL_EVENTS["REWARD_TRIGGERED"])
+
+      # Deactivate the visual cue
+      self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
     elif not (left_lever or right_lever) and self.is_lever_pressed and self.reward_triggered:
       # Check for lever release
       self.is_lever_pressed = False
-      log("Lever released", "info")
 
     # Update lights
     if not self.reward_triggered and not self.trial_blocked:
@@ -541,7 +578,7 @@ class Stage2(Trial):
       self.delivered_water = True
       self.water_start_time = current_time
       log("Water delivery started", "success")
-      self.add_event("water_delivery_start")
+      self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
@@ -549,12 +586,11 @@ class Stage2(Trial):
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
-        self.add_event("water_delivery_complete")
+        self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
 
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""
     if self.nose_port_entry:
-      self.visual_cue = False
       self.nose_port_light = False
 
   def _update_visual_cue(self):

@@ -113,5 +113,8 @@ TRIAL_EVENTS = {
 
     # Trial state events
     "TRIAL_START": "trial_start",
-    "TRIAL_END": "trial_end"
+    "TRIAL_END": "trial_end",
+
+    # Trial error events
+    "TRIAL_CUE_TIMEOUT": "trial_cue_timeout",
 }

@@ -331,7 +331,6 @@ class Stage1(Trial):
 
     # Condition for trial end - must have nose port entry, water delivery complete, AND nose port exit
     if self.nose_port_entry and self.water_delivery_complete and self.nose_port_exit:
-      log("Trial complete: nose port entry, water delivery, and nose port exit", "success")
       self.add_data("trial_outcome", TrialOutcome.SUCCESS)
       return False
 
@@ -734,7 +733,7 @@ class Stage3(Trial):
         and self.get_input_states()["nose_poke"]
         and not self.water_delivery_complete
     ):
-      log("Error: Premature nose withdrawal", "error")
+      log("Premature nose withdrawal", "error")
       # Update lights
       self.left_lever_light = False
       self.right_lever_light = False

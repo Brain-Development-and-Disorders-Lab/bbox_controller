@@ -716,8 +716,10 @@ class ControlPanel(tk.Frame):
         trial_data = received_message.get('data', {}).get('data', {})
         trial_outcome = trial_data.get('trial_outcome', 'success')
 
-        log_level = "warning" if trial_outcome.startswith('failure') else "success"
-        self.log(f"Trial complete with errors: {received_message['data']['trial']}", log_level)
+        if trial_outcome.startswith("failure"):
+          self.log(f"Trial complete with errors: {received_message['data']['trial']}", "warning")
+        else:
+          self.log(f"Trial complete: {received_message['data']['trial']}", "success")
       elif received_message["type"] == "device_log":
         # Update device log
         self.log(received_message["data"]["message"], received_message["data"]["state"], "device")

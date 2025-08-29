@@ -280,7 +280,7 @@ class Device:
     """Reset all statistics to zero"""
     self.statistics_controller.reset_all_stats()
 
-  def start_experiment(self, animal_id, trials, trial_configs, config=None, loop=False):
+  def start_experiment(self, animal_id, trials, trial_configs, config=None, loop=False, experiment_file=None):
     """Start the experiment with a custom timeline"""
     if self._experiment_started:
       log("Experiment already running", "warning")
@@ -297,6 +297,10 @@ class Device:
     # Store the experiment config
     self.experiment_config = config
     self._data.add_task_data({"config": asdict(config)})
+
+    # Store the complete experiment file data if provided
+    if experiment_file:
+        self._data.add_experiment_file(experiment_file)
 
     # Set trials from timeline
     self._trials = trials.copy() # Store original trials\

@@ -53,6 +53,10 @@ class DataController:
     """Add task-level data"""
     self.data["experiment_metadata"]["config"] = data
 
+  def add_experiment_file(self, experiment_file):
+    """Add the complete experiment file data to metadata"""
+    self.data["experiment_metadata"]["experiment_file"] = experiment_file
+
   def add_statistics(self, statistics):
     """Add statistics data"""
     self.data["experiment_statistics"] = statistics

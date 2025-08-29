@@ -63,7 +63,7 @@ class ExperimentProcessor:
                     "kwargs": trial_data.parameters
                 })
 
-            self.device.start_experiment(animal_id, trials, trial_configs, self.current_experiment.config, self.current_experiment.loop)
+            self.device.start_experiment(animal_id, trials, trial_configs, self.current_experiment.config, self.current_experiment.loop, self.current_experiment.to_dict())
             return True, f"Experiment '{self.current_experiment.name}' started successfully"
 
         except Exception as e:

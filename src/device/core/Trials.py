@@ -13,6 +13,7 @@ from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
 from device.hardware.IOController import IOController
 from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
+from shared.constants import TRIAL_EVENTS
 from shared.managers import StatisticsManager
 
 class Trial:
@@ -202,14 +203,23 @@ class Stage1(Trial):
     self.start_time = None
     self.water_start_time = None
 
-    # Trial state
+    # Light state
     self.nose_port_light = False
+
+    # Water delivery state
     self.delivered_water = False
     self.water_delivery_complete = False
+
+    # Visual cue state
     self.visual_cue = False
+
+    # Nose port state
     self.nose_port_entry = False
     self.nose_port_exit = False
-    self.lever_press = False
+
+    # Lever state
+    self.left_lever_pressed = False
+    self.right_lever_pressed = False
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -223,11 +233,14 @@ class Stage1(Trial):
     super().on_enter()
 
     # Setup trial
-    # Activate the nose port light
+    # Activate the lights
     self.nose_port_light = True
     self.left_lever_light = True
     self.right_lever_light = True
+
+    # Activate the visual cue
     self.visual_cue = True
+    self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
@@ -262,7 +275,6 @@ class Stage1(Trial):
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""
     if self.nose_port_entry:
-      self.visual_cue = False
       self.nose_port_light = False
 
   def update(self, events):
@@ -282,15 +294,19 @@ class Stage1(Trial):
     current_nose_state = self.get_input_states()["nose_poke"]
 
     if not current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry (nose_poke = False means nose is IN)
+      # Detect nose port entry
       self.nose_port_entry = True
-      self.add_event("nose_port_entry")
       log("Nose port entry detected", "info")
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
+
+      # Deactivate the visual cue
+      self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
     elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
-      # Detect nose port exit (nose_poke = True means nose is OUT)
+      # Detect nose port exit
       self.nose_port_exit = True
-      self.add_event("nose_port_exit")
       log("Nose port exit detected", "info")
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
 
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
@@ -298,11 +314,20 @@ class Stage1(Trial):
     self.left_lever_light = False # Lever lights off by default
     self.right_lever_light = False # Lever lights off by default
 
-    if left_lever:
-      self.add_event("left_lever_press")
+    # Capture lever press events
+    if left_lever and not self.left_lever_pressed:
+      self.left_lever_pressed = True
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_PRESS"])
+    elif not left_lever and self.left_lever_pressed:
+      self.left_lever_pressed = False
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_RELEASE"])
 
-    if right_lever:
-      self.add_event("right_lever_press")
+    if right_lever and not self.right_lever_pressed:
+      self.right_lever_pressed = True
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_PRESS"])
+    elif not right_lever and self.right_lever_pressed:
+      self.right_lever_pressed = False
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_RELEASE"])
 
     # Condition for trial end - must have nose port entry, water delivery complete, AND nose port exit
     if self.nose_port_entry and self.water_delivery_complete and self.nose_port_exit:

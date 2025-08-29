@@ -296,7 +296,6 @@ class Device:
 
     # Store the experiment config
     self.experiment_config = config
-    self._data.add_task_data({"config": asdict(config)})
 
     # Store the complete experiment file data if provided
     if experiment_file:

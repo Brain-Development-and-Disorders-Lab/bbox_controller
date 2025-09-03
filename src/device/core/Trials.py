@@ -8,10 +8,12 @@ License: MIT
 
 import random
 import pygame
+from datetime import datetime
 from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
 from device.hardware.IOController import IOController
 from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
+from shared.constants import TRIAL_EVENTS
 from shared.managers import StatisticsManager
 
 class Trial:
@@ -48,6 +50,21 @@ class Trial:
     if SIMULATION_MODE:
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
 
+  def get_timestamp(self):
+    """Get current timestamp in ISO format for consistent event timing"""
+    return datetime.now().isoformat()
+
+  def add_event(self, event_type: str, **kwargs):
+    """Add a timestamped event to the trial's event log"""
+    event = {
+      "type": event_type,
+      "timestamp": self.get_timestamp(),
+      **kwargs
+    }
+    if not hasattr(self, 'events'):
+      self.events = []
+    self.events.append(event)
+
   def update(self, events):
     """
     Update trial state based on events and time
@@ -68,12 +85,13 @@ class Trial:
     """
     Called when trial becomes active
     """
-    pass
+    self.trial_start = self.get_timestamp()
 
   def on_exit(self):
     """
     Called when trial is being exited
     """
+    self.trial_end = self.get_timestamp()
     # Increment trial count if statistics controller is available
     if hasattr(self, 'statistics') and self.statistics is not None:
       self.statistics.increment_trial_count()
@@ -129,6 +147,7 @@ class Interval(Trial):
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
+    super().on_enter()
 
     # Reset the IO outputs
     self.io.set_water_port(False)
@@ -184,14 +203,23 @@ class Stage1(Trial):
     self.start_time = None
     self.water_start_time = None
 
-    # Trial state
+    # Light state
     self.nose_port_light = False
+
+    # Water delivery state
     self.delivered_water = False
     self.water_delivery_complete = False
+
+    # Visual cue state
     self.visual_cue = False
+
+    # Nose port state
     self.nose_port_entry = False
     self.nose_port_exit = False
-    self.lever_press = False
+
+    # Lever state
+    self.left_lever_pressed = False
+    self.right_lever_pressed = False
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -202,13 +230,17 @@ class Stage1(Trial):
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
     self.water_start_time = pygame.time.get_ticks() # Start water delivery immediately
+    super().on_enter()
 
     # Setup trial
-    # Activate the nose port light
+    # Activate the lights
     self.nose_port_light = True
     self.left_lever_light = True
     self.right_lever_light = True
+
+    # Activate the visual cue
     self.visual_cue = True
+    self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     # Clear the displays and randomly select the display to show the visual cue
     if not SIMULATION_MODE:
@@ -219,6 +251,7 @@ class Stage1(Trial):
     log("Trial started", "info")
 
   def on_exit(self):
+    super().on_exit()
     self.add_data("events", self.events)
 
   def _update_water_delivery(self):
@@ -229,10 +262,7 @@ class Stage1(Trial):
       self.io.set_water_port(True)
       self.delivered_water = True
       log("Water delivery started", "success")
-      self.events.append({
-        "type": "water_delivery_start",
-        "timestamp": current_time
-      })
+      self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
@@ -240,15 +270,11 @@ class Stage1(Trial):
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
-        self.events.append({
-          "type": "water_delivery_complete",
-          "timestamp": current_time
-        })
+        self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
 
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""
     if self.nose_port_entry:
-      self.visual_cue = False
       self.nose_port_light = False
 
   def update(self, events):
@@ -268,21 +294,19 @@ class Stage1(Trial):
     current_nose_state = self.get_input_states()["nose_poke"]
 
     if not current_nose_state and not self.nose_port_entry:
-      # Detect nose port entry (nose_poke = False means nose is IN)
+      # Detect nose port entry
       self.nose_port_entry = True
-      self.events.append({
-        "type": "nose_port_entry",
-        "timestamp": pygame.time.get_ticks()
-      })
       log("Nose port entry detected", "info")
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
+
+      # Deactivate the visual cue
+      self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
     elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
-      # Detect nose port exit (nose_poke = True means nose is OUT)
+      # Detect nose port exit
       self.nose_port_exit = True
-      self.events.append({
-        "type": "nose_port_exit",
-        "timestamp": pygame.time.get_ticks()
-      })
       log("Nose port exit detected", "info")
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
 
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
@@ -290,21 +314,23 @@ class Stage1(Trial):
     self.left_lever_light = False # Lever lights off by default
     self.right_lever_light = False # Lever lights off by default
 
-    if left_lever:
-      self.events.append({
-        "type": "left_lever_press",
-        "timestamp": pygame.time.get_ticks()
-      })
+    # Capture lever press events
+    if left_lever and not self.left_lever_pressed:
+      self.left_lever_pressed = True
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_PRESS"])
+    elif not left_lever and self.left_lever_pressed:
+      self.left_lever_pressed = False
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_RELEASE"])
 
-    if right_lever:
-      self.events.append({
-        "type": "right_lever_press",
-        "timestamp": pygame.time.get_ticks()
-      })
+    if right_lever and not self.right_lever_pressed:
+      self.right_lever_pressed = True
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_PRESS"])
+    elif not right_lever and self.right_lever_pressed:
+      self.right_lever_pressed = False
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_RELEASE"])
 
     # Condition for trial end - must have nose port entry, water delivery complete, AND nose port exit
     if self.nose_port_entry and self.water_delivery_complete and self.nose_port_exit:
-      log("Trial complete: nose port entry, water delivery, and nose port exit", "success")
       self.add_data("trial_outcome", TrialOutcome.SUCCESS)
       return False
 
@@ -367,21 +393,32 @@ class Stage2(Trial):
     self.title = "trial_stage_2"
     self.start_time = None
     self.water_start_time = None
-    self.lever_press_start_time = None
 
     # Trial state
     self.trial_blocked = False
+    self.reward_triggered = False
+
+    # Light state
     self.nose_port_light = False
     self.left_lever_light = False
     self.right_lever_light = False
+
+    # Water delivery state
     self.delivered_water = False
     self.water_delivery_complete = False
+
+    # Visual cue state
+    self.visual_cue_active = False # To aid in tracking the visual cue state
     self.visual_cue = False
+
+    # Nose port state
     self.nose_port_entry = False
     self.nose_port_exit = False
-    self.lever_press = False
-    self.reward_triggered = False
+
+    # Lever state
     self.is_lever_pressed = False
+    self.left_lever_pressed = False
+    self.right_lever_pressed = False
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -391,6 +428,7 @@ class Stage2(Trial):
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
+    super().on_enter()
 
     # Setup the lights
     self.nose_port_light = False
@@ -408,23 +446,27 @@ class Stage2(Trial):
     else:
       # Activate the visual cue
       self.visual_cue = True
+      self.visual_cue_active = True
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     log("Trial started", "info")
 
   def on_exit(self):
+    super().on_exit()
     self.add_data("events", self.events)
 
   def update(self, events):
-    current_time = pygame.time.get_ticks()
-
     # Halt the trial if it is blocked
     if self.trial_blocked and self._check_trial_blocked():
       return True
     else:
       self.trial_blocked = False
 
-      # Activate the visual cue
-      self.visual_cue = True
+      # Activate the visual cue if not already activated
+      if not self.visual_cue and not self.visual_cue_active:
+        self.visual_cue = True
+        self.visual_cue_active = True
+        self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     # Condition for trial end
     if self.reward_triggered and self.water_delivery_complete and self.nose_port_exit:
@@ -449,38 +491,52 @@ class Stage2(Trial):
     if self.reward_triggered:
       if not current_nose_state and not self.nose_port_entry:
         self.nose_port_entry = True
-        self.events.append({
-          "type": "nose_port_entry",
-          "timestamp": current_time
-        })
+        self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
         log("Nose port entry", "info")
       elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
         self.nose_port_exit = True
-        self.events.append({
-          "type": "nose_port_exit",
-          "timestamp": current_time
-        })
+        self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
         log("Nose port exit", "info")
 
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
+
+    # Capture lever press events
+    if left_lever and not self.left_lever_pressed:
+      self.left_lever_pressed = True
+      log("Left lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_PRESS"])
+    elif not left_lever and self.left_lever_pressed:
+      self.left_lever_pressed = False
+      log("Left lever released", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_RELEASE"])
+
+    if right_lever and not self.right_lever_pressed:
+      self.right_lever_pressed = True
+      log("Right lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_PRESS"])
+    elif not right_lever and self.right_lever_pressed:
+      self.right_lever_pressed = False
+      log("Right lever released", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_RELEASE"])
+
+    # Handle lever press events
     if (left_lever or right_lever) and not self.is_lever_pressed and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
-      self.lever_press_start_time = current_time
 
       # Trigger the reward only if lever is pressed
       self.reward_triggered = True
       log("Lever press reward triggered", "success")
-      self.events.append({
-        "type": "lever_press_reward",
-        "timestamp": current_time
-      })
+      self.add_event(TRIAL_EVENTS["REWARD_TRIGGERED"])
+
+      # Deactivate the visual cue
+      self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
     elif not (left_lever or right_lever) and self.is_lever_pressed and self.reward_triggered:
       # Check for lever release
       self.is_lever_pressed = False
-      log("Lever released", "info")
 
     # Update lights
     if not self.reward_triggered and not self.trial_blocked:
@@ -521,10 +577,7 @@ class Stage2(Trial):
       self.delivered_water = True
       self.water_start_time = current_time
       log("Water delivery started", "success")
-      self.events.append({
-        "type": "water_delivery_start",
-        "timestamp": current_time
-      })
+      self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
@@ -532,15 +585,11 @@ class Stage2(Trial):
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
-        self.events.append({
-          "type": "water_delivery_complete",
-          "timestamp": current_time
-        })
+        self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
 
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""
     if self.nose_port_entry:
-      self.visual_cue = False
       self.nose_port_light = False
 
   def _update_visual_cue(self):
@@ -602,22 +651,34 @@ class Stage3(Trial):
     self.start_time = None
     self.water_start_time = None
     self.cue_start_time = None
-    self.lever_press_start_time = None
 
     # Trial state
     self.trial_blocked = False
+    self.reward_triggered = False
+    self.is_error_trial = False
+
+    # Light state
     self.nose_port_light = False
     self.left_lever_light = False
     self.right_lever_light = False
+
+    # Water delivery state
     self.delivered_water = False
     self.water_delivery_complete = False
+
+    # Visual cue state
     self.visual_cue = False
+
+    # Nose port state
     self.nose_port_entry = False
     self.nose_port_exit = False
-    self.lever_press = False
-    self.reward_triggered = False
-    self.is_error_trial = False
+
+    # Lever state
     self.is_lever_pressed = False
+    self.left_lever_pressed = False
+    self.left_lever_start_time = None
+    self.right_lever_pressed = False
+    self.right_lever_start_time = None
 
     # Trial parameters
     self.cue_side = random.choice(["left", "right"])
@@ -631,6 +692,7 @@ class Stage3(Trial):
 
   def on_enter(self):
     self.start_time = pygame.time.get_ticks()
+    super().on_enter()
 
     # Check if the trial should be blocked
     if self._check_trial_blocked():
@@ -646,6 +708,7 @@ class Stage3(Trial):
     log("Trial started", "info")
 
   def on_exit(self):
+    super().on_exit()
     self.add_data("events", self.events)
     if self.is_error_trial:
       self.add_data("error_trial", True)
@@ -670,7 +733,7 @@ class Stage3(Trial):
         and self.get_input_states()["nose_poke"]
         and not self.water_delivery_complete
     ):
-      log("Error: Premature nose withdrawal", "error")
+      log("Premature nose withdrawal", "error")
       # Update lights
       self.left_lever_light = False
       self.right_lever_light = False
@@ -678,6 +741,7 @@ class Stage3(Trial):
 
       # Update visual cue
       self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
 
       # Update trial state and end trial
       self.is_error_trial = True
@@ -696,6 +760,7 @@ class Stage3(Trial):
 
       # Update visual cue
       self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
       return False
 
     # Handle any PyGame events
@@ -714,16 +779,14 @@ class Stage3(Trial):
     if not current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
-      self.events.append({
-        "type": "nose_port_entry",
-        "timestamp": current_time
-      })
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
       log("Nose port entry", "info")
 
       # Update cue display
       log("Cue display started", "info")
       self.cue_start_time = current_time
       self.visual_cue = True
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
       # Update lights
       self.left_lever_light = True
@@ -732,43 +795,51 @@ class Stage3(Trial):
     elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
-      self.events.append({
-        "type": "nose_port_exit",
-        "timestamp": current_time
-      })
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
       log("Nose port exit", "info")
 
     # Update lever state
     left_lever = self.get_input_states()["left_lever"]
     right_lever = self.get_input_states()["right_lever"]
 
+    # Capture lever press events
+    if left_lever and not self.left_lever_pressed:
+      self.left_lever_pressed = True
+      self.left_lever_start_time = current_time
+      log("Left lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_PRESS"])
+    elif not left_lever and self.left_lever_pressed:
+      self.left_lever_pressed = False
+      log("Left lever released", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_RELEASE"], duration=current_time - self.left_lever_start_time)
+
+    if right_lever and not self.right_lever_pressed:
+      self.right_lever_pressed = True
+      self.right_lever_start_time = current_time
+      log("Right lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_PRESS"])
+    elif not right_lever and self.right_lever_pressed:
+      self.right_lever_pressed = False
+      log("Right lever released", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_RELEASE"], duration=current_time - self.right_lever_start_time)
+
     if (left_lever or right_lever) and not self.is_lever_pressed and self.nose_port_entry and not self.reward_triggered:
       # Check for lever press start
       self.is_lever_pressed = True
-      self.lever_press_start_time = current_time
 
       # Trigger reward
       self.reward_triggered = True
+      log("Nose port entry reward triggered", "success")
+      self.add_event(TRIAL_EVENTS["REWARD_TRIGGERED"])
+
+      # Deactivate the visual cue
       self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
 
       # Update lights
       self.left_lever_light = False
       self.right_lever_light = False
       self.nose_port_light = False
-
-      # Store data
-      if left_lever:
-        self.events.append({
-          "type": "left_lever_press",
-          "timestamp": current_time,
-          "duration": current_time - self.lever_press_start_time
-        })
-      if right_lever:
-        self.events.append({
-          "type": "right_lever_press",
-          "timestamp": current_time,
-          "duration": current_time - self.lever_press_start_time
-        })
     elif self.is_lever_pressed and not (left_lever or right_lever) and not self.reward_triggered:
       # Check for lever release
       log("Lever press released", "info")
@@ -786,10 +857,7 @@ class Stage3(Trial):
       if current_time - self.cue_start_time >= self.cue_duration:
         self.visual_cue = False
         log("Cue duration elapsed without lever press", "info")
-        self.events.append({
-          "type": "cue_timeout",
-          "timestamp": current_time
-        })
+        self.add_event(TRIAL_EVENTS["TRIAL_CUE_TIMEOUT"])
         # Trial failure
         self.add_data("trial_outcome", TrialOutcome.FAILURE_NOLEVER)
         return False
@@ -813,10 +881,7 @@ class Stage3(Trial):
       self.delivered_water = True
       self.water_start_time = current_time
       log("Water delivery started", "success")
-      self.events.append({
-        "type": "water_delivery_start",
-        "timestamp": current_time
-      })
+      self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
 
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
@@ -824,10 +889,7 @@ class Stage3(Trial):
         self.io.set_water_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
-        self.events.append({
-          "type": "water_delivery_complete",
-          "timestamp": current_time
-        })
+        self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
 
   def _update_nose_port_state(self):
     """Update nose port light and visual cue based on nose port entry"""

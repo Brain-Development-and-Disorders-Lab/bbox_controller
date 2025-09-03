@@ -13,13 +13,12 @@ Use the *Connection* frame to connect to the device using an IP address and port
 **Basic Experiments**: To run a basic experiment, enter the animal ID in the *Experiment Management* frame and click the *Start* button.
 
 **Timeline Experiments**: For advanced experiment protocols, use the timeline management system:
+
 1. Click *Edit Timeline* to open the timeline editor
 2. Create custom experiment protocols with multiple trial types
 3. Save and manage timelines
 
 ## Device
-
-Both `input` and `output` controllers are implemented. Inputs include levers and other sensors, outputs include LEDs and display modules.
 
 ### Simulation
 
@@ -71,47 +70,86 @@ The startup script generates three log files in the `src/device/logs/` directory
 
 These are the default credentials for connecting to the device's WiFi network.
 
-## Data Management
+## Data Files
 
-Datasets are stored under the `src/device/data` directory in individual JSON files named `[Animal ID]_[Date]_[Time].json`. Currently, datasets are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS.
+Data files are stored under the `src/device/data` directory in individual JSON files named `[Animal ID]_[Date]_[Time].json`. A data file is generated for *each* experiment run. Currently, data files are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS. All timestamps use ISO 8601 format (`YYYY-MM-DDTHH:MM:SS.microseconds`). The major headings within a data file are listed below, and an example is also shown.
 
-Datasets follow this format:
+### `experiment_metadata`
+
+Contains metadata about the experiment session including animal identification, timing, configuration parameters, and the experiment definition with trial specifications.
+
+### `experiment_trials`
+
+Records all trials during the experiment, including behavioral events, trial outcomes, and timings. Each trial contains a chronological sequence of events with timestamps.
+
+### `experiment_statistics`
+
+Provides summary statistics for the entire experiment session, including counts of lever presses, nose pokes, and water deliveries.
+
+Example Output:
 
 ```json
 {
-  "metadata": {
-    "animal_id": [Animal ID],
-    "start_time": [Starting Timestamp],
-    "end_time": [Ending Timestamp],
-    "trials": [
-      {
-        "name": [Trial Name],
-        "timestamp": [Starting Timestamp]
-      },
-      ...
-    ]
+  "experiment_metadata": {
+    "animal_id": "test_00",
+    "experiment_start": "2025-08-29T11:12:18.836449",
+    "experiment_end": "2025-08-29T11:12:35.709546",
+    "config": {
+      "iti_minimum": 100,
+      "iti_maximum": 1000,
+      "response_limit": 1000,
+      "cue_minimum": 5000,
+      "cue_maximum": 10000,
+      "hold_minimum": 100,
+      "hold_maximum": 1000,
+      "valve_open": 100,
+      "punish_time": 1000
+    },
+    "experiment_file": {
+      "name": "Test Experiment",
+      "trials": [
+        {
+          "type": "Stage3",
+          "id": "Stage3_0",
+          "parameters": {
+            "cue_duration": 5000,
+            "response_limit": 1000,
+            "water_delivery_duration": 2000
+          }
+        }
+      ],
+      "version": "1.0",
+      "loop": true
+    }
   },
-  "trials": [
+  "experiment_trials": [
     {
-      "trial_outcome": [Outcome Code],
+      "trial_outcome": "success",
       "events": [
         {
-          "type": [Event Type],
-          "timestamp": [Event Timestamp]
+          "type": "left_lever_press",
+          "timestamp": "2025-08-29T11:12:26.558849"
         },
-        ...
+        {
+          "type": "nose_port_entry",
+          "timestamp": "2025-08-29T11:12:28.607925"
+        },
+        {
+          "type": "reward_triggered",
+          "timestamp": "2025-08-29T11:12:30.101765"
+        }
       ],
-      "timestamp": [Starting Timestamp],
-      "trial_type": [Trial Name]
-      // ... Other Trial Parameters ...
-    },
-    ...
+      "trial_start": "2025-08-29T11:12:31.892916",
+      "trial_end": "2025-08-29T11:12:31.892917",
+      "trial_type": "trial_stage_3"
+    }
   ],
-  "task": {
-    "config": {
-      // [Variable Name]: [Variable Value], ...
-    },
-    "timestamp": [Starting Task Timestamp]
+  "experiment_statistics": {
+    "nose_pokes": 3,
+    "left_lever_presses": 2,
+    "right_lever_presses": 2,
+    "trial_count": 4,
+    "water_deliveries": 1
   }
 }
 ```
@@ -119,10 +157,6 @@ Datasets follow this format:
 ### Version Tracking
 
 The device code includes version tracking to help identify which version is running on the device. The version is stored in the shared module and is displayed on the device screen and logged in the control panel.
-
-- Displayed on the device's waiting screen
-- Sent to the control panel via WebSocket
-- Logged in the control panel console when connected
 
 ## Issues and Feedback
 

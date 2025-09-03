@@ -87,3 +87,34 @@ AVAILABLE_TRIAL_TYPES = {
         }
     }
 }
+
+# Event types
+TRIAL_EVENTS = {
+    # Lever events
+    "LEFT_LEVER_PRESS": "left_lever_press",
+    "LEFT_LEVER_RELEASE": "left_lever_release",
+    "RIGHT_LEVER_PRESS": "right_lever_press",
+    "RIGHT_LEVER_RELEASE": "right_lever_release",
+
+    # Nose port events
+    "NOSE_PORT_ENTRY": "nose_port_entry",
+    "NOSE_PORT_EXIT": "nose_port_exit",
+
+    # Water delivery events
+    "WATER_DELIVERY_START": "water_delivery_start",
+    "WATER_DELIVERY_COMPLETE": "water_delivery_complete",
+
+    # Reward events
+    "REWARD_TRIGGERED": "reward_triggered",
+
+    # Visual cue events
+    "VISUAL_CUE_START": "visual_cue_start",
+    "VISUAL_CUE_END": "visual_cue_end",
+
+    # Trial state events
+    "TRIAL_START": "trial_start",
+    "TRIAL_END": "trial_end",
+
+    # Trial error events
+    "TRIAL_CUE_TIMEOUT": "trial_cue_timeout",
+}

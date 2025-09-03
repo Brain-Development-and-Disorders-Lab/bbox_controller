@@ -48,7 +48,7 @@ def log(message, state="info"):
         _device_message_queue.put({
             "type": "device_log",
             "data": {
-                "message": formatted_message,
+                "message": message,
                 "state": state
             }
         })

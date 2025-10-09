@@ -14,6 +14,8 @@ import threading
 import asyncio
 import websockets
 import queue
+import socket
+import subprocess
 from dataclasses import asdict
 
 from shared.constants import *
@@ -103,21 +105,60 @@ class Device:
     self._running = True
     self._websocket_server = None
 
+  def _get_local_ip(self):
+    """Get the local IP address of the device for LAN connections"""
+    try:
+      # Method 1: Try hostname -I
+      result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=1)
+      if result.returncode == 0:
+        ips = result.stdout.strip().split()
+        for ip in ips:
+          if ip and not ip.startswith('127.') and not ip.startswith('::'):
+            return ip
+    except:
+      pass
+
+    try:
+      # Method 2: Try ifconfig
+      result = subprocess.run(['ifconfig'], capture_output=True, text=True, timeout=1)
+      if result.returncode == 0:
+        for line in result.stdout.split('\n'):
+          if 'inet ' in line and '127.0.0.1' not in line:
+            parts = line.split()
+            ip = parts[1] if len(parts) > 1 else None
+            if ip and not ip.startswith('127.'):
+              return ip
+    except:
+      pass
+
+    return "127.0.0.1"
+
   def _render_waiting_screen(self):
     """Render the waiting screen with timeline upload message"""
     self.screen.fill((0, 0, 0))
 
-    text = self.font.render("Waiting...", True, (255, 255, 255))
-    text_rect = text.get_rect(center=(self.width // 2, self.height // 2))
-    self.screen.blit(text, text_rect)
-    version_font = pygame.font.SysFont("Arial", 24)
-    version_text = version_font.render(f"Version: {self.version}", True, (150, 150, 150))
-    version_rect = version_text.get_rect(center=(self.width // 2, self.height // 2 + 50))
+    # Main "Waiting for connection..." text in center
+    main_font = pygame.font.SysFont("Arial", 48)
+    main_text = main_font.render("Waiting for connection...", True, (255, 255, 255))
+    main_rect = main_text.get_rect(center=(self.width // 2, self.height // 2))
+    self.screen.blit(main_text, main_rect)
+
+    # IP address beneath main text
+    ip_address = self._get_local_ip()
+    ip_font = pygame.font.SysFont("Arial", 32)
+    ip_text = ip_font.render(ip_address, True, (255, 255, 255))
+    ip_rect = ip_text.get_rect(center=(self.width // 2, self.height // 2 + 60))
+    self.screen.blit(ip_text, ip_rect)
+
+    # Version at bottom of screen
+    version_font = pygame.font.SysFont("Arial", 20)
+    version_text = version_font.render(f"Version: {self.version}", True, (255, 255, 255))
+    version_rect = version_text.get_rect(center=(self.width // 2, self.height - 30))
     self.screen.blit(version_text, version_rect)
 
+    # Simulation indicators in top left corner (if in simulation mode)
     if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
-      # Simulation controls
-      sim_font = pygame.font.SysFont("Arial", 20)
+      sim_font = pygame.font.SysFont("Arial", 16)
       input_states = self.io.get_input_states()
       state_text = [
         f"Left Lever: {'PRESSED' if input_states['left_lever'] else 'RELEASED'}",
@@ -136,9 +177,7 @@ class Device:
           color = (255, 100, 100)
 
         line_surface = sim_font.render(line, True, color)
-        line_rect = line_surface.get_rect(
-          center=(self.width // 2, self.height // 2 + 100 + i * 25)
-        )
+        line_rect = line_surface.get_rect(topleft=(20, 20 + i * 20))
         self.screen.blit(line_surface, line_rect)
 
     pygame.display.flip()

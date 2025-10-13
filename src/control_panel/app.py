@@ -279,7 +279,7 @@ class ControlPanel(tk.Frame):
     tk.Entry(connection_frame, textvariable=self.ip_address_var, width=15).pack(side=tk.LEFT, padx=(0, 15))
     tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT, padx=(0, 5))
     tk.Entry(connection_frame, textvariable=self.port_var, width=6).pack(side=tk.LEFT, padx=(0, 15))
-    self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_to_device)
+    self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_websocket)
     self.connect_button.pack(side=tk.LEFT, padx=(0, 5))
     self.disconnect_button = tk.Button(connection_frame, text="Disconnect", font="Arial 10", command=self.disconnect_from_device, state=tk.DISABLED)
     self.disconnect_button.pack(side=tk.LEFT, padx=(0, 15))
@@ -801,7 +801,7 @@ class ControlPanel(tk.Frame):
     else:
       self.log(f"Invalid command: {command}", "error")
 
-  def connect_to_device(self):
+  def connect_websocket(self):
     """
     Connects to the device.
     """
@@ -810,23 +810,25 @@ class ControlPanel(tk.Frame):
       port = self.port_var.get()
       websocket_url = f"ws://{ip_address}:{port}"
 
-    # Attempt to connect to the WebSocket service for 10 seconds
-    self.log(f"Attempting to connect to {websocket_url}", "info")
-    self.ws = websocket.WebSocketApp(websocket_url,
-                                        on_message=self.on_message,
-                                        on_error=self.on_error,
-                                        on_close=self.on_close)
-    self.ws_thread = threading.Thread(target=self.run_websocket)
-    self.ws_thread.start()
+      # Attempt to connect to the WebSocket service for 10 seconds
+      self.log(f"Attempting to connect to {websocket_url}", "info")
+      self.ws = websocket.WebSocketApp(websocket_url,
+                                          on_message=self.on_message,
+                                          on_error=self.on_error,
+                                          on_close=self.on_close)
+      self.ws_thread = threading.Thread(target=self.run_websocket)
+      self.ws_thread.start()
 
-    # Wait for connection attempt
-    for _ in range(20):
-      if self.ws.sock and self.ws.sock.connected:
-        self.on_connect()
-        return
-      time.sleep(0.5)
+      # Wait for connection attempt
+      for _ in range(20):
+        if self.ws.sock and self.ws.sock.connected:
+          self.on_connect()
+          return
+        time.sleep(0.5)
 
-    self.log("Failed to connect to the device within 10 seconds", "error")
+      self.log("Failed to connect to the device within 10 seconds", "error")
+    else:
+      self.log("Already connected to the device", "info")
 
   def disconnect_from_device(self):
     """

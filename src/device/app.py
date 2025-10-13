@@ -105,6 +105,9 @@ class Device:
     self._running = True
     self._websocket_server = None
 
+    # Connection state
+    self._control_panel_connected = False
+
   def _get_local_ip(self):
     """Get the local IP address of the device for LAN connections"""
     try:
@@ -137,9 +140,12 @@ class Device:
     """Render the waiting screen with timeline upload message"""
     self.screen.fill((0, 0, 0))
 
-    # Main "Waiting for connection..." text in center
+    # Status text in center
     main_font = pygame.font.SysFont("Arial", 48)
-    main_text = main_font.render("Waiting for connection...", True, (255, 255, 255))
+    if self._control_panel_connected:
+      main_text = main_font.render("Ready", True, (255, 255, 255))
+    else:
+      main_text = main_font.render("Waiting for connection...", True, (255, 255, 255))
     main_rect = main_text.get_rect(center=(self.width // 2, self.height // 2))
     self.screen.blit(main_text, main_rect)
 
@@ -640,6 +646,7 @@ class Device:
     """Clean up resources before shutdown"""
     if self._experiment_started:
       self.stop_experiment()
+    self._control_panel_connected = False
     pygame.quit()
 
   def reset_test_state(self):
@@ -681,6 +688,8 @@ async def send_state_message(websocket):
 async def handle_connection(websocket, device: Device):
   """Handle a single websocket connection"""
   try:
+    device._control_panel_connected = True
+
     message_sender_task = asyncio.create_task(send_queued_messages(websocket))
     state_sender_task = asyncio.create_task(send_state_message(websocket))
 
@@ -714,6 +723,7 @@ async def handle_connection(websocket, device: Device):
   except websockets.exceptions.ConnectionClosed:
     pass
   finally:
+    device._control_panel_connected = False
     device.reset_test_state()
     await websocket.close()
 

@@ -146,15 +146,15 @@ class Device:
       simulated_components.append("Displays")
 
     # Draw orange warning banner if any components are simulated
-    banner_height = 40
+    banner_height = 32
     if simulated_components:
       # Orange banner background
       banner_rect = pygame.Rect(0, 0, self.width, banner_height)
       pygame.draw.rect(self.screen, (255, 165, 0), banner_rect)  # Orange color
 
       # Warning text
-      warning_font = pygame.font.SysFont("Arial", 24)
-      warning_text = f"Simulated: {', '.join(simulated_components)}"
+      warning_font = pygame.font.SysFont("Arial", 18)
+      warning_text = f"Simulating: {', '.join(simulated_components)}"
       warning_surface = warning_font.render(warning_text, True, (0, 0, 0))  # Black text
       warning_rect = warning_surface.get_rect(center=(self.width // 2, banner_height // 2))
       self.screen.blit(warning_surface, warning_rect)
@@ -188,32 +188,35 @@ class Device:
     self.screen.blit(version_text, version_rect)
 
     # Simulation indicators in top left corner (if in simulation mode)
-    if hasattr(self.gpio, '_simulated_inputs') and self.gpio._simulated_inputs:
+    if self.gpio.is_simulating_gpio():
       sim_font = pygame.font.SysFont("Arial", 16)
       input_states = self.gpio.get_gpio_state()
       state_text = [
+        f"Simulated GPIO:",
         f"Left Lever: {'PRESSED' if input_states['input_lever_left'] else 'RELEASED'}",
         f"Right Lever: {'PRESSED' if input_states['input_lever_right'] else 'RELEASED'}",
-        f"Nose Poke: {'ACTIVE' if input_states['input_ir'] else 'INACTIVE'}",
-        f"Water Port: {'ON' if input_states['input_port'] else 'OFF'}",
-        f"Left Lever Light: {'ON' if input_states['led_lever_left'] else 'OFF'}",
-        f"Nose Light: {'ON' if input_states['led_port'] else 'OFF'}",
-        f"Right Lever Light: {'ON' if input_states['led_lever_right'] else 'OFF'}"
+        f"Nose Port IR: {'ACTIVE' if input_states['input_ir'] else 'INACTIVE'}",
+        f"Nost Port Water: {'ON' if input_states['input_port'] else 'OFF'}",
+        f"Left Lever LED: {'ON' if input_states['led_lever_left'] else 'OFF'}",
+        f"Nose Port LED: {'ON' if input_states['led_port'] else 'OFF'}",
+        f"Right Lever LED: {'ON' if input_states['led_lever_right'] else 'OFF'}"
       ]
 
       # Adjust top position if banner is present
-      top_y = 20
+      top_y = 10
       if simulated_components:
-        top_y = banner_height + 20
+        top_y = banner_height + 10
 
       for i, line in enumerate(state_text):
-        if 'PRESSED' in line or 'ACTIVE' in line or 'ON' in line:
+        if "PRESSED" in line or "ACTIVE" in line or "ON" in line:
           color = (0, 255, 0)
+        elif "Simulated" in line:
+          color = (255, 255, 255)
         else:
           color = (255, 100, 100)
 
         line_surface = sim_font.render(line, True, color)
-        line_rect = line_surface.get_rect(topleft=(20, top_y + i * 20))
+        line_rect = line_surface.get_rect(topleft=(10, top_y + i * 20))
         self.screen.blit(line_surface, line_rect)
 
     pygame.display.flip()
@@ -433,7 +436,7 @@ class Device:
     self.test_state_manager.set_test_state("test_water_delivery", TEST_STATES["RUNNING"])
     asyncio.create_task(self._test_water_delivery(duration_ms))
 
-  def _test_levers(self):
+  def _test_input_levers(self):
     # Step 2: Test that the left lever can be moved to 1.0
     log("Testing left lever", "start")
     log("Waiting for left lever input...", "info")
@@ -446,13 +449,13 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
+        self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["FAILED"])
         _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
         log("Left lever input timed out", "error")
         return
 
     if input_state["input_lever_left"] != True:
-      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Left lever did not move to 1.0", "error")
       return
@@ -471,37 +474,37 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
+        self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["FAILED"])
         _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
         log("Right lever input timed out", "error")
         return
 
     if input_state["input_lever_right"] != True:
-      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Right lever did not move to 1.0", "error")
       return
 
     log("Right lever test passed", "success")
-    if self.test_state_manager.get_test_state("test_levers") == TEST_STATES["RUNNING"]:
-      self.test_state_manager.set_test_state("test_levers", TEST_STATES["PASSED"])
+    if self.test_state_manager.get_test_state("test_input_levers") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["PASSED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Levers test passed", "success")
 
-  def test_levers(self):
-    log("Testing levers", "start")
-    self.test_state_manager.set_test_state("test_levers", TEST_STATES["RUNNING"])
+  def test_input_levers(self):
+    log("Testing input levers", "start")
+    self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["RUNNING"])
 
     # Step 1: Test that both levers default to 0.0
     input_state = self.gpio.get_gpio_state()
     if input_state["input_lever_left"] != False:
-      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Left lever did not default to 0.0", "error")
       return
 
     if input_state["input_lever_right"] != False:
-      self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_input_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Right lever did not default to 0.0", "error")
       return
@@ -509,10 +512,10 @@ class Device:
     log("Levers defaulted to 0.0", "success")
 
     # Run the test in a separate thread
-    lever_test_thread = threading.Thread(target=self._test_levers)
+    lever_test_thread = threading.Thread(target=self._test_input_levers)
     lever_test_thread.start()
 
-  def _test_ir(self):
+  def _test_input_ir(self):
     # Step 1: Test that the IR is broken
     log("Waiting for IR input...", "info")
     running_input_test = True
@@ -524,53 +527,53 @@ class Device:
 
       # Ensure test doesn't run indefinitely
       if time.time() - running_input_test_start_time > INPUT_TEST_TIMEOUT:
-        self.test_state_manager.set_test_state("test_ir", TEST_STATES["FAILED"])
+        self.test_state_manager.set_test_state("test_input_ir", TEST_STATES["FAILED"])
         _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
         log("Timed out while waiting for IR input", "error")
         return
 
     if input_state["input_ir"] != False:
-      self.test_state_manager.set_test_state("test_ir", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_input_ir", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("No IR input detected", "error")
       return
 
     # Set test to passed
-    if self.test_state_manager.get_test_state("test_ir") == TEST_STATES["RUNNING"]:
-      self.test_state_manager.set_test_state("test_ir", TEST_STATES["PASSED"])
+    if self.test_state_manager.get_test_state("test_input_ir") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_input_ir", TEST_STATES["PASSED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("IR test passed", "success")
 
-  def test_ir(self):
+  def test_input_ir(self):
     log("Testing IR", "start")
-    self.test_state_manager.set_test_state("test_ir", TEST_STATES["RUNNING"])
+    self.test_state_manager.set_test_state("test_input_ir", TEST_STATES["RUNNING"])
 
     # Run the test in a separate thread
-    ir_test_thread = threading.Thread(target=self._test_ir)
-    ir_test_thread.start()
+    input_ir_test_thread = threading.Thread(target=self._test_input_ir)
+    input_ir_test_thread.start()
 
-  async def _test_nose_light(self, duration_ms=2000):
+  async def _test_led_port(self, duration_ms=2000):
     try:
       # Turn on the nose light
       self.gpio.set_led_port(True)
       await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
       self.gpio.set_led_port(False)
     except Exception as e:
-      self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_led_port", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log(f"Could not control nose light: {str(e)}", "error")
+      log(f"Could not control nose port LED: {str(e)}", "error")
 
-    if self.test_state_manager.get_test_state("test_nose_light") == TEST_STATES["RUNNING"]:
-      self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["PASSED"])
+    if self.test_state_manager.get_test_state("test_led_port") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_led_port", TEST_STATES["PASSED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log(f"Nose light test passed (duration: {duration_ms}ms)", "success")
+      log(f"Nose port LED test passed (duration: {duration_ms}ms)", "success")
 
-  def test_nose_light(self, duration_ms=2000):
-    log(f"Testing nose light for {duration_ms}ms", "start")
-    self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["RUNNING"])
-    asyncio.create_task(self._test_nose_light(duration_ms))
+  def test_led_port(self, duration_ms=2000):
+    log(f"Testing nose port LED for {duration_ms}ms", "start")
+    self.test_state_manager.set_test_state("test_led_port", TEST_STATES["RUNNING"])
+    asyncio.create_task(self._test_led_port(duration_ms))
 
-  async def _test_lever_lights(self, duration_ms=2000):
+  async def _test_led_levers(self, duration_ms=2000):
     try:
       # Turn on the lever lights
       self.gpio.set_led_lever_left(True)
@@ -579,19 +582,19 @@ class Device:
       self.gpio.set_led_lever_left(False)
       self.gpio.set_led_lever_right(False)
     except Exception as e:
-      self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["FAILED"])
+      self.test_state_manager.set_test_state("test_led_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log(f"Could not control lever lights: {str(e)}", "error")
+      log(f"Could not control lever LEDs: {str(e)}", "error")
 
-    if self.test_state_manager.get_test_state("test_lever_lights") == TEST_STATES["RUNNING"]:
-      self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["PASSED"])
+    if self.test_state_manager.get_test_state("test_led_levers") == TEST_STATES["RUNNING"]:
+      self.test_state_manager.set_test_state("test_led_levers", TEST_STATES["PASSED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
-      log(f"Lever lights test passed (duration: {duration_ms}ms)", "success")
+      log(f"Lever LEDs test passed (duration: {duration_ms}ms)", "success")
 
-  def test_lever_lights(self, duration_ms=2000):
-    log(f"Testing lever lights for {duration_ms}ms", "start")
-    self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["RUNNING"])
-    asyncio.create_task(self._test_lever_lights(duration_ms))
+  def test_led_levers(self, duration_ms=2000):
+    log(f"Testing lever LEDs for {duration_ms}ms", "start")
+    self.test_state_manager.set_test_state("test_led_levers", TEST_STATES["RUNNING"])
+    asyncio.create_task(self._test_led_levers(duration_ms))
 
   async def _test_displays(self, duration_ms=2000):
     try:
@@ -628,36 +631,36 @@ class Device:
           log(f"Invalid duration for water delivery test: {parts[1]}", "error")
       else:
         self.test_water_delivery()
-    elif command == "test_levers":
-      self.test_levers()
-    elif command == "test_ir":
-      self.test_ir()
-    elif command == "test_nose_light":
-      self.test_nose_light()
-    elif command.startswith("test_nose_light"):
-      # Parse duration from command: "test_nose_light <duration_ms>"
+    elif command == "test_input_levers":
+      self.test_input_levers()
+    elif command == "test_input_ir":
+      self.test_input_ir()
+    elif command == "test_led_port":
+      self.test_led_port()
+    elif command.startswith("test_led_port"):
+      # Parse duration from command: "test_led_port <duration_ms>"
       parts = command.split(" ")
       if len(parts) > 1:
         try:
           duration_ms = int(parts[1])
-          self.test_nose_light(duration_ms)
+          self.test_led_port(duration_ms)
         except ValueError:
-          log(f"Invalid duration for nose light test: {parts[1]}", "error")
+          log(f"Invalid duration for nose port LED test: {parts[1]}", "error")
       else:
-        self.test_nose_light()
+        self.test_led_port()
     elif command == "test_lever_lights":
-      self.test_lever_lights()
-    elif command.startswith("test_lever_lights"):
-      # Parse duration from command: "test_lever_lights <duration_ms>"
+      self.test_led_levers()
+    elif command.startswith("test_led_levers"):
+      # Parse duration from command: "test_led_levers <duration_ms>"
       parts = command.split(" ")
       if len(parts) > 1:
         try:
           duration_ms = int(parts[1])
-          self.test_lever_lights(duration_ms)
+          self.test_led_levers(duration_ms)
         except ValueError:
-          log(f"Invalid duration for lever lights test: {parts[1]}", "error")
+          log(f"Invalid duration for lever LEDs test: {parts[1]}", "error")
       else:
-        self.test_lever_lights()
+        self.test_led_levers()
     elif command == "test_displays":
       self.test_displays()
     elif command.startswith("test_displays"):

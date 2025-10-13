@@ -91,11 +91,13 @@ class TestStatistics(unittest.TestCase):
 
         try:
             from device.core.Trials import Interval
+            from device.hardware.GPIOController import GPIOController
             from shared.managers import StatisticsManager
             stats_controller = StatisticsManager()
+            gpio = GPIOController()
 
             # Create trial with statistics manager
-            trial = Interval(statistics=stats_controller)
+            trial = Interval(statistics=stats_controller, gpio=gpio)
 
             # Verify initial trial count
             initial_count = stats_controller.get_statistics()["trial_count"]

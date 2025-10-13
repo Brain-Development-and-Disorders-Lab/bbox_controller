@@ -17,18 +17,17 @@ os.chdir(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'shared'))
 pygame.init()
 
 from device.core.Trials import Stage1
-from device.hardware.IOController import IOController
+from device.hardware.GPIOController import GPIOController
 
 def test_stage1_nose_port_exit():
     """Test that Stage1 properly waits for nose port exit"""
     print("Testing Stage1 nose port exit behavior...")
 
     # Create IO controller in simulation mode
-    io = IOController()
+    gpio = GPIOController()
 
     # Create Stage1 trial (config will be loaded automatically from current directory)
-    trial = Stage1()
-    trial.io = io
+    trial = Stage1(gpio=gpio)
 
     # Mock screen and other required attributes
     trial.screen = None
@@ -44,7 +43,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port entry
     print("\n1. Simulating nose port entry...")
-    io.simulate_nose_poke(False)  # False means nose is IN (entry)
+    gpio.simulate_input_ir(False)  # False means nose is IN (entry)
 
     # Update trial
     trial.update([])
@@ -66,7 +65,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port exit
     print("\n3. Simulating nose port exit...")
-    io.simulate_nose_poke(True)  # True means nose is OUT (exit)
+    gpio.simulate_input_ir(True)  # True means nose is OUT (exit)
 
     # Update trial
     should_continue = trial.update([])

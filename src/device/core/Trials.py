@@ -291,7 +291,7 @@ class Stage1(Trial):
           return False
 
     # Track nose port state changes
-    current_nose_state = self.get_gpio_state()["nose_poke"]
+    current_nose_state = self.get_gpio_state()["input_ir"]
 
     if not current_nose_state and not self.nose_port_entry:
       # Detect nose port entry

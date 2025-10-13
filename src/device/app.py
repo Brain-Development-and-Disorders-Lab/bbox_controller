@@ -14,16 +14,14 @@ import threading
 import asyncio
 import websockets
 import queue
-import socket
 import subprocess
-from dataclasses import asdict
 
 from shared.constants import *
 from shared.models import Config
 from shared.managers import CommunicationMessageBuilder, CommunicationMessageParser, TestStateManager, StatisticsManager
 from shared import VERSION
 
-from device.hardware.IOController import IOController
+from device.hardware.GPIOController import GPIOController
 from device.hardware.DisplayController import DisplayController
 from device.hardware.DataController import DataController
 from device.core.ExperimentProcessor import ExperimentProcessor
@@ -46,7 +44,7 @@ class Device:
     self.config = None
 
     self.randomness = Randomness()
-    self.io = IOController()
+    self.gpio = GPIOController()
     self.display = DisplayController()
     self.experiment_processor = ExperimentProcessor(self)
     self.statistics_controller = StatisticsManager()
@@ -54,28 +52,28 @@ class Device:
 
     # Input states
     self._input_states = {
-      "left_lever": False,
-      "right_lever": False,
-      "nose_poke": False,
-      "water_port": False,
-      "nose_light": False,
-      "left_lever_light": False,
-      "right_lever_light": False,
+      "input_lever_left": False,
+      "input_lever_right": False,
+      "input_ir": False,
+      "input_port": False,
+      "led_port": False,
+      "led_lever_left": False,
+      "led_lever_right": False
     }
     self._previous_input_states = {
-      "left_lever": False,
-      "right_lever": False,
-      "nose_poke": False,
-      "water_port": False,
-      "nose_light": False,
-      "left_lever_light": False,
-      "right_lever_light": False,
+      "input_lever_left": False,
+      "input_lever_right": False,
+      "input_ir": False,
+      "input_port": False,
+      "led_port": False,
+      "led_lever_left": False,
+      "led_lever_right": False
     }
 
     # Initialize pygame
     pygame.init()
     screen_info = pygame.display.Info()
-    is_simulation = hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs
+    is_simulation = self.gpio.is_simulating_gpio()
 
     if is_simulation:
       # Windowed mode for simulation
@@ -140,20 +138,47 @@ class Device:
     """Render the waiting screen with timeline upload message"""
     self.screen.fill((0, 0, 0))
 
-    # Status text in center
+    # Check for hardware simulation warnings
+    simulated_components = []
+    if self.gpio.is_simulating_gpio():
+      simulated_components.append("GPIO")
+    if self.display.is_simulating_displays():
+      simulated_components.append("Displays")
+
+    # Draw orange warning banner if any components are simulated
+    banner_height = 40
+    if simulated_components:
+      # Orange banner background
+      banner_rect = pygame.Rect(0, 0, self.width, banner_height)
+      pygame.draw.rect(self.screen, (255, 165, 0), banner_rect)  # Orange color
+
+      # Warning text
+      warning_font = pygame.font.SysFont("Arial", 24)
+      warning_text = f"Simulated: {', '.join(simulated_components)}"
+      warning_surface = warning_font.render(warning_text, True, (0, 0, 0))  # Black text
+      warning_rect = warning_surface.get_rect(center=(self.width // 2, banner_height // 2))
+      self.screen.blit(warning_surface, warning_rect)
+
+    # Status text in center (adjusted for banner)
     main_font = pygame.font.SysFont("Arial", 48)
     if self._control_panel_connected:
       main_text = main_font.render("Ready", True, (255, 255, 255))
     else:
       main_text = main_font.render("Waiting for connection...", True, (255, 255, 255))
-    main_rect = main_text.get_rect(center=(self.width // 2, self.height // 2))
+
+    # Adjust center position if banner is present
+    center_y = self.height // 2
+    if simulated_components:
+      center_y = (self.height - banner_height) // 2 + banner_height
+
+    main_rect = main_text.get_rect(center=(self.width // 2, center_y))
     self.screen.blit(main_text, main_rect)
 
     # IP address beneath main text
     ip_address = self._get_local_ip()
     ip_font = pygame.font.SysFont("Arial", 32)
     ip_text = ip_font.render(ip_address, True, (255, 255, 255))
-    ip_rect = ip_text.get_rect(center=(self.width // 2, self.height // 2 + 60))
+    ip_rect = ip_text.get_rect(center=(self.width // 2, center_y + 60))
     self.screen.blit(ip_text, ip_rect)
 
     # Version at bottom of screen
@@ -163,18 +188,23 @@ class Device:
     self.screen.blit(version_text, version_rect)
 
     # Simulation indicators in top left corner (if in simulation mode)
-    if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
+    if hasattr(self.gpio, '_simulated_inputs') and self.gpio._simulated_inputs:
       sim_font = pygame.font.SysFont("Arial", 16)
-      input_states = self.io.get_input_states()
+      input_states = self.gpio.get_gpio_state()
       state_text = [
-        f"Left Lever: {'PRESSED' if input_states['left_lever'] else 'RELEASED'}",
-        f"Right Lever: {'PRESSED' if input_states['right_lever'] else 'RELEASED'}",
-        f"Nose Poke: {'ACTIVE' if input_states['nose_poke'] else 'INACTIVE'}",
-        f"Water Port: {'ON' if input_states['water_port'] else 'OFF'}",
-        f"Left Lever Light: {'ON' if input_states['left_lever_light'] else 'OFF'}",
-        f"Nose Light: {'ON' if input_states['nose_light'] else 'OFF'}",
-        f"Right Lever Light: {'ON' if input_states['right_lever_light'] else 'OFF'}"
+        f"Left Lever: {'PRESSED' if input_states['input_lever_left'] else 'RELEASED'}",
+        f"Right Lever: {'PRESSED' if input_states['input_lever_right'] else 'RELEASED'}",
+        f"Nose Poke: {'ACTIVE' if input_states['input_ir'] else 'INACTIVE'}",
+        f"Water Port: {'ON' if input_states['input_port'] else 'OFF'}",
+        f"Left Lever Light: {'ON' if input_states['led_lever_left'] else 'OFF'}",
+        f"Nose Light: {'ON' if input_states['led_port'] else 'OFF'}",
+        f"Right Lever Light: {'ON' if input_states['led_lever_right'] else 'OFF'}"
       ]
+
+      # Adjust top position if banner is present
+      top_y = 20
+      if simulated_components:
+        top_y = banner_height + 20
 
       for i, line in enumerate(state_text):
         if 'PRESSED' in line or 'ACTIVE' in line or 'ON' in line:
@@ -183,7 +213,7 @@ class Device:
           color = (255, 100, 100)
 
         line_surface = sim_font.render(line, True, color)
-        line_rect = line_surface.get_rect(topleft=(20, 20 + i * 20))
+        line_rect = line_surface.get_rect(topleft=(20, top_y + i * 20))
         self.screen.blit(line_surface, line_rect)
 
     pygame.display.flip()
@@ -200,37 +230,37 @@ class Device:
         if event.key == pygame.K_ESCAPE:
           self._running = False
           return False
-        elif hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
+        elif self.gpio.is_simulating_gpio():
           if event.key == pygame.K_1: # Left lever press
-            self.io.simulate_left_lever(True)
+            self.gpio.simulate_input_lever_left(True)
           elif event.key == pygame.K_2: # Right lever press
-            self.io.simulate_right_lever(True)
+            self.gpio.simulate_input_lever_right(True)
           elif event.key == pygame.K_3: # Nose poke entry
-            self.io.simulate_nose_poke(False)
+            self.gpio.simulate_input_ir(False)
           elif event.key == pygame.K_SPACE: # Nose poke entry (existing)
-            self.io.simulate_nose_poke(False)
+            self.gpio.simulate_input_ir(False)
           elif event.key == pygame.K_j: # Left lever light
-            self.io.simulate_left_lever_light(True)
+            self.gpio.simulate_led_lever_left(True)
           elif event.key == pygame.K_k: # Nose light
-            self.io.simulate_nose_light(True)
+            self.gpio.simulate_led_port(True)
           elif event.key == pygame.K_l: # Right lever light
-            self.io.simulate_right_lever_light(True)
+            self.gpio.simulate_led_lever_right(True)
       elif event.type == pygame.KEYUP:
-        if hasattr(self.io, '_simulated_inputs') and self.io._simulated_inputs:
+        if self.gpio.is_simulating_gpio():
           if event.key == pygame.K_1: # Left lever release
-            self.io.simulate_left_lever(False)
+            self.gpio.simulate_input_lever_left(False)
           elif event.key == pygame.K_2: # Right lever release
-            self.io.simulate_right_lever(False)
+            self.gpio.simulate_input_lever_right(False)
           elif event.key == pygame.K_3: # Nose poke exit
-            self.io.simulate_nose_poke(True)
+            self.gpio.simulate_input_ir(True)
           elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
-            self.io.simulate_nose_poke(True)
+            self.gpio.simulate_input_ir(True)
           elif event.key == pygame.K_j: # Left lever light
-            self.io.simulate_left_lever_light(False)
+            self.gpio.simulate_led_lever_left(False)
           elif event.key == pygame.K_k: # Nose light
-            self.io.simulate_nose_light(False)
+            self.gpio.simulate_led_port(False)
           elif event.key == pygame.K_l: # Right lever light
-            self.io.simulate_right_lever_light(False)
+            self.gpio.simulate_led_lever_right(False)
 
     self._update_input_states_and_statistics()
 
@@ -265,7 +295,7 @@ class Device:
                 font=self.font,
                 width=self.width,
                 height=self.height,
-                io=self.io,
+                gpio=self.gpio,
                 display=self.display,
                 statistics=self.statistics_controller,
                 config=self.config
@@ -302,18 +332,18 @@ class Device:
 
   def _update_input_states_and_statistics(self):
     """Update input states and track statistics based on changes"""
-    current_input_states = self.io.get_input_states()
+    current_input_states = self.gpio.get_gpio_state()
     self._input_states = current_input_states.copy()
 
     if self._experiment_started:
       # Check for changes and update statistics
-      if not self._previous_input_states["nose_poke"] and current_input_states["nose_poke"]:
+      if not self._previous_input_states["input_ir"] and current_input_states["input_ir"]:
         self.statistics_controller.increment_stat("nose_pokes")
-      if not self._previous_input_states["left_lever"] and current_input_states["left_lever"]:
+      if not self._previous_input_states["input_lever_left"] and current_input_states["input_lever_left"]:
         self.statistics_controller.increment_stat("left_lever_presses")
-      if not self._previous_input_states["right_lever"] and current_input_states["right_lever"]:
+      if not self._previous_input_states["input_lever_right"] and current_input_states["input_lever_right"]:
         self.statistics_controller.increment_stat("right_lever_presses")
-      if not self._previous_input_states["water_port"] and current_input_states["water_port"]:
+      if not self._previous_input_states["input_port"] and current_input_states["input_port"]:
         self.statistics_controller.increment_stat("water_deliveries")
     self._previous_input_states = current_input_states.copy()
 
@@ -365,7 +395,7 @@ class Device:
       return
 
     # Reset all output IO
-    self.io.reset_all_outputs()
+    self.gpio.reset_all_outputs()
     self.display.clear_displays()
 
     # Stop the current experiment
@@ -385,9 +415,9 @@ class Device:
 
   async def _test_water_delivery(self, duration_ms=2000):
     try:
-      self.io.set_water_port(True)
+      self.gpio.set_input_port(True)
       await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
-      self.io.set_water_port(False)
+      self.gpio.set_input_port(False)
     except Exception as e:
       self.test_state_manager.set_test_state("test_water_delivery", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
@@ -410,8 +440,8 @@ class Device:
     running_input_test = True
     running_input_test_start_time = time.time()
     while running_input_test:
-      input_state = self.io.get_input_states()
-      if input_state["left_lever"] == True:
+      input_state = self.gpio.get_gpio_state()
+      if input_state["input_lever_left"] == True:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -421,7 +451,7 @@ class Device:
         log("Left lever input timed out", "error")
         return
 
-    if input_state["left_lever"] != True:
+    if input_state["input_lever_left"] != True:
       self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Left lever did not move to 1.0", "error")
@@ -435,8 +465,8 @@ class Device:
     log("Testing right lever", "start")
     log("Waiting for right lever input...", "info")
     while running_input_test:
-      input_state = self.io.get_input_states()
-      if input_state["right_lever"] == True:
+      input_state = self.gpio.get_gpio_state()
+      if input_state["input_lever_right"] == True:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -446,7 +476,7 @@ class Device:
         log("Right lever input timed out", "error")
         return
 
-    if input_state["right_lever"] != True:
+    if input_state["input_lever_right"] != True:
       self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Right lever did not move to 1.0", "error")
@@ -463,14 +493,14 @@ class Device:
     self.test_state_manager.set_test_state("test_levers", TEST_STATES["RUNNING"])
 
     # Step 1: Test that both levers default to 0.0
-    input_state = self.io.get_input_states()
-    if input_state["left_lever"] != False:
+    input_state = self.gpio.get_gpio_state()
+    if input_state["input_lever_left"] != False:
       self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Left lever did not default to 0.0", "error")
       return
 
-    if input_state["right_lever"] != False:
+    if input_state["input_lever_right"] != False:
       self.test_state_manager.set_test_state("test_levers", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("Right lever did not default to 0.0", "error")
@@ -488,8 +518,8 @@ class Device:
     running_input_test = True
     running_input_test_start_time = time.time()
     while running_input_test:
-      input_state = self.io.get_input_states()
-      if input_state["nose_poke"] == False:
+      input_state = self.gpio.get_gpio_state()
+      if input_state["input_ir"] == False:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -499,7 +529,7 @@ class Device:
         log("Timed out while waiting for IR input", "error")
         return
 
-    if input_state["nose_poke"] != False:
+    if input_state["input_ir"] != False:
       self.test_state_manager.set_test_state("test_ir", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("No IR input detected", "error")
@@ -522,9 +552,9 @@ class Device:
   async def _test_nose_light(self, duration_ms=2000):
     try:
       # Turn on the nose light
-      self.io.set_nose_light(True)
+      self.gpio.set_led_port(True)
       await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
-      self.io.set_nose_light(False)
+      self.gpio.set_led_port(False)
     except Exception as e:
       self.test_state_manager.set_test_state("test_nose_light", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
@@ -543,11 +573,11 @@ class Device:
   async def _test_lever_lights(self, duration_ms=2000):
     try:
       # Turn on the lever lights
-      self.io.set_left_lever_light(True)
-      self.io.set_right_lever_light(True)
+      self.gpio.set_led_lever_left(True)
+      self.gpio.set_led_lever_right(True)
       await asyncio.sleep(duration_ms / 1000)  # Convert milliseconds to seconds
-      self.io.set_left_lever_light(False)
-      self.io.set_right_lever_light(False)
+      self.gpio.set_led_lever_left(False)
+      self.gpio.set_led_lever_right(False)
     except Exception as e:
       self.test_state_manager.set_test_state("test_lever_lights", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
@@ -675,7 +705,7 @@ async def send_state_message(websocket):
   """
   while True:
     try:
-      state_data = CommunicationMessageBuilder.input_state(_device.io.get_input_states(), _device.version)
+      state_data = CommunicationMessageBuilder.input_state(_device.gpio.get_gpio_state(), _device.version)
       await websocket.send(json.dumps(state_data))
       if _device._experiment_started:
         stats_data = CommunicationMessageBuilder.statistics(_device.get_statistics())

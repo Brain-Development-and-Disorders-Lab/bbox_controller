@@ -4,6 +4,9 @@
 # Device logs and data
 src/device/data/
 
+# Control experiments
+src/control_panel/experiments/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

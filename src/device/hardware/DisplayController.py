@@ -6,6 +6,9 @@ Description: Handles the display of information on the behavior box
 License: MIT
 """
 
+from device.hardware.constants import DISPLAY_ADDRESS_LEFT, DISPLAY_ADDRESS_RIGHT
+from device.utils.logger import log
+
 from PIL import Image, ImageDraw, ImageFont
 import os
 import math
@@ -16,11 +19,27 @@ try:
   import adafruit_ssd1306
   SIMULATION_MODE = False
 except (ImportError, NotImplementedError):
-  print("Display interfaces not available - running in simulation mode")
+  log("Display interfaces not available, using simulated displays", "warning")
   SIMULATION_MODE = True
 
 class DisplayController:
   def __init__(self):
+    self._simulate_displays = SIMULATION_MODE
+
+    if not self._simulate_displays:
+      try:
+        # Setup I2C
+        i2c = busio.I2C(SCL, SDA)
+
+        # Try to initialize each display independently
+        self.display_left = self._init_display(i2c, DISPLAY_ADDRESS_LEFT, "left")
+        self.display_right = self._init_display(i2c, DISPLAY_ADDRESS_RIGHT, "right")
+      except (ValueError, OSError) as e:
+        log(f"Failed to initialize I2C bus: {e}", "error")
+        self._init_simulated_displays()
+    else:
+      self._init_simulated_displays()
+
     self.width = 128
     self.height = 64
 
@@ -31,22 +50,6 @@ class DisplayController:
     # Create drawing objects
     self.draw_left = ImageDraw.Draw(self.image_left)
     self.draw_right = ImageDraw.Draw(self.image_right)
-
-    if not SIMULATION_MODE:
-      try:
-        # Setup I2C
-        i2c = busio.I2C(SCL, SDA)
-
-        # Try to initialize each display independently
-        self.display_left = self._init_display(i2c, 0x3C, "left")
-        self.display_right = self._init_display(i2c, 0x3D, "right")
-      except (ValueError, OSError) as e:
-        print(f"Failed to initialize I2C bus: {e}")
-        print("Switching to full simulation mode")
-        self._init_simulation()
-    else:
-      # Initialize simulation mode displays
-      self._init_simulation()
 
     try:
       # Try system fonts in different locations
@@ -64,23 +67,26 @@ class DisplayController:
     except:
       self.font = ImageFont.load_default()
 
+  def is_simulating_displays(self):
+    """Check if the displays are in simulation mode"""
+    return self._simulate_displays
+
   def _init_display(self, i2c, address, name):
     """Initialize a single display, return DummyDisplay if fails"""
     try:
       display = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=address)
-      print(f"Successfully initialized {name} display at address 0x{address:02X}")
+      log(f"Successfully initialized {name} display at address 0x{address:02X}", "success")
       return display
     except (ValueError, OSError) as e:
-      print(f"Failed to initialize {name} display at address 0x{address:02X}: {e}")
-      print(f"Using simulation mode for {name} display")
+      log(f"Failed to initialize {name} display at address 0x{address:02X}: {e}", "error")
+      log(f"Using simulation mode for {name} display", "warning")
       return DummyDisplay(128, 64)
 
-  def _init_simulation(self):
-    """Initialize dummy displays for simulation mode."""
-    print("Initializing simulation mode displays...")
+  def _init_simulated_displays(self):
+    log("Initializing simulated displays...", "info")
     self.display_left = DummyDisplay(128, 64)
     self.display_right = DummyDisplay(128, 64)
-    print("Simulation mode displays initialized.")
+    log("Simulated displays initialized successfully", "success")
 
   def draw_test_pattern(self, side="both"):
     if side in ["left", "both"]:

@@ -37,38 +37,23 @@ You can run the device in simulation mode for development and testing without ph
 
 ### Hardware Usage
 
-The device controller runs only on the device and the device controller must be on the same network as the control panel software in order to communicate. This is accomplished by setting the Raspberry Pi to act as a wireless access point (AP) and connecting to it directly.
+The device controller runs on the device and communicates with the control panel software via WebSocket connections over the network.
 
-## Starting the Device and Access Point
+## Starting the Device
 
-The startup script is located in the `src/device` directory. To start both the WiFi Access Point and the device controller, run:
+The startup script is located in the `src/device` directory. To start the device controller, run:
 
 ```bash
 sudo ./start.sh
 ```
 
-For testing to avoid SSID conflicts, use the `--test` flag:
-```bash
-sudo ./start.sh --test
-```
-
-This is the only script you need to run. It will automatically set up the AP, launch the device controller, and handle all dependencies and logging. All logs are saved in the `logs/` directory.
+This is the only script you need to run. It will automatically launch the device controller and handle all dependencies and logging.
 
 ### Log Files
 
-The startup script generates three log files in the `src/device/logs/` directory:
+All logs are saved in the `logs/` directory:
 
-- **`startup.log`** - Main startup script execution and WiFi AP setup
-- **`ap.log`** - WiFi access point configuration and status
-- **`run.log`** - Device controller runtime output and experiment data
-
-## Default WiFi Access Point Settings
-
-- **SSID:** `BehaviorBox_0`
-- **Password:** `behaviorbox0`
-- **Device IP Address:** `192.168.4.1`
-
-These are the default credentials for connecting to the device's WiFi network.
+- **`device.log`** - Unified log file containing startup events, runtime output, and experiment data
 
 ## Data Files
 

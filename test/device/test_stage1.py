@@ -43,7 +43,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port entry
     print("\n1. Simulating nose port entry...")
-    gpio.simulate_input_ir(False)  # False means nose is IN (entry)
+    gpio.simulate_input_ir(True)  # True means nose is IN (entry)
 
     # Update trial
     trial.update([])
@@ -65,7 +65,7 @@ def test_stage1_nose_port_exit():
 
     # Simulate nose port exit
     print("\n3. Simulating nose port exit...")
-    gpio.simulate_input_ir(True)  # True means nose is OUT (exit)
+    gpio.simulate_input_ir(False)  # False means nose is OUT (exit)
 
     # Update trial
     should_continue = trial.update([])

@@ -239,9 +239,9 @@ class Device:
           elif event.key == pygame.K_2: # Right lever press
             self.gpio.simulate_input_lever_right(True)
           elif event.key == pygame.K_3: # Nose poke entry
-            self.gpio.simulate_input_ir(False)
+            self.gpio.simulate_input_ir(True)
           elif event.key == pygame.K_SPACE: # Nose poke entry (existing)
-            self.gpio.simulate_input_ir(False)
+            self.gpio.simulate_input_ir(True)
           elif event.key == pygame.K_j: # Left lever light
             self.gpio.simulate_led_lever_left(True)
           elif event.key == pygame.K_k: # Nose light
@@ -255,9 +255,9 @@ class Device:
           elif event.key == pygame.K_2: # Right lever release
             self.gpio.simulate_input_lever_right(False)
           elif event.key == pygame.K_3: # Nose poke exit
-            self.gpio.simulate_input_ir(True)
+            self.gpio.simulate_input_ir(False)
           elif event.key == pygame.K_SPACE: # Nose poke exit (existing)
-            self.gpio.simulate_input_ir(True)
+            self.gpio.simulate_input_ir(False)
           elif event.key == pygame.K_j: # Left lever light
             self.gpio.simulate_led_lever_left(False)
           elif event.key == pygame.K_k: # Nose light

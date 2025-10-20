@@ -293,7 +293,7 @@ class Stage1(Trial):
     # Track nose port state changes
     current_nose_state = self.get_gpio_state()["input_ir"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       log("Nose port entry detected", "info")
@@ -302,7 +302,7 @@ class Stage1(Trial):
       # Deactivate the visual cue
       self.visual_cue = False
       self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit
       self.nose_port_exit = True
       log("Nose port exit detected", "info")
@@ -489,11 +489,11 @@ class Stage2(Trial):
 
     # Only consider nose port entry and exit if reward has been triggered
     if self.reward_triggered:
-      if not current_nose_state and not self.nose_port_entry:
+      if current_nose_state and not self.nose_port_entry:
         self.nose_port_entry = True
         self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
         log("Nose port entry", "info")
-      elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
         self.nose_port_exit = True
         self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
         log("Nose port exit", "info")
@@ -564,7 +564,7 @@ class Stage2(Trial):
     """Check if the trial should be blocked due to active nose poke or lever press"""
     if self.get_gpio_state()["input_lever_left"] or self.get_gpio_state()["input_lever_right"]:
       return True
-    elif not self.get_gpio_state()["input_ir"]:
+    elif self.get_gpio_state()["input_ir"]:
       return True
     return False
 
@@ -730,7 +730,7 @@ class Stage3(Trial):
     if (
         self.nose_port_entry
         and not self.nose_port_exit
-        and self.get_gpio_state()["input_ir"]
+        and not self.get_gpio_state()["input_ir"]
         and not self.water_delivery_complete
     ):
       log("Premature nose withdrawal", "error")
@@ -776,7 +776,7 @@ class Stage3(Trial):
     # Track nose port state changes
     current_nose_state = self.get_gpio_state()["input_ir"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
@@ -792,7 +792,7 @@ class Stage3(Trial):
       self.left_lever_light = True
       self.right_lever_light = True
       self.nose_port_light = False
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
       self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
@@ -868,7 +868,7 @@ class Stage3(Trial):
     """Check if the trial should be blocked due to active nose poke or lever press"""
     if self.get_gpio_state()["input_lever_left"] or self.get_gpio_state()["input_lever_right"]:
       return True
-    elif not self.get_gpio_state()["input_ir"]:
+    elif self.get_gpio_state()["input_ir"]:
       return True
     return False
 

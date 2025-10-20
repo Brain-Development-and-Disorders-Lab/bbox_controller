@@ -522,7 +522,7 @@ class Device:
     running_input_test_start_time = time.time()
     while running_input_test:
       input_state = self.gpio.get_gpio_state()
-      if input_state["input_ir"] == False:
+      if input_state["input_ir"] == True:
         running_input_test = False
 
       # Ensure test doesn't run indefinitely
@@ -532,7 +532,7 @@ class Device:
         log("Timed out while waiting for IR input", "error")
         return
 
-    if input_state["input_ir"] != False:
+    if input_state["input_ir"] != True:
       self.test_state_manager.set_test_state("test_input_ir", TEST_STATES["FAILED"])
       _device_message_queue.put(CommunicationMessageBuilder.test_state(self.test_state_manager.get_all_test_states()))
       log("No IR input detected", "error")

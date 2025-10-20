@@ -25,7 +25,7 @@ class GPIOController:
         # Setup GPIO inputs using gpiozero (initial_value=True by default)
         self.input_lever_left = Button(INPUT_LEVER_LEFT)
         self.input_lever_right = Button(INPUT_LEVER_RIGHT)
-        self.input_ir = Button(INPUT_IR)
+        self.input_ir = Button(INPUT_IR, pull_up=False)
         self.input_port = DigitalOutputDevice(INPUT_PORT, initial_value=False)
 
         # Setup LED outputs
@@ -36,7 +36,7 @@ class GPIOController:
         self._gpio_state = {
           "input_lever_left": self.input_lever_left.is_pressed,
           "input_lever_right": self.input_lever_right.is_pressed,
-          "input_ir": self.input_ir.is_pressed,
+          "input_ir": self.input_ir.value,
           "input_port": self.input_port.value,
           "led_port": self.led_port.value,
           "led_lever_left": self.led_lever_left.value,
@@ -73,7 +73,7 @@ class GPIOController:
       self._gpio_state = {
         "input_lever_left": self.input_lever_left.is_pressed,
         "input_lever_right": self.input_lever_right.is_pressed,
-        "input_ir": self.input_ir.is_pressed,
+        "input_ir": self.input_ir.value,
         "input_port": self.input_port.value,
         "led_port": self.led_port.value,
         "led_lever_left": self.led_lever_left.value,

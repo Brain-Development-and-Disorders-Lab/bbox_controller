@@ -2,6 +2,104 @@
 
 This repository contains the code to control a behavior box utilizing IO and displays.
 
+## Requirements
+
+### Software Dependencies
+
+**Core Python Packages:**
+- Python 3.11 or later
+- `pygame` (game engine for simulation controls)
+- `websockets` and `websocket-client` (network communication)
+- `numpy` (numerical computations)
+- `Pillow` (image processing for displays)
+- `tk` (GUI framework for control panel)
+
+**Raspberry Pi Packages:**
+- `gpiozero` (GPIO control library)
+- `adafruit-circuitpython-ssd1306` (OLED display driver)
+- `adafruit-blinka` (CircuitPython compatibility)
+- `lgpio` (low-level GPIO access)
+
+**Optional Development Packages:**
+- `pytest` (testing framework)
+
+All dependencies are listed in `requirements.txt` and will be automatically installed based on the platform.
+
+### Hardware Requirements
+
+**Raspberry Pi Setup:**
+- Raspberry Pi (tested on Raspberry Pi OS)
+- Root/sudo access required for GPIO control
+- I2C interface must be enabled
+
+**GPIO Pin Mapping:**
+- **GPIO 17**: IR beam sensor (nose poke detection)
+- **GPIO 22**: Left lever LED indicator
+- **GPIO 23**: Right lever press sensor
+- **GPIO 24**: Left lever press sensor
+- **GPIO 25**: Water delivery control
+- **GPIO 26**: Right lever LED indicator
+- **GPIO 27**: Nose port LED indicator
+
+**I2C Displays:**
+- Two SSD1306 OLED displays (128x64)
+- Left display: I2C address `0x3C`
+- Right display: I2C address `0x3D`
+- Uses standard I2C pins (GPIO 2/3 for SDA/SCL)
+
+## Raspberry Pi Setup
+
+### Initial System Configuration
+
+1. **Enable I2C Interface:**
+   ```bash
+   sudo raspi-config
+   # Navigate to: Interface Options → I2C → Enable
+   # Reboot when prompted
+   ```
+
+2. **Update system packages:**
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install python3-pip python3-venv python3-dev -y
+   ```
+
+3. **Clone and setup the repository:**
+   ```bash
+   git clone <repository-url>
+   cd bbox_controller
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+4. **Verify hardware detection:**
+   ```bash
+   # Test I2C devices (should show 0x3C and 0x3D)
+   sudo i2cdetect -y 1
+   ```
+
+### Starting the Device
+
+The device must run with root privileges to access GPIO:
+
+```bash
+cd src/device
+sudo ./start.sh
+```
+
+### Troubleshooting
+
+**Display Issues:**
+- Confirm I2C is enabled: `sudo raspi-config` → Interface Options → I2C
+- Check I2C device detection: `sudo i2cdetect -y 1` (should show 0x3C and 0x3D)
+- Verify display addresses match the constants in `src/device/hardware/constants.py`
+
+**Simulation Mode Active:**
+- If running on Raspberry Pi, an orange banner on the display indicates hardware communication issues
+- Use keyboard controls for testing (see Simulation section below)
+- Check logs in `src/device/logs/device.log` for hardware initialization messages
+
 ## Control Panel
 
 The control panel facilitates wireless monitoring and control via Websockets. To launch the control panel, run `./start.sh`, located in the `control_panel` directory.
@@ -37,38 +135,17 @@ You can run the device in simulation mode for development and testing without ph
 
 ### Hardware Usage
 
-The device controller runs only on the device and the device controller must be on the same network as the control panel software in order to communicate. This is accomplished by setting the Raspberry Pi to act as a wireless access point (AP) and connecting to it directly.
+The device controller runs on the device and communicates with the control panel software via WebSocket connections over the network.
 
-## Starting the Device and Access Point
+After the device software has started, the network IP address of the device will be shown on the display.
 
-The startup script is located in the `src/device` directory. To start both the WiFi Access Point and the device controller, run:
-
-```bash
-sudo ./start.sh
-```
-
-For testing to avoid SSID conflicts, use the `--test` flag:
-```bash
-sudo ./start.sh --test
-```
-
-This is the only script you need to run. It will automatically set up the AP, launch the device controller, and handle all dependencies and logging. All logs are saved in the `logs/` directory.
+## Device Operation
 
 ### Log Files
 
-The startup script generates three log files in the `src/device/logs/` directory:
+All logs are saved in the `logs/` directory:
 
-- **`startup.log`** - Main startup script execution and WiFi AP setup
-- **`ap.log`** - WiFi access point configuration and status
-- **`run.log`** - Device controller runtime output and experiment data
-
-## Default WiFi Access Point Settings
-
-- **SSID:** `BehaviorBox_0`
-- **Password:** `behaviorbox0`
-- **Device IP Address:** `192.168.4.1`
-
-These are the default credentials for connecting to the device's WiFi network.
+- **`device.log`** - Unified log file containing startup events, runtime output, and experiment data
 
 ## Data Files
 

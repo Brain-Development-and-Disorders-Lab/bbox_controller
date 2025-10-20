@@ -7,15 +7,16 @@ License: MIT
 """
 
 import datetime
+import os
 
 # Log states
 LOG_STATES = {
-    "start": "Start",
-    "success": "Success",
-    "error": "Error",
-    "warning": "Warning",
-    "info": "Info",
-    "debug": "Debug",
+    "start": "START",
+    "success": "SUCCESS",
+    "error": "ERROR",
+    "warning": "WARN",
+    "info": "INFO",
+    "debug": "DEBUG",
 }
 
 # Global message queue reference
@@ -28,7 +29,7 @@ def set_message_queue(queue):
 
 def log(message, state="info"):
     """
-    Logs a message to the console with a timestamp and sends it to the message queue.
+    Logs a message to the console, device.log file, and sends it to the message queue.
 
     Parameters:
     message (str): The message to log.
@@ -37,11 +38,20 @@ def log(message, state="info"):
     if state not in LOG_STATES:
         state = "info"  # Default to info if invalid state
 
-    timestamp = datetime.datetime.now().strftime('%H:%M:%S')
-    formatted_message = f"[{timestamp}] [{LOG_STATES[state]}] {message}"
+    # Use consistent timestamp format
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    formatted_message = f"{timestamp} [{LOG_STATES[state]}] {message}"
 
     # Print to console
     print(formatted_message)
+
+    # Write to device.log file
+    log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+
+    device_log_path = os.path.join(log_dir, 'device.log')
+    with open(device_log_path, 'a') as f:
+        f.write(formatted_message + '\n')
 
     # Send to message queue if available
     if _device_message_queue:

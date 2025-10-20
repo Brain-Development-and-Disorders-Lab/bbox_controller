@@ -14,7 +14,7 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOGFILE="$SCRIPT_DIR/logs/startup.log"
+LOGFILE="$SCRIPT_DIR/logs/device.log"
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -96,10 +96,10 @@ fi
 trap cleanup EXIT SIGINT SIGTERM
 
 log INFO "Starting device controller..."
-start_device_controller > "$SCRIPT_DIR/logs/run.log" 2>&1 &
+start_device_controller &
 RUN_PID=$!
 log INFO "Device controller started with PID: $RUN_PID"
-log INFO "Logs: $SCRIPT_DIR/logs/startup.log, $SCRIPT_DIR/logs/run.log"
+log INFO "Logs: $SCRIPT_DIR/logs/device.log"
 
 # Wait for device controller process to complete
 wait $RUN_PID

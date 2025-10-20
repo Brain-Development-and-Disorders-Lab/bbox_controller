@@ -9,8 +9,8 @@ License: MIT
 import random
 import pygame
 from datetime import datetime
-from device.hardware.DisplayController import DisplayController, SIMULATION_MODE
-from device.hardware.IOController import IOController
+from device.hardware.DisplayController import DisplayController
+from device.hardware.GPIOController import GPIOController
 from device.utils.logger import log
 from device.utils.helpers import TrialOutcome
 from shared.constants import TRIAL_EVENTS
@@ -33,7 +33,7 @@ class Trial:
     self.kwargs = kwargs
 
     # Controllers
-    self.io: IOController = kwargs.get('io')
+    self.gpio: GPIOController = kwargs.get('gpio')
     self.display: DisplayController = kwargs.get('display')
     self.statistics: StatisticsManager = kwargs.get('statistics')
 
@@ -47,7 +47,7 @@ class Trial:
         from shared.models import Config
         self.config = Config()
 
-    if SIMULATION_MODE:
+    if self.gpio.is_simulating_gpio():
       self.simulation_font = pygame.font.SysFont("Arial", 16, bold=True)
 
   def get_timestamp(self):
@@ -108,20 +108,20 @@ class Trial:
     """Get the display controller"""
     return self.display
 
-  def get_input_states(self):
+  def get_gpio_state(self):
     """Get current input states"""
-    if self.io is None:
+    if self.gpio is None:
         # Default state if no updates received yet
         return {
-            "right_lever": False,
-            "left_lever": False,
-            "nose_poke": False,
-            "water_port": False,
-            "nose_light": False,
-            "left_lever_light": False,
-            "right_lever_light": False,
+          "input_lever_left": False,
+          "input_lever_right": False,
+          "input_ir": False,
+          "input_port": False,
+          "led_port": False,
+          "led_lever_left": False,
+          "led_lever_right": False
         }
-    return self.io.get_input_states()
+    return self.gpio.get_gpio_state()
 
 class Interval(Trial):
   """
@@ -150,10 +150,10 @@ class Interval(Trial):
     super().on_enter()
 
     # Reset the IO outputs
-    self.io.set_water_port(False)
-    self.io.set_nose_light(False)
-    self.io.set_left_lever_light(False)
-    self.io.set_right_lever_light(False)
+    self.gpio.set_input_port(False)
+    self.gpio.set_led_port(False)
+    self.gpio.set_led_lever_left(False)
+    self.gpio.set_led_lever_right(False)
     self.display.clear_displays()
 
   def update(self, events):
@@ -180,7 +180,7 @@ class Interval(Trial):
     self.screen.fill((0, 0, 0))
 
     # Add simulation mode banner if in simulation mode
-    if SIMULATION_MODE and self.simulation_font:
+    if self.gpio.is_simulating_gpio() and self.simulation_font:
       banner_text = f"[SIMULATION - {self.title}]"
       text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
       # Center the text horizontally
@@ -243,7 +243,7 @@ class Stage1(Trial):
     self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
 
     # Clear the displays and randomly select the display to show the visual cue
-    if not SIMULATION_MODE:
+    if not self.gpio.is_simulating_gpio():
       self.display.clear_displays()
       self.display.draw_alternating_pattern(self.cue_side)
       log("Visual cue displayed on the " + self.cue_side + " side", "success")
@@ -259,7 +259,7 @@ class Stage1(Trial):
 
     # Start water delivery at trial start
     if not self.delivered_water:
-      self.io.set_water_port(True)
+      self.gpio.set_input_port(True)
       self.delivered_water = True
       log("Water delivery started", "success")
       self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
@@ -267,7 +267,7 @@ class Stage1(Trial):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config.valve_open:
-        self.io.set_water_port(False)
+        self.gpio.set_input_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
         self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
@@ -291,9 +291,9 @@ class Stage1(Trial):
           return False
 
     # Track nose port state changes
-    current_nose_state = self.get_input_states()["nose_poke"]
+    current_nose_state = self.get_gpio_state()["input_ir"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       log("Nose port entry detected", "info")
@@ -302,15 +302,15 @@ class Stage1(Trial):
       # Deactivate the visual cue
       self.visual_cue = False
       self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit
       self.nose_port_exit = True
       log("Nose port exit detected", "info")
       self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
 
     # Update lever state
-    left_lever = self.get_input_states()["left_lever"]
-    right_lever = self.get_input_states()["right_lever"]
+    left_lever = self.get_gpio_state()["input_lever_left"]
+    right_lever = self.get_gpio_state()["input_lever_right"]
     self.left_lever_light = False # Lever lights off by default
     self.right_lever_light = False # Lever lights off by default
 
@@ -343,7 +343,7 @@ class Stage1(Trial):
 
   def _render_visual_cue(self):
     # Update visual state
-    if not SIMULATION_MODE:
+    if not self.gpio.is_simulating_gpio():
       if self.visual_cue:
         self.display.draw_alternating_pattern(self.cue_side)
       else:
@@ -351,12 +351,12 @@ class Stage1(Trial):
 
   def _update_nose_port_light(self):
     # Update nose port light
-    self.io.set_nose_light(self.nose_port_light)
+    self.gpio.set_led_port(self.nose_port_light)
 
   def _update_lever_lights(self):
     # Update lever lights
-    self.io.set_left_lever_light(self.left_lever_light)
-    self.io.set_right_lever_light(self.right_lever_light)
+    self.gpio.set_led_lever_left(self.left_lever_light)
+    self.gpio.set_led_lever_right(self.right_lever_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -364,7 +364,7 @@ class Stage1(Trial):
 
   def _post_render_tasks(self):
     # Add simulation mode banner if in simulation mode
-    if SIMULATION_MODE and self.simulation_font:
+    if self.gpio.is_simulating_gpio() and self.simulation_font:
       banner_text = f"[SIMULATION - {self.title}]"
       text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))
@@ -436,7 +436,7 @@ class Stage2(Trial):
     self.right_lever_light = False
 
     # Clear the displays
-    if not SIMULATION_MODE:
+    if not self.gpio.is_simulating_gpio():
       self.display.clear_displays()
 
     # Check if the trial should be blocked
@@ -485,22 +485,22 @@ class Stage2(Trial):
 
     # Handle IO events (works for both real hardware and simulation)
     # Track nose port state changes
-    current_nose_state = self.get_input_states()["nose_poke"]
+    current_nose_state = self.get_gpio_state()["input_ir"]
 
     # Only consider nose port entry and exit if reward has been triggered
     if self.reward_triggered:
-      if not current_nose_state and not self.nose_port_entry:
+      if current_nose_state and not self.nose_port_entry:
         self.nose_port_entry = True
         self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
         log("Nose port entry", "info")
-      elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
         self.nose_port_exit = True
         self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
         log("Nose port exit", "info")
 
     # Update lever state
-    left_lever = self.get_input_states()["left_lever"]
-    right_lever = self.get_input_states()["right_lever"]
+    left_lever = self.get_gpio_state()["input_lever_left"]
+    right_lever = self.get_gpio_state()["input_lever_right"]
 
     # Capture lever press events
     if left_lever and not self.left_lever_pressed:
@@ -562,9 +562,9 @@ class Stage2(Trial):
 
   def _check_trial_blocked(self):
     """Check if the trial should be blocked due to active nose poke or lever press"""
-    if self.get_input_states()["left_lever"] or self.get_input_states()["right_lever"]:
+    if self.get_gpio_state()["input_lever_left"] or self.get_gpio_state()["input_lever_right"]:
       return True
-    elif not self.get_input_states()["nose_poke"]:
+    elif self.get_gpio_state()["input_ir"]:
       return True
     return False
 
@@ -573,7 +573,7 @@ class Stage2(Trial):
 
     # Start water delivery when reward is triggered
     if self.reward_triggered and not self.delivered_water:
-      self.io.set_water_port(True)
+      self.gpio.set_input_port(True)
       self.delivered_water = True
       self.water_start_time = current_time
       log("Water delivery started", "success")
@@ -582,7 +582,7 @@ class Stage2(Trial):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config.valve_open:
-        self.io.set_water_port(False)
+        self.gpio.set_input_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
         self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
@@ -594,7 +594,7 @@ class Stage2(Trial):
 
   def _update_visual_cue(self):
     # Update visual state
-    if not SIMULATION_MODE:
+    if not self.gpio.is_simulating_gpio():
       if self.visual_cue:
         self.display.draw_alternating_pattern(self.cue_side)
       else:
@@ -602,12 +602,12 @@ class Stage2(Trial):
 
   def _update_nose_port_light(self):
     # Update nose port light
-    self.io.set_nose_light(self.nose_port_light)
+    self.gpio.set_led_port(self.nose_port_light)
 
   def _update_lever_lights(self):
     # Update lever lights
-    self.io.set_left_lever_light(self.left_lever_light)
-    self.io.set_right_lever_light(self.right_lever_light)
+    self.gpio.set_led_lever_left(self.left_lever_light)
+    self.gpio.set_led_lever_right(self.right_lever_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -615,7 +615,7 @@ class Stage2(Trial):
 
   def _post_render_tasks(self):
     # Add simulation mode banner if in simulation mode
-    if SIMULATION_MODE and self.simulation_font:
+    if self.gpio.is_simulating_gpio() and self.simulation_font:
       banner_text = f"[SIMULATION - {self.title}]"
       text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))
@@ -703,7 +703,7 @@ class Stage3(Trial):
       self.nose_port_light = True
 
     # Clear the displays
-    if not SIMULATION_MODE:
+    if not self.gpio.is_simulating_gpio():
       self.display.clear_displays()
     log("Trial started", "info")
 
@@ -730,7 +730,7 @@ class Stage3(Trial):
     if (
         self.nose_port_entry
         and not self.nose_port_exit
-        and self.get_input_states()["nose_poke"]
+        and not self.get_gpio_state()["input_ir"]
         and not self.water_delivery_complete
     ):
       log("Premature nose withdrawal", "error")
@@ -774,9 +774,9 @@ class Stage3(Trial):
 
     # Handle IO events (works for both real hardware and simulation)
     # Track nose port state changes
-    current_nose_state = self.get_input_states()["nose_poke"]
+    current_nose_state = self.get_gpio_state()["input_ir"]
 
-    if not current_nose_state and not self.nose_port_entry:
+    if current_nose_state and not self.nose_port_entry:
       # Detect nose port entry
       self.nose_port_entry = True
       self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
@@ -792,15 +792,15 @@ class Stage3(Trial):
       self.left_lever_light = True
       self.right_lever_light = True
       self.nose_port_light = False
-    elif current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
       # Detect nose port exit (nose_poke = True means nose is OUT)
       self.nose_port_exit = True
       self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
       log("Nose port exit", "info")
 
     # Update lever state
-    left_lever = self.get_input_states()["left_lever"]
-    right_lever = self.get_input_states()["right_lever"]
+    left_lever = self.get_gpio_state()["input_lever_left"]
+    right_lever = self.get_gpio_state()["input_lever_right"]
 
     # Capture lever press events
     if left_lever and not self.left_lever_pressed:
@@ -866,9 +866,9 @@ class Stage3(Trial):
 
   def _check_trial_blocked(self):
     """Check if the trial should be blocked due to active nose poke or lever press"""
-    if self.get_input_states()["left_lever"] or self.get_input_states()["right_lever"]:
+    if self.get_gpio_state()["input_lever_left"] or self.get_gpio_state()["input_lever_right"]:
       return True
-    elif not self.get_input_states()["nose_poke"]:
+    elif self.get_gpio_state()["input_ir"]:
       return True
     return False
 
@@ -877,7 +877,7 @@ class Stage3(Trial):
 
     # Start water delivery when reward is triggered
     if self.reward_triggered and not self.delivered_water:
-      self.io.set_water_port(True)
+      self.gpio.set_input_port(True)
       self.delivered_water = True
       self.water_start_time = current_time
       log("Water delivery started", "success")
@@ -886,7 +886,7 @@ class Stage3(Trial):
     # Check if water delivery duration has elapsed
     elif self.delivered_water and not self.water_delivery_complete:
       if current_time - self.water_start_time >= self.config.valve_open:
-        self.io.set_water_port(False)
+        self.gpio.set_input_port(False)
         self.water_delivery_complete = True
         log("Water delivery complete", "success")
         self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
@@ -898,7 +898,7 @@ class Stage3(Trial):
 
   def _update_visual_cue(self):
     # Update visual state
-    if not SIMULATION_MODE:
+    if not self.gpio.is_simulating_gpio():
       if self.visual_cue:
         self.display.draw_alternating_pattern(self.cue_side)
       else:
@@ -906,12 +906,12 @@ class Stage3(Trial):
 
   def _update_nose_port_light(self):
     # Update nose port light
-    self.io.set_nose_light(self.nose_port_light)
+    self.gpio.set_led_port(self.nose_port_light)
 
   def _update_lever_lights(self):
     # Update lever lights
-    self.io.set_left_lever_light(self.left_lever_light)
-    self.io.set_right_lever_light(self.right_lever_light)
+    self.gpio.set_led_lever_left(self.left_lever_light)
+    self.gpio.set_led_lever_right(self.right_lever_light)
 
   def _pre_render_tasks(self):
     # Clear screen
@@ -919,7 +919,7 @@ class Stage3(Trial):
 
   def _post_render_tasks(self):
     # Add simulation mode banner if in simulation mode
-    if SIMULATION_MODE and self.simulation_font:
+    if self.gpio.is_simulating_gpio() and self.simulation_font:
       banner_text = f"[SIMULATION - {self.title}]"
       text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
       text_rect = text_surface.get_rect(center=(self.width // 2, 20))

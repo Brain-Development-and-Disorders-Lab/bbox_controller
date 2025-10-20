@@ -53,22 +53,22 @@ class ControlPanel(tk.Frame):
       self.test_state_manager = TestStateManager()
 
       self.input_states = {
-        "left_lever": False,
-        "right_lever": False,
-        "nose_poke": False,
-        "water_port": False,
-        "nose_light": False,
-        "left_lever_light": False,
-        "right_lever_light": False,
+        "input_lever_left": False,
+        "input_lever_right": False,
+        "input_ir": False,
+        "input_port": False,
+        "led_port": False,
+        "led_lever_left": False,
+        "led_lever_right": False
       }
 
       self.input_label_states = {
-        "left_lever": tk.BooleanVar(self.master, False),
-        "right_lever": tk.BooleanVar(self.master, False),
-        "nose_poke": tk.BooleanVar(self.master, False),
-        "nose_light": tk.BooleanVar(self.master, False),
-        "left_lever_light": tk.BooleanVar(self.master, False),
-        "right_lever_light": tk.BooleanVar(self.master, False),
+        "input_lever_left": tk.BooleanVar(self.master, False),
+        "input_lever_right": tk.BooleanVar(self.master, False),
+        "input_ir": tk.BooleanVar(self.master, False),
+        "led_port": tk.BooleanVar(self.master, False),
+        "led_lever_left": tk.BooleanVar(self.master, False),
+        "led_lever_right": tk.BooleanVar(self.master, False),
       }
 
       # Statistics tracking
@@ -279,7 +279,7 @@ class ControlPanel(tk.Frame):
     tk.Entry(connection_frame, textvariable=self.ip_address_var, width=15).pack(side=tk.LEFT, padx=(0, 15))
     tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT, padx=(0, 5))
     tk.Entry(connection_frame, textvariable=self.port_var, width=6).pack(side=tk.LEFT, padx=(0, 15))
-    self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_to_device)
+    self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_websocket)
     self.connect_button.pack(side=tk.LEFT, padx=(0, 5))
     self.disconnect_button = tk.Button(connection_frame, text="Disconnect", font="Arial 10", command=self.disconnect_from_device, state=tk.DISABLED)
     self.disconnect_button.pack(side=tk.LEFT, padx=(0, 15))
@@ -311,12 +311,12 @@ class ControlPanel(tk.Frame):
     input_status_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
 
     # Create input indicators
-    self.create_state_indicator(input_status_frame, "Left Lever", self.input_label_states["left_lever"])
-    self.create_state_indicator(input_status_frame, "Left Lever Light", self.input_label_states["left_lever_light"])
-    self.create_state_indicator(input_status_frame, "Right Lever", self.input_label_states["right_lever"])
-    self.create_state_indicator(input_status_frame, "Right Lever Light", self.input_label_states["right_lever_light"])
-    self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["nose_poke"])
-    self.create_state_indicator(input_status_frame, "Nose Light", self.input_label_states["nose_light"])
+    self.create_state_indicator(input_status_frame, "Left Lever", self.input_label_states["input_lever_left"])
+    self.create_state_indicator(input_status_frame, "Left Lever Light", self.input_label_states["led_lever_left"])
+    self.create_state_indicator(input_status_frame, "Right Lever", self.input_label_states["input_lever_right"])
+    self.create_state_indicator(input_status_frame, "Right Lever Light", self.input_label_states["led_lever_right"])
+    self.create_state_indicator(input_status_frame, "Nose Poke", self.input_label_states["input_ir"])
+    self.create_state_indicator(input_status_frame, "Nose Light", self.input_label_states["led_port"])
 
     # Test Status section
     test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
@@ -324,10 +324,10 @@ class ControlPanel(tk.Frame):
 
     # Create test rows
     self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery", True)
-    self.create_test_row(test_status_frame, "Test Levers", "test_levers", False)
-    self.create_test_row(test_status_frame, "Test Lever Lights", "test_lever_lights", True)
-    self.create_test_row(test_status_frame, "Test IR", "test_ir", False)
-    self.create_test_row(test_status_frame, "Test Nose Light", "test_nose_light", True)
+    self.create_test_row(test_status_frame, "Test Levers", "test_input_levers", False)
+    self.create_test_row(test_status_frame, "Test Lever Lights", "test_led_levers", True)
+    self.create_test_row(test_status_frame, "Test IR", "test_input_ir", False)
+    self.create_test_row(test_status_frame, "Test Nose Light", "test_led_port", True)
     self.create_test_row(test_status_frame, "Test Displays", "test_displays", True)
 
     # Reset button
@@ -422,11 +422,11 @@ class ControlPanel(tk.Frame):
 
     # Store references to test buttons for later use
     self.test_water_delivery_button = self.test_indicators["test_water_delivery"]["button"]
-    self.test_levers_button = self.test_indicators["test_levers"]["button"]
-    self.test_ir_button = self.test_indicators["test_ir"]["button"]
-    self.test_nose_light_button = self.test_indicators["test_nose_light"]["button"]
+    self.test_input_levers_button = self.test_indicators["test_input_levers"]["button"]
+    self.test_input_ir_button = self.test_indicators["test_input_ir"]["button"]
+    self.test_led_port_button = self.test_indicators["test_led_port"]["button"]
+    self.test_led_levers_button = self.test_indicators["test_led_levers"]["button"]
     self.test_displays_button = self.test_indicators["test_displays"]["button"]
-    self.test_lever_lights_button = self.test_indicators["test_lever_lights"]["button"]
 
   def log(self, message, state="info", source="UI"):
     """
@@ -473,12 +473,12 @@ class ControlPanel(tk.Frame):
     """
     Updates the state labels for the input states.
     """
-    self.input_label_states["left_lever"].set(self.input_states["left_lever"])
-    self.input_label_states["right_lever"].set(self.input_states["right_lever"])
-    self.input_label_states["nose_poke"].set(self.input_states["nose_poke"])
-    self.input_label_states["nose_light"].set(self.input_states["nose_light"])
-    self.input_label_states["left_lever_light"].set(self.input_states["left_lever_light"])
-    self.input_label_states["right_lever_light"].set(self.input_states["right_lever_light"])
+    self.input_label_states["input_lever_left"].set(self.input_states["input_lever_left"])
+    self.input_label_states["input_lever_right"].set(self.input_states["input_lever_right"])
+    self.input_label_states["input_ir"].set(self.input_states["input_ir"])
+    self.input_label_states["led_port"].set(self.input_states["led_port"])
+    self.input_label_states["led_lever_left"].set(self.input_states["led_lever_left"])
+    self.input_label_states["led_lever_right"].set(self.input_states["led_lever_right"])
 
   def update_test_state(self, command_name, state):
       """
@@ -508,40 +508,40 @@ class ControlPanel(tk.Frame):
     """
     # Disable test buttons
     if disabled:
-      self.test_ir_button.config(state=tk.DISABLED)
-      self.test_levers_button.config(state=tk.DISABLED)
+      self.test_input_ir_button.config(state=tk.DISABLED)
+      self.test_input_levers_button.config(state=tk.DISABLED)
       self.test_water_delivery_button.config(state=tk.DISABLED)
-      self.test_nose_light_button.config(state=tk.DISABLED)
+      self.test_led_port_button.config(state=tk.DISABLED)
       self.test_displays_button.config(state=tk.DISABLED)
-      self.test_lever_lights_button.config(state=tk.DISABLED)
+      self.test_led_levers_button.config(state=tk.DISABLED)
 
       # Disable duration inputs
       if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
         self.test_indicators["test_water_delivery"]["duration_entry"].config(state=tk.DISABLED)
-      if "test_nose_light" in self.test_indicators and "duration_entry" in self.test_indicators["test_nose_light"]:
-        self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.DISABLED)
+      if "test_led_port" in self.test_indicators and "duration_entry" in self.test_indicators["test_led_port"]:
+        self.test_indicators["test_led_port"]["duration_entry"].config(state=tk.DISABLED)
       if "test_displays" in self.test_indicators and "duration_entry" in self.test_indicators["test_displays"]:
         self.test_indicators["test_displays"]["duration_entry"].config(state=tk.DISABLED)
-      if "test_lever_lights" in self.test_indicators and "duration_entry" in self.test_indicators["test_lever_lights"]:
-        self.test_indicators["test_lever_lights"]["duration_entry"].config(state=tk.DISABLED)
+      if "test_led_levers" in self.test_indicators and "duration_entry" in self.test_indicators["test_led_levers"]:
+        self.test_indicators["test_led_levers"]["duration_entry"].config(state=tk.DISABLED)
     else:
       # Enable test buttons
-      self.test_ir_button.config(state=tk.NORMAL)
-      self.test_levers_button.config(state=tk.NORMAL)
+      self.test_input_ir_button.config(state=tk.NORMAL)
+      self.test_input_levers_button.config(state=tk.NORMAL)
       self.test_water_delivery_button.config(state=tk.NORMAL)
-      self.test_nose_light_button.config(state=tk.NORMAL)
+      self.test_led_port_button.config(state=tk.NORMAL)
       self.test_displays_button.config(state=tk.NORMAL)
-      self.test_lever_lights_button.config(state=tk.NORMAL)
+      self.test_led_levers_button.config(state=tk.NORMAL)
 
       # Enable duration inputs
       if "test_water_delivery" in self.test_indicators and "duration_entry" in self.test_indicators["test_water_delivery"]:
         self.test_indicators["test_water_delivery"]["duration_entry"].config(state=tk.NORMAL)
-      if "test_nose_light" in self.test_indicators and "duration_entry" in self.test_indicators["test_nose_light"]:
-        self.test_indicators["test_nose_light"]["duration_entry"].config(state=tk.NORMAL)
+      if "test_led_port" in self.test_indicators and "duration_entry" in self.test_indicators["test_led_port"]:
+        self.test_indicators["test_led_port"]["duration_entry"].config(state=tk.NORMAL)
       if "test_displays" in self.test_indicators and "duration_entry" in self.test_indicators["test_displays"]:
         self.test_indicators["test_displays"]["duration_entry"].config(state=tk.NORMAL)
-      if "test_lever_lights" in self.test_indicators and "duration_entry" in self.test_indicators["test_lever_lights"]:
-        self.test_indicators["test_lever_lights"]["duration_entry"].config(state=tk.NORMAL)
+      if "test_led_levers" in self.test_indicators and "duration_entry" in self.test_indicators["test_led_levers"]:
+        self.test_indicators["test_led_levers"]["duration_entry"].config(state=tk.NORMAL)
 
   def set_experiment_buttons_disabled(self, disabled):
     """
@@ -604,11 +604,11 @@ class ControlPanel(tk.Frame):
 
     # Test buttons
     self.test_water_delivery_button.config(state=tk.NORMAL)
-    self.test_levers_button.config(state=tk.NORMAL)
-    self.test_ir_button.config(state=tk.NORMAL)
-    self.test_nose_light_button.config(state=tk.NORMAL)
+    self.test_input_levers_button.config(state=tk.NORMAL)
+    self.test_input_ir_button.config(state=tk.NORMAL)
+    self.test_led_port_button.config(state=tk.NORMAL)
     self.test_displays_button.config(state=tk.NORMAL)
-    self.test_lever_lights_button.config(state=tk.NORMAL)
+    self.test_led_levers_button.config(state=tk.NORMAL)
     self.reset_tests_button.config(state=tk.NORMAL)  # Enable reset button
 
     # Animal ID input
@@ -640,11 +640,11 @@ class ControlPanel(tk.Frame):
 
     # Test buttons
     self.test_water_delivery_button.config(state=tk.DISABLED)
-    self.test_levers_button.config(state=tk.DISABLED)
-    self.test_ir_button.config(state=tk.DISABLED)
-    self.test_nose_light_button.config(state=tk.DISABLED)
+    self.test_input_levers_button.config(state=tk.DISABLED)
+    self.test_input_ir_button.config(state=tk.DISABLED)
+    self.test_led_port_button.config(state=tk.DISABLED)
     self.test_displays_button.config(state=tk.DISABLED)
-    self.test_lever_lights_button.config(state=tk.DISABLED)
+    self.test_led_levers_button.config(state=tk.DISABLED)
     self.reset_tests_button.config(state=tk.DISABLED)  # Disable reset button
 
     # Animal ID input
@@ -801,7 +801,7 @@ class ControlPanel(tk.Frame):
     else:
       self.log(f"Invalid command: {command}", "error")
 
-  def connect_to_device(self):
+  def connect_websocket(self):
     """
     Connects to the device.
     """
@@ -810,23 +810,25 @@ class ControlPanel(tk.Frame):
       port = self.port_var.get()
       websocket_url = f"ws://{ip_address}:{port}"
 
-    # Attempt to connect to the WebSocket service for 10 seconds
-    self.log(f"Attempting to connect to {websocket_url}", "info")
-    self.ws = websocket.WebSocketApp(websocket_url,
-                                        on_message=self.on_message,
-                                        on_error=self.on_error,
-                                        on_close=self.on_close)
-    self.ws_thread = threading.Thread(target=self.run_websocket)
-    self.ws_thread.start()
+      # Attempt to connect to the WebSocket service for 10 seconds
+      self.log(f"Attempting to connect to {websocket_url}", "info")
+      self.ws = websocket.WebSocketApp(websocket_url,
+                                          on_message=self.on_message,
+                                          on_error=self.on_error,
+                                          on_close=self.on_close)
+      self.ws_thread = threading.Thread(target=self.run_websocket)
+      self.ws_thread.start()
 
-    # Wait for connection attempt
-    for _ in range(20):
-      if self.ws.sock and self.ws.sock.connected:
-        self.on_connect()
-        return
-      time.sleep(0.5)
+      # Wait for connection attempt
+      for _ in range(20):
+        if self.ws.sock and self.ws.sock.connected:
+          self.on_connect()
+          return
+        time.sleep(0.5)
 
-    self.log("Failed to connect to the device within 10 seconds", "error")
+      self.log("Failed to connect to the device within 10 seconds", "error")
+    else:
+      self.log("Already connected to the device", "info")
 
   def disconnect_from_device(self):
     """
@@ -860,13 +862,13 @@ class ControlPanel(tk.Frame):
     """
     self.is_connected = False
     self.input_states = {
-      "left_lever": False,
-      "right_lever": False,
-      "nose_poke": False,
-      "water_port": False,
-      "nose_light": False,
-      "left_lever_light": False,
-      "right_lever_light": False,
+      "input_lever_left": False,
+      "input_lever_right": False,
+      "input_ir": False,
+      "input_port": False,
+      "led_port": False,
+      "led_lever_left": False,
+      "led_lever_right": False,
     }
 
     self.reset_tests()

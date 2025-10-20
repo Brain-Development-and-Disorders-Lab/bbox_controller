@@ -17,16 +17,16 @@ class TestStateManager:
             "test_water_delivery": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
-            "test_levers": {
+            "test_input_levers": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
-            "test_ir": {
+            "test_input_ir": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
-            "test_nose_light": {
+            "test_led_port": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
-            "test_lever_lights": {
+            "test_led_levers": {
                 "state": TEST_STATES["NOT_TESTED"],
             },
             "test_displays": {
@@ -93,7 +93,7 @@ class TestCommandValidator:
             return False, f"Unknown test command: {base_command}"
 
         # Validate duration parameters for commands that support them
-        if base_command in ["test_water_delivery", "test_nose_light", "test_displays", "test_lever_lights"]:
+        if base_command in ["test_water_delivery", "test_led_port", "test_displays", "test_led_levers"]:
             if len(parts) > 1:
                 try:
                     duration = int(parts[1])

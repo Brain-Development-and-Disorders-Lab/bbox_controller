@@ -53,7 +53,7 @@ class ExperimentProcessor:
                     font=self.device.font,
                     width=self.device.width,
                     height=self.device.height,
-                    io=self.device.io,
+                    gpio=self.device.gpio,
                     display=self.device.display,
                     statistics=self.device.statistics_controller,
                     config=self.current_experiment.config

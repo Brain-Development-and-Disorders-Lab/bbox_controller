@@ -18,6 +18,7 @@ class TrialOutcome(str, Enum):
   SUCCESS = "success"
   FAILURE_NOSEPORT = "failure_noseport"
   FAILURE_NOLEVER = "failure_nolever"
+  FAILURE_WRONGLEVER = "failure_wronglever"
   FAILURE_TIMEOUT = "failure_timeout"
   FAILURE_OTHER = "failure_other"
   CANCELLED = "cancelled"

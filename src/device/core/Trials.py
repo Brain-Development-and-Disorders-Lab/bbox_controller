@@ -937,3 +937,338 @@ class Stage3(Trial):
 
     # Run post-render tasks
     self._post_render_tasks()
+
+
+class Stage4(Trial):
+  """
+  Trial Stage 4: Nose port entry followed by correct lever press for reward
+  Description: At the beginning of each trial, lit up the nose port light. Upon the mouse entering
+  the nose port, turn off the nose port light and randomly display the visual cue on one of the side
+  screens. Only the correct lever press instructed by the visual cue will trigger reward water
+  delivery. Turn off the visual cue either upon lever pressing or reaching visual cue display time
+  limit whichever comes first. Premature nose withdraw and wrong lever pressing will result in an error
+  trial and termination of the trial.
+  """
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.title = "trial_stage_4"
+    self.start_time = None
+    self.water_start_time = None
+    self.cue_start_time = None
+
+    # Trial state
+    self.trial_blocked = False
+    self.reward_triggered = False
+    self.is_error_trial = False
+
+    # Light state
+    self.nose_port_light = False
+    self.left_lever_light = False
+    self.right_lever_light = False
+
+    # Water delivery state
+    self.delivered_water = False
+    self.water_delivery_complete = False
+
+    # Visual cue state
+    self.visual_cue = False
+
+    # Nose port state
+    self.nose_port_entry = False
+    self.nose_port_exit = False
+
+    # Lever state
+    self.is_lever_pressed = False
+    self.left_lever_pressed = False
+    self.left_lever_start_time = None
+    self.right_lever_pressed = False
+    self.right_lever_start_time = None
+
+    # Trial parameters
+    self.cue_side = random.choice(["left", "right"])
+    self.cue_duration = random.randint(
+      self.config.cue_minimum,
+      self.config.cue_maximum
+    )
+    log(f"Cue will be displayed on {self.cue_side} side", "info")
+
+    # Trial events
+    self.events = []
+
+  def on_enter(self):
+    self.start_time = pygame.time.get_ticks()
+    super().on_enter()
+
+    # Check if the trial should be blocked
+    if self._check_trial_blocked():
+      self.trial_blocked = True
+      log("Trial blocked by active nose poke or lever press", "warning")
+    else:
+      # Activate the nose port light
+      self.nose_port_light = True
+
+    # Clear the displays
+    if not self.gpio.is_simulating_gpio():
+      self.display.clear_displays()
+    log("Trial started", "info")
+
+  def on_exit(self):
+    super().on_exit()
+    self.add_data("events", self.events)
+    if self.is_error_trial:
+      self.add_data("error_trial", True)
+      if hasattr(self, 'error_type'):
+        self.add_data("error_type", self.error_type)
+
+  def update(self, events):
+    current_time = pygame.time.get_ticks()
+
+    # Halt the trial if it is blocked
+    if self.trial_blocked and self._check_trial_blocked():
+      return True
+    else:
+      self.trial_blocked = False
+
+      # Activate the nose port light
+      self.nose_port_light = True
+
+    # Condition for trial end - premature nose withdrawal
+    if (
+        self.nose_port_entry
+        and not self.nose_port_exit
+        and not self.get_gpio_state()["input_ir"]
+        and not self.water_delivery_complete
+    ):
+      log("Premature nose withdrawal", "error")
+      # Update lights
+      self.left_lever_light = False
+      self.right_lever_light = False
+      self.nose_port_light = False
+
+      # Update visual cue
+      self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
+
+      # Update trial state and end trial
+      self.is_error_trial = True
+      self.error_type = "premature_withdrawal"
+      self.add_data("trial_outcome", TrialOutcome.FAILURE_NOSEPORT)
+      return False
+
+    # Condition for trial end - when water delivery is complete and nose port is exited
+    if self.water_delivery_complete and self.nose_port_exit:
+      log("Trial ended after water delivery and nose port exit", "success")
+      self.add_data("trial_outcome", TrialOutcome.SUCCESS)
+
+      # Update lights
+      self.left_lever_light = False
+      self.right_lever_light = False
+      self.nose_port_light = False
+
+      # Update visual cue
+      self.visual_cue = False
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
+      return False
+
+    # Handle any PyGame events
+    for event in events:
+      if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_ESCAPE:
+          log("Trial canceled", "info")
+          self.add_data("trial_canceled", True)
+          self.add_data("trial_outcome", TrialOutcome.CANCELLED)
+          return False
+
+    # Track nose port state changes
+    current_nose_state = self.get_gpio_state()["input_ir"]
+
+    if current_nose_state and not self.nose_port_entry:
+      # Detect nose port entry
+      self.nose_port_entry = True
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_ENTRY"])
+      log("Nose port entry", "info")
+
+      # Update cue display
+      log("Cue display started", "info")
+      self.cue_start_time = current_time
+      self.visual_cue = True
+      self.add_event(TRIAL_EVENTS["VISUAL_CUE_START"])
+
+      # Update lights
+      self.left_lever_light = True
+      self.right_lever_light = True
+      self.nose_port_light = False
+    elif not current_nose_state and self.nose_port_entry and not self.nose_port_exit:
+      # Detect nose port exit (nose_poke = False means nose is OUT)
+      self.nose_port_exit = True
+      self.add_event(TRIAL_EVENTS["NOSE_PORT_EXIT"])
+      log("Nose port exit", "info")
+
+    # Update lever state
+    left_lever = self.get_gpio_state()["input_lever_left"]
+    right_lever = self.get_gpio_state()["input_lever_right"]
+
+    # Capture lever press events
+    if left_lever and not self.left_lever_pressed:
+      self.left_lever_pressed = True
+      self.left_lever_start_time = current_time
+      log("Left lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_PRESS"])
+    elif not left_lever and self.left_lever_pressed:
+      self.left_lever_pressed = False
+      log("Left lever released", "info")
+      self.add_event(TRIAL_EVENTS["LEFT_LEVER_RELEASE"], duration=current_time - self.left_lever_start_time)
+
+    if right_lever and not self.right_lever_pressed:
+      self.right_lever_pressed = True
+      self.right_lever_start_time = current_time
+      log("Right lever pressed", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_PRESS"])
+    elif not right_lever and self.right_lever_pressed:
+      self.right_lever_pressed = False
+      log("Right lever released", "info")
+      self.add_event(TRIAL_EVENTS["RIGHT_LEVER_RELEASE"], duration=current_time - self.right_lever_start_time)
+
+    # Handle lever press events - STAGE 4 SPECIFIC LOGIC
+    if (left_lever or right_lever) and not self.is_lever_pressed and self.nose_port_entry and not self.reward_triggered:
+      # Check for lever press start
+      self.is_lever_pressed = True
+
+      # Check if the correct lever was pressed
+      correct_lever_pressed = False
+      if self.cue_side == "left" and left_lever:
+        correct_lever_pressed = True
+        log("Correct lever pressed (left)", "success")
+      elif self.cue_side == "right" and right_lever:
+        correct_lever_pressed = True
+        log("Correct lever pressed (right)", "success")
+      else:
+        # Wrong lever pressed
+        log(f"Wrong lever pressed, cue was on {self.cue_side} side", "error")
+        self.is_error_trial = True
+        self.error_type = "wrong_lever"
+
+        # Update lights
+        self.left_lever_light = False
+        self.right_lever_light = False
+        self.nose_port_light = False
+
+        # Update visual cue
+        self.visual_cue = False
+        self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
+
+        # End trial with failure
+        self.add_data("trial_outcome", TrialOutcome.FAILURE_WRONGLEVER)
+        return False
+
+      if correct_lever_pressed:
+        # Trigger reward only for correct lever
+        self.reward_triggered = True
+        log("Correct lever press reward triggered", "success")
+        self.add_event(TRIAL_EVENTS["REWARD_TRIGGERED"])
+
+        # Deactivate the visual cue
+        self.visual_cue = False
+        self.add_event(TRIAL_EVENTS["VISUAL_CUE_END"])
+
+        # Update lights
+        self.left_lever_light = False
+        self.right_lever_light = False
+        self.nose_port_light = False
+    elif self.is_lever_pressed and not (left_lever or right_lever) and not self.reward_triggered:
+      # Check for lever release
+      log("Lever press released", "info")
+      self.is_lever_pressed = False
+
+    # Update water delivery and other tasks
+    self._update_water_delivery()
+    self._update_nose_port_state()
+    self._update_visual_cue()
+    self._update_nose_port_light()
+    self._update_lever_lights()
+
+    # Check if cue duration has elapsed without lever press
+    if self.nose_port_entry and not self.reward_triggered and self.cue_start_time:
+      if current_time - self.cue_start_time >= self.cue_duration:
+        self.visual_cue = False
+        log("Cue duration elapsed without lever press", "info")
+        self.add_event(TRIAL_EVENTS["TRIAL_CUE_TIMEOUT"])
+        # Trial failure
+        self.add_data("trial_outcome", TrialOutcome.FAILURE_NOLEVER)
+        return False
+
+    return True
+
+  def _check_trial_blocked(self):
+    """Check if the trial should be blocked due to active nose poke or lever press"""
+    if self.get_gpio_state()["input_lever_left"] or self.get_gpio_state()["input_lever_right"]:
+      return True
+    elif self.get_gpio_state()["input_ir"]:
+      return True
+    return False
+
+  def _update_water_delivery(self):
+    current_time = pygame.time.get_ticks()
+
+    # Start water delivery when reward is triggered
+    if self.reward_triggered and not self.delivered_water:
+      self.gpio.set_input_port(True)
+      self.delivered_water = True
+      self.water_start_time = current_time
+      log("Water delivery started", "success")
+      self.add_event(TRIAL_EVENTS["WATER_DELIVERY_START"])
+
+    # Check if water delivery duration has elapsed
+    elif self.delivered_water and not self.water_delivery_complete:
+      if current_time - self.water_start_time >= self.config.valve_open:
+        self.gpio.set_input_port(False)
+        self.water_delivery_complete = True
+        log("Water delivery complete", "success")
+        self.add_event(TRIAL_EVENTS["WATER_DELIVERY_COMPLETE"])
+
+  def _update_nose_port_state(self):
+    """Update nose port light and visual cue based on nose port entry"""
+    if self.nose_port_entry:
+      self.nose_port_light = False
+
+  def _update_visual_cue(self):
+    # Update visual state
+    if not self.gpio.is_simulating_gpio():
+      if self.visual_cue:
+        self.display.draw_alternating_pattern(self.cue_side)
+      else:
+        self.display.clear_displays()
+
+  def _update_nose_port_light(self):
+    # Update nose port light
+    self.gpio.set_led_port(self.nose_port_light)
+
+  def _update_lever_lights(self):
+    # Update lever lights
+    self.gpio.set_led_lever_left(self.left_lever_light)
+    self.gpio.set_led_lever_right(self.right_lever_light)
+
+  def _pre_render_tasks(self):
+    # Clear screen
+    self.screen.fill((0, 0, 0))
+
+  def _post_render_tasks(self):
+    # Add simulation mode banner if in simulation mode
+    if self.gpio.is_simulating_gpio() and self.simulation_font:
+      banner_text = f"[SIMULATION - {self.title}]"
+      text_surface = self.simulation_font.render(banner_text, True, (255, 255, 255))
+      text_rect = text_surface.get_rect(center=(self.width // 2, 20))
+      self.screen.blit(text_surface, text_rect)
+
+  def render(self):
+    # Run pre-render tasks
+    self._pre_render_tasks()
+
+    # Run update tasks
+    self._update_water_delivery()
+    self._update_nose_port_state()
+    self._update_visual_cue()
+    self._update_nose_port_light()
+
+    # Run post-render tasks
+    self._post_render_tasks()

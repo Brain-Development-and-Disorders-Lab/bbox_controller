@@ -80,6 +80,14 @@ AVAILABLE_TRIAL_TYPES = {
             "water_delivery_duration": 2000
         }
     },
+    "Stage4": {
+        "description": "Nose poke and correct lever press training stage",
+        "default_parameters": {
+            "cue_duration": 5000,
+            "response_limit": 1000,
+            "water_delivery_duration": 2000
+        }
+    },
     "Interval": {
         "description": "Inter-trial interval",
         "default_parameters": {

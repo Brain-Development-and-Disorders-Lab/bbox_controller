@@ -22,6 +22,8 @@ class Trial:
   Each trial should implement update() and render() methods.
   """
   def __init__(self, *args, **kwargs):
+    self.title = "trial_default"
+
     # Screen properties
     self.screen = kwargs.get('screen')
     self.width = kwargs.get('width')
@@ -93,7 +95,7 @@ class Trial:
     """
     self.trial_end = self.get_timestamp()
     # Increment trial count if statistics controller is available
-    if hasattr(self, 'statistics') and self.statistics is not None:
+    if self.title != "trial_iti" and hasattr(self, 'statistics') and self.statistics is not None:
       self.statistics.increment_trial_count()
 
   def add_data(self, key, value):

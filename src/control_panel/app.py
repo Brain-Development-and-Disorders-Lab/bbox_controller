@@ -202,9 +202,9 @@ class ControlPanel(tk.Frame):
       duration_frame.grid(row=0, column=1, sticky="e", padx=(0, 5))
 
       # Duration label and input
-      tk.Label(duration_frame, text="Duration (ms):", font="Arial 9", bg="#f0f0f0").pack(side=tk.LEFT, padx=(0, 2))
+      tk.Label(duration_frame, text="Duration:", font="Arial 8", bg="#f0f0f0").pack(side=tk.LEFT, padx=(0, 2))
       duration_var = tk.StringVar(value="2000")  # Default 2000ms
-      duration_entry = tk.Entry(duration_frame, textvariable=duration_var, width=6, font="Arial 9")
+      duration_entry = tk.Entry(duration_frame, textvariable=duration_var, width=4, font="Arial 8")
       duration_entry.pack(side=tk.LEFT, padx=(0, 5))
 
     # State indicator (circle)
@@ -216,7 +216,7 @@ class ControlPanel(tk.Frame):
       button = tk.Button(
         container_frame,
         text="Test",
-        font="Arial 10",
+        font="Arial 8",
         command=lambda: self.execute_command(f"{command_name} {duration_var.get()}"),
         state=tk.DISABLED
       )
@@ -224,7 +224,7 @@ class ControlPanel(tk.Frame):
       button = tk.Button(
         container_frame,
         text="Test",
-        font="Arial 10",
+        font="Arial 8",
         command=lambda: self.execute_command(command_name),
         state=tk.DISABLED
       )
@@ -268,8 +268,11 @@ class ControlPanel(tk.Frame):
     self.test_indicators = {}
 
     # Configure the grid
-    self.master.grid_columnconfigure(0, weight=1) # Left column (status)
-    self.master.grid_columnconfigure(1, weight=1) # Right column (experiment)
+    self.master.grid_columnconfigure(0, weight=1)  # Left column (connection)
+    self.master.grid_columnconfigure(1, weight=2)  # Right column (experiment management) - wider
+    self.master.grid_rowconfigure(0, weight=0)     # Top row (connection + experiment management)
+    self.master.grid_rowconfigure(1, weight=1)     # Middle row (status panels)
+    self.master.grid_rowconfigure(2, weight=1)     # Bottom row (console)
 
     # Set the UI to resize with the window
     self.master.grid_propagate(True)
@@ -278,45 +281,137 @@ class ControlPanel(tk.Frame):
     main_frame = tk.Frame(self.master, padx=PADDING, pady=PADDING)
     main_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
-    # Connection section with border
+    # Row 0: Connection section and Experiment Management
     connection_frame = tk.LabelFrame(main_frame, text="Connection", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    connection_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, PADDING))
+    connection_frame.grid(row=0, column=0, sticky="nsew", pady=(0, PADDING), padx=(0, PADDING//2))
 
-    # Connection controls
-    tk.Label(connection_frame, text="IP Address:").pack(side=tk.LEFT, padx=(0, 5))
-    tk.Entry(connection_frame, textvariable=self.ip_address_var, width=15).pack(side=tk.LEFT, padx=(0, 15))
-    tk.Label(connection_frame, text="Port:").pack(side=tk.LEFT, padx=(0, 5))
-    tk.Entry(connection_frame, textvariable=self.port_var, width=6).pack(side=tk.LEFT, padx=(0, 15))
-    self.connect_button = tk.Button(connection_frame, text="Connect", font="Arial 10", command=self.connect_websocket)
+    # Configure grid for connection frame
+    connection_frame.grid_columnconfigure(0, weight=1)  # Left side (IP/Port/Buttons)
+    connection_frame.grid_columnconfigure(1, weight=1)  # Right side (Status/Versions)
+
+    # Left side: IP Address, Port, and Buttons
+    left_frame = tk.Frame(connection_frame)
+    left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, PADDING//2))
+
+    # IP Address
+    ip_frame = tk.Frame(left_frame)
+    ip_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+    tk.Label(ip_frame, text="IP Address:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Entry(ip_frame, textvariable=self.ip_address_var, width=15).pack(side=tk.LEFT, padx=(5, 0))
+
+    # Port
+    port_frame = tk.Frame(left_frame)
+    port_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+    tk.Label(port_frame, text="Port:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Entry(port_frame, textvariable=self.port_var, width=8).pack(side=tk.LEFT, padx=(5, 0))
+
+    # Connect/Disconnect buttons
+    buttons_frame = tk.Frame(left_frame)
+    buttons_frame.pack(side=tk.TOP, fill=tk.X)
+    self.connect_button = tk.Button(buttons_frame, text="Connect", font="Arial 9", command=self.connect_websocket)
     self.connect_button.pack(side=tk.LEFT, padx=(0, 5))
-    self.disconnect_button = tk.Button(connection_frame, text="Disconnect", font="Arial 10", command=self.disconnect_from_device, state=tk.DISABLED)
-    self.disconnect_button.pack(side=tk.LEFT, padx=(0, 15))
+    self.disconnect_button = tk.Button(buttons_frame, text="Disconnect", font="Arial 9", command=self.disconnect_from_device, state=tk.DISABLED)
+    self.disconnect_button.pack(side=tk.LEFT, padx=(0, 0))
 
-    # Version information
-    version_frame = tk.LabelFrame(connection_frame, text="Versions", font=("Arial", 9), fg="gray", padx=5, pady=2)
-    version_frame.pack(side=tk.RIGHT, padx=(15, 0))
-    tk.Label(version_frame, text=f"Control Panel: {self.version}", font=("Arial", 9), fg="gray").pack(side=tk.TOP, anchor="w")
-    self.device_version_label = tk.Label(version_frame, text="Device: unknown", font=("Arial", 9), fg="gray")
-    self.device_version_label.pack(side=tk.BOTTOM, anchor="w")
+    # Right side: Status and Version information
+    right_frame = tk.Frame(connection_frame)
+    right_frame.grid(row=0, column=1, sticky="nsew", padx=(PADDING//2, 0))
 
-    # Main content area
-    content_frame = tk.Frame(main_frame)
-    content_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+    # Status
+    status_frame = tk.Frame(right_frame)
+    status_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(status_frame, text="Status:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.connection_status_label = tk.Label(status_frame, text="Disconnected", font=("Arial", 11), anchor="e", fg="red")
+    self.connection_status_label.pack(side=tk.RIGHT)
 
-    # Left column - Status Information
-    status_frame = tk.Frame(content_frame)
-    status_frame.grid(row=0, column=0, sticky="n", padx=(0, PADDING))
+    # Control Panel Version
+    cp_version_frame = tk.Frame(right_frame)
+    cp_version_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(cp_version_frame, text="Control Panel Version:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.control_panel_version_label = tk.Label(cp_version_frame, text=self.version, font=("Arial", 11), anchor="e")
+    self.control_panel_version_label.pack(side=tk.RIGHT)
 
-    # Statistics section
-    statistics_frame = tk.LabelFrame(status_frame, text="Experiment Statistics", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    statistics_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
+    # Device Version
+    device_version_frame = tk.Frame(right_frame)
+    device_version_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(device_version_frame, text="Device Version:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.device_version_label = tk.Label(device_version_frame, text="unknown", font=("Arial", 11), anchor="e")
+    self.device_version_label.pack(side=tk.RIGHT)
 
-    # Create statistics display
-    self.create_statistics_display(statistics_frame)
+    # Experiment Management section
+    experiment_management_frame = tk.LabelFrame(main_frame, text="Experiment Management", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    experiment_management_frame.grid(row=0, column=1, sticky="nsew", padx=(PADDING//2, 0), pady=(0, PADDING))
+
+    # Animal ID input frame
+    animal_id_frame = tk.Frame(experiment_management_frame)
+    animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+
+    tk.Label(animal_id_frame, text="Animal ID:").pack(side=tk.LEFT, pady=0)
+    self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
+    self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)
+
+    # Experiment selection
+    experiment_selection_frame = tk.Frame(experiment_management_frame)
+    experiment_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+
+    tk.Label(experiment_selection_frame, text="Experiment:").pack(side=tk.LEFT, pady=0)
+    self.experiment_var = tk.StringVar()
+    self.experiment_combo = ttk.Combobox(experiment_selection_frame, textvariable=self.experiment_var, state="readonly", width=20)
+    self.experiment_combo.pack(side=tk.LEFT, pady=0, padx=(5, 0))
+    self.experiment_combo.bind("<<ComboboxSelected>>", self.on_experiment_selected)
+
+    # Experiment buttons
+    experiment_buttons_frame = tk.Frame(experiment_management_frame)
+    experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
+
+    self.new_experiment_button = tk.Button(
+      experiment_buttons_frame,
+      text="New Experiment",
+      font="Arial 9",
+      command=self.create_new_experiment,
+      state=tk.NORMAL
+    )
+    self.new_experiment_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
+    self.experiment_editor_button = tk.Button(
+      experiment_buttons_frame,
+      text="Edit Experiment",
+      font="Arial 9",
+      command=self.open_experiment_editor,
+      state=tk.DISABLED
+    )
+    self.experiment_editor_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
+    self.start_experiment_button = tk.Button(
+      experiment_buttons_frame,
+      text="Start",
+      font="Arial 9",
+      command=self.start_experiment,
+      state=tk.DISABLED
+    )
+    self.start_experiment_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
+
+    self.stop_experiment_button = tk.Button(
+      experiment_buttons_frame,
+      text="Stop",
+      font="Arial 9",
+      command=lambda: self.execute_command("stop_experiment"),
+      state=tk.DISABLED
+    )
+    self.stop_experiment_button.pack(side=tk.LEFT, padx=(0, 0), pady=0)
+
+    # Row 1: Status panels (Input Status, Test Status, Experiment Statistics)
+    status_panels_frame = tk.Frame(main_frame)
+    status_panels_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(0, PADDING))
+
+    # Configure grid for status panels
+    status_panels_frame.grid_columnconfigure(0, weight=1)  # Input Status
+    status_panels_frame.grid_columnconfigure(1, weight=2)  # Test Status (wider)
+    status_panels_frame.grid_columnconfigure(2, weight=1)  # Experiment Statistics
 
     # Input Status section
-    input_status_frame = tk.LabelFrame(status_frame, text="Input Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    input_status_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, PADDING))
+    input_status_frame = tk.LabelFrame(status_panels_frame, text="Input Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    input_status_frame.grid(row=0, column=0, sticky="nsew", padx=(0, PADDING//2))
 
     # Create input indicators
     self.create_state_indicator(input_status_frame, "Left Lever", self.input_label_states["input_lever_left"])
@@ -327,8 +422,8 @@ class ControlPanel(tk.Frame):
     self.create_state_indicator(input_status_frame, "Nose Light", self.input_label_states["led_port"])
 
     # Test Status section
-    test_status_frame = tk.LabelFrame(status_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    test_status_frame.pack(side=tk.TOP, fill=tk.X)
+    test_status_frame = tk.LabelFrame(status_panels_frame, text="Test Status", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    test_status_frame.grid(row=0, column=1, sticky="nsew", padx=(PADDING//2, PADDING//2))
 
     # Create test rows
     self.create_test_row(test_status_frame, "Test Water Delivery", "test_water_delivery", True)
@@ -342,85 +437,22 @@ class ControlPanel(tk.Frame):
     self.reset_tests_button = tk.Button(
       test_status_frame,
       text="Reset",
-      font="Arial 10",
+      font="Arial 9",
       command=self.reset_tests,
       state=tk.DISABLED
     )
     self.reset_tests_button.pack(side=tk.RIGHT, padx=1, pady=(5, 0))
 
-    # Right column - Experiment Management
-    experiment_frame = tk.Frame(content_frame)
-    experiment_frame.grid(row=0, column=1, sticky="nsew", rowspan=2)
+    # Statistics section
+    statistics_frame = tk.LabelFrame(status_panels_frame, text="Experiment Statistics", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    statistics_frame.grid(row=0, column=2, sticky="nsew", padx=(PADDING//2, 0))
 
-    # Experiment Management section
-    experiment_management_frame = tk.LabelFrame(experiment_frame, text="Experiment Management", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    experiment_management_frame.pack(side=tk.TOP, fill=tk.X)
+    # Create statistics display
+    self.create_statistics_display(statistics_frame)
 
-    # Animal ID input frame
-    animal_id_frame = tk.Frame(experiment_management_frame)
-    animal_id_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
-
-    tk.Label(animal_id_frame, text="Animal ID:").pack(side=tk.LEFT, pady=0)
-    self.animal_id_input = tk.Entry(animal_id_frame, textvariable=self.animal_id_var, state=tk.DISABLED)
-    self.animal_id_input.pack(side=tk.LEFT, pady=0, fill=tk.X, expand=True)
-
-    # Experiment selection
-    experiment_selection_frame = tk.Frame(experiment_management_frame)
-    experiment_selection_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
-
-    tk.Label(experiment_selection_frame, text="Experiment:").pack(side=tk.LEFT, pady=0)
-    self.experiment_var = tk.StringVar()
-    self.experiment_combo = ttk.Combobox(experiment_selection_frame, textvariable=self.experiment_var, state="readonly", width=32)
-    self.experiment_combo.pack(side=tk.LEFT, pady=0, padx=(5, 0))
-    self.experiment_combo.bind("<<ComboboxSelected>>", self.on_experiment_selected)
-
-    # Experiment buttons
-    experiment_buttons_frame = tk.Frame(experiment_management_frame)
-    experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
-
-    self.new_experiment_button = tk.Button(
-      experiment_buttons_frame,
-      text="New Experiment",
-      font="Arial 10",
-      command=self.create_new_experiment,
-      state=tk.NORMAL
-    )
-    self.new_experiment_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
-
-    self.experiment_editor_button = tk.Button(
-      experiment_buttons_frame,
-      text="Edit Experiment",
-      font="Arial 10",
-      command=self.open_experiment_editor,
-      state=tk.DISABLED
-    )
-    self.experiment_editor_button.pack(side=tk.LEFT, padx=(0, 5), pady=0)
-
-    # Experiment buttons frame
-    experiment_buttons_frame = tk.Frame(experiment_management_frame)
-    experiment_buttons_frame.pack(side=tk.TOP, fill=tk.X)
-
-    self.start_experiment_button = tk.Button(
-      experiment_buttons_frame,
-      text="Start",
-      font="Arial 10",
-      command=self.start_experiment,
-      state=tk.DISABLED
-    )
-    self.start_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
-
-    self.stop_experiment_button = tk.Button(
-      experiment_buttons_frame,
-      text="Stop",
-      font="Arial 10",
-      command=lambda: self.execute_command("stop_experiment"),
-      state=tk.DISABLED
-    )
-    self.stop_experiment_button.pack(side=tk.RIGHT, padx=2, pady=0)
-
-    # Console section
-    console_frame = tk.LabelFrame(experiment_frame, text="Console", padx=SECTION_PADDING, pady=SECTION_PADDING)
-    console_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+    # Row 2: Console section
+    console_frame = tk.LabelFrame(main_frame, text="Console", padx=SECTION_PADDING, pady=SECTION_PADDING)
+    console_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
     console_frame.grid_columnconfigure(0, weight=1)
     console_frame.grid_rowconfigure(0, weight=1)
 
@@ -607,6 +639,9 @@ class ControlPanel(tk.Frame):
     self.is_connected = True
     self.log("Connected to the device", "success")
 
+    # Update connection status
+    self.connection_status_label.config(text="Connected", fg="green")
+
     # Enable all buttons
     self.connect_button.config(state=tk.DISABLED)
 
@@ -642,6 +677,9 @@ class ControlPanel(tk.Frame):
 
     self.is_connected = False
 
+    # Update connection status
+    self.connection_status_label.config(text="Disconnected", fg="red")
+
     # Enable connect button and disable disconnect button
     self.connect_button.config(state=tk.NORMAL)
     self.disconnect_button.config(state=tk.DISABLED)
@@ -668,7 +706,7 @@ class ControlPanel(tk.Frame):
 
     # Reset device version display
     self.device_version = "unknown"
-    self.device_version_label.config(text="Device: unknown")
+    self.device_version_label.config(text="unknown")
 
     self.log("Disconnected from the device", "info")
 
@@ -687,7 +725,7 @@ class ControlPanel(tk.Frame):
         new_version = received_message["version"]
         if new_version != self.device_version:
           self.device_version = new_version
-          self.device_version_label.config(text=f"Device: {self.device_version}")
+          self.device_version_label.config(text=self.device_version)
           self.log(f"Device version: {self.device_version}", "info", "SYSTEM")
 
       # Handle other message types
@@ -1144,7 +1182,7 @@ class ControlPanel(tk.Frame):
 def main():
   root = tk.Tk()
   root.title("Behavior Box: Control Panel")
-  root.geometry("864x760")
+  root.geometry("846x620")
   root.resizable(False, False)
 
   # Set window icon

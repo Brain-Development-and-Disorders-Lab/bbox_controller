@@ -80,6 +80,11 @@ class ControlPanel(tk.Frame):
         "water_deliveries": 0
       }
 
+      # Experiment timing tracking
+      self.experiment_start_time = None
+      self.current_trial_type = "None"
+      self.current_trial_start_time = None
+
       # Configure source-specific colors
       self.source_colors = {
         "UI": "#0066CC",
@@ -119,6 +124,9 @@ class ControlPanel(tk.Frame):
 
       # Handle exiting
       atexit.register(self.on_exit)
+
+      # Start timer update loop
+      self.update_timers()
 
   def create_state_indicator(self, parent, label_text, var):
     """
@@ -706,20 +714,38 @@ class ControlPanel(tk.Frame):
         if status == "started":
           self.set_experiment_buttons_disabled(True)
           self.reset_statistics_display()
+          # Start experiment timer
+          self.experiment_start_time = time.time()
         elif status == "completed" or status == "stopped":
           self.set_experiment_buttons_disabled(False)
+          # Stop experiment timer
+          self.experiment_start_time = None
+          self.current_trial_type = "None"
+          self.current_trial_start_time = None
       elif received_message["type"] == "trial_start":
         # Update trial start
-        self.log(f"Trial start: {received_message['data']['trial']}", "info")
+        trial_name = received_message['data']['trial']
+        self.log(f"Trial start: {trial_name}", "info")
+        # Update active trial information
+        self.current_trial_type = trial_name
+        self.current_trial_start_time = time.time()
+        if hasattr(self, 'active_trial_type_label'):
+          self.active_trial_type_label.config(text=trial_name)
       elif received_message["type"] == "trial_complete":
         # Update trial complete with appropriate log level based on outcome
         trial_data = received_message.get('data', {}).get('data', {})
         trial_outcome = trial_data.get('trial_outcome', 'success')
+        trial_name = received_message['data']['trial']
 
         if trial_outcome.startswith("failure"):
-          self.log(f"Trial complete with errors: {received_message['data']['trial']}", "warning")
+          self.log(f"Trial complete with errors: {trial_name}", "warning")
         else:
-          self.log(f"Trial complete: {received_message['data']['trial']}", "success")
+          self.log(f"Trial complete: {trial_name}", "success")
+
+        # Reset active trial timer
+        self.current_trial_start_time = None
+        if hasattr(self, 'active_trial_time_label'):
+          self.active_trial_time_label.config(text="00:00:00")
       elif received_message["type"] == "device_log":
         # Update device log
         self.log(received_message["data"]["message"], received_message["data"]["state"], "device")
@@ -994,38 +1020,59 @@ class ControlPanel(tk.Frame):
     stats_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
 
     # Create labels for each statistic with proper alignment
+    # Total Experiment Time
+    total_time_frame = tk.Frame(stats_frame)
+    total_time_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(total_time_frame, text="Total Experiment Time:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.total_experiment_time_label = tk.Label(total_time_frame, text="00:00:00", font=("Arial", 11), anchor="e")
+    self.total_experiment_time_label.pack(side=tk.RIGHT)
+
+    # Active Trial Time
+    active_trial_time_frame = tk.Frame(stats_frame)
+    active_trial_time_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(active_trial_time_frame, text="Active Trial Time:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.active_trial_time_label = tk.Label(active_trial_time_frame, text="00:00:00", font=("Arial", 11), anchor="e")
+    self.active_trial_time_label.pack(side=tk.RIGHT)
+
+    # Active Trial Type
+    active_trial_frame = tk.Frame(stats_frame)
+    active_trial_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(active_trial_frame, text="Active Trial:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.active_trial_type_label = tk.Label(active_trial_frame, text="None", font=("Arial", 11), anchor="e")
+    self.active_trial_type_label.pack(side=tk.RIGHT)
+
+    # Trial Count
+    trial_frame = tk.Frame(stats_frame)
+    trial_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+    tk.Label(trial_frame, text="Total Trials:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    self.trial_count_label = tk.Label(trial_frame, text="0", font=("Arial", 11), anchor="e")
+    self.trial_count_label.pack(side=tk.RIGHT)
+
     # Nose Pokes
     nose_pokes_frame = tk.Frame(stats_frame)
     nose_pokes_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
-    tk.Label(nose_pokes_frame, text="Nose Pokes:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Label(nose_pokes_frame, text="Total Nose Pokes:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
     self.nose_pokes_label = tk.Label(nose_pokes_frame, text="0", font=("Arial", 11), anchor="e")
     self.nose_pokes_label.pack(side=tk.RIGHT)
 
     # Left Lever Presses
     left_lever_frame = tk.Frame(stats_frame)
     left_lever_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
-    tk.Label(left_lever_frame, text="Left Lever Presses:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Label(left_lever_frame, text="Total Left Lever Presses:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
     self.left_lever_presses_label = tk.Label(left_lever_frame, text="0", font=("Arial", 11), anchor="e")
     self.left_lever_presses_label.pack(side=tk.RIGHT)
 
     # Right Lever Presses
     right_lever_frame = tk.Frame(stats_frame)
     right_lever_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
-    tk.Label(right_lever_frame, text="Right Lever Presses:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Label(right_lever_frame, text="Total Right Lever Presses:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
     self.right_lever_presses_label = tk.Label(right_lever_frame, text="0", font=("Arial", 11), anchor="e")
     self.right_lever_presses_label.pack(side=tk.RIGHT)
-
-    # Trial Count
-    trial_frame = tk.Frame(stats_frame)
-    trial_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
-    tk.Label(trial_frame, text="Trials:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
-    self.trial_count_label = tk.Label(trial_frame, text="0", font=("Arial", 11), anchor="e")
-    self.trial_count_label.pack(side=tk.RIGHT)
 
     # Water Deliveries
     water_frame = tk.Frame(stats_frame)
     water_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
-    tk.Label(water_frame, text="Water Deliveries:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Label(water_frame, text="Total Water Deliveries:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
     self.water_deliveries_label = tk.Label(water_frame, text="0", font=("Arial", 11), anchor="e")
     self.water_deliveries_label.pack(side=tk.RIGHT)
 
@@ -1051,6 +1098,48 @@ class ControlPanel(tk.Frame):
       "water_deliveries": 0
     }
     self.update_statistics(self.statistics)
+
+    # Reset timing variables
+    self.experiment_start_time = None
+    self.current_trial_type = "None"
+    self.current_trial_start_time = None
+
+    # Reset timer displays
+    if hasattr(self, 'total_experiment_time_label'):
+      self.total_experiment_time_label.config(text="00:00:00")
+    if hasattr(self, 'active_trial_type_label'):
+      self.active_trial_type_label.config(text="None")
+    if hasattr(self, 'active_trial_time_label'):
+      self.active_trial_time_label.config(text="00:00:00")
+
+  def update_timers(self):
+    """
+    Updates the timer displays every second.
+    """
+    if hasattr(self, 'total_experiment_time_label'):
+      # Update total experiment time
+      if self.experiment_start_time:
+        elapsed = time.time() - self.experiment_start_time
+        hours = int(elapsed // 3600)
+        minutes = int((elapsed % 3600) // 60)
+        seconds = int(elapsed % 60)
+        self.total_experiment_time_label.config(text=f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+      else:
+        self.total_experiment_time_label.config(text="00:00:00")
+
+    if hasattr(self, 'active_trial_time_label'):
+      # Update active trial time
+      if self.current_trial_start_time:
+        elapsed = time.time() - self.current_trial_start_time
+        hours = int(elapsed // 3600)
+        minutes = int((elapsed % 3600) // 60)
+        seconds = int(elapsed % 60)
+        self.active_trial_time_label.config(text=f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+      else:
+        self.active_trial_time_label.config(text="00:00:00")
+
+    # Schedule next update in 1 second
+    self.master.after(1000, self.update_timers)
 
 def main():
   root = tk.Tk()

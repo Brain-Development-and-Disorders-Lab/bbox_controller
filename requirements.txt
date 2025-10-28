@@ -7,8 +7,9 @@ numpy
 # Image processing and display
 Pillow
 
-# GUI framework (for tkinter)
-tk
+# GUI framework
+PyQt6
+PySide6
 
 # Raspberry Pi specific requirements (only install on Linux/Raspberry Pi)
 gpiozero; platform_system == "Linux"

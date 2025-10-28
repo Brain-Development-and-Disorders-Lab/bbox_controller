@@ -48,7 +48,7 @@ class ExperimentEditor(QDialog):
         if self.current_experiment:
             self.update_ui()
         else:
-            self.new_experiment()
+            self.current_experiment = None
 
     def create_widgets(self):
         """Create all UI widgets"""
@@ -189,6 +189,7 @@ class ExperimentEditor(QDialog):
 
     def new_experiment(self):
         """Create a new experiment"""
+        from shared.models import Experiment, Config
         config = Config()
         self.current_experiment = Experiment(name="New Experiment", config=config)
         self.update_ui()
@@ -262,6 +263,7 @@ class ExperimentEditor(QDialog):
             if self.on_experiment_save:
                 self.on_experiment_save(self.current_experiment)
             self.experiment_saved.emit(self.current_experiment)
+            self.accept()
         else:
             QMessageBox.critical(self, "Error", "Failed to save experiment.")
 
@@ -295,23 +297,113 @@ class ExperimentEditor(QDialog):
 
     def add_trial(self):
         """Add a new trial to the timeline"""
-        # TODO: Implement add trial dialog
-        pass
+        if not self.current_experiment:
+            return
+
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QComboBox, QLineEdit
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add Trial")
+        dialog.setModal(True)
+        dialog.resize(300, 200)
+
+        layout = QVBoxLayout()
+
+        layout.addWidget(QLabel("Select trial type:"))
+
+        trial_type_combo = QComboBox()
+        trial_type_combo.addItems(list(AVAILABLE_TRIAL_TYPES.keys()))
+        layout.addWidget(trial_type_combo)
+
+        layout.addWidget(QLabel("Trial ID:"))
+        trial_id_entry = QLineEdit()
+        layout.addWidget(trial_id_entry)
+
+        layout.addWidget(QLabel("Description (optional):"))
+        trial_desc_entry = QLineEdit()
+        layout.addWidget(trial_desc_entry)
+
+        def on_trial_type_changed():
+            trial_type = trial_type_combo.currentText()
+            if trial_type:
+                existing_trials = [t for t in self.current_experiment.timeline.trials if t.type == trial_type]
+                trial_id = f"{trial_type}_{len(existing_trials)}"
+                trial_id_entry.setText(trial_id)
+
+        trial_type_combo.currentTextChanged.connect(on_trial_type_changed)
+
+        def on_add():
+            trial_type = trial_type_combo.currentText()
+            if not trial_type:
+                QMessageBox.warning(self, "Error", "Please select a trial type.")
+                return
+
+            trial_id = trial_id_entry.text().strip()
+            if not trial_id:
+                QMessageBox.warning(self, "Error", "Trial ID is required.")
+                return
+
+            description = trial_desc_entry.text().strip()
+            default_params = AVAILABLE_TRIAL_TYPES[trial_type]["default_parameters"].copy()
+
+            self.current_experiment.timeline.add_trial(trial_type, default_params, trial_id, description)
+            self.update_ui()
+            dialog.accept()
+
+        button_layout = QHBoxLayout()
+        add_btn = QPushButton("Add")
+        cancel_btn = QPushButton("Cancel")
+        add_btn.clicked.connect(on_add)
+        cancel_btn.clicked.connect(dialog.reject)
+
+        button_layout.addWidget(add_btn)
+        button_layout.addWidget(cancel_btn)
+        layout.addLayout(button_layout)
+
+        dialog.setLayout(layout)
+        dialog.exec()
 
     def remove_trial(self):
         """Remove the selected trial"""
-        # TODO: Implement remove trial
-        pass
+        if not self.current_experiment:
+            return
+
+        current_row = self.trial_list.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "No Selection", "Please select a trial to remove.")
+            return
+
+        if 0 <= current_row < len(self.current_experiment.timeline.trials):
+            trial = self.current_experiment.timeline.trials[current_row]
+            reply = QMessageBox.question(self, "Confirm", f"Remove trial '{trial.id}'?",
+                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.current_experiment.timeline.remove_trial(trial.id)
+                self.update_ui()
 
     def move_trial_up(self):
         """Move the selected trial up"""
-        # TODO: Implement move trial up
-        pass
+        if not self.current_experiment:
+            return
+
+        current_row = self.trial_list.currentRow()
+        if current_row > 0:
+            trial = self.current_experiment.timeline.trials[current_row]
+            self.current_experiment.timeline.move_trial(trial.id, current_row - 1)
+            self.update_ui()
+            self.trial_list.setCurrentRow(current_row - 1)
 
     def move_trial_down(self):
         """Move the selected trial down"""
-        # TODO: Implement move trial down
-        pass
+        if not self.current_experiment:
+            return
+
+        current_row = self.trial_list.currentRow()
+        if 0 <= current_row < len(self.current_experiment.timeline.trials) - 1:
+            trial = self.current_experiment.timeline.trials[current_row]
+            self.current_experiment.timeline.move_trial(trial.id, current_row + 1)
+            self.update_ui()
+            self.trial_list.setCurrentRow(current_row + 1)
 
     def on_trial_selected(self, row):
         """Handle trial selection in listbox"""

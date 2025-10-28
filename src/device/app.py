@@ -388,6 +388,7 @@ class Device:
     self._current_trial.on_enter()
     self._experiment_started = True
 
+    _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
     _device_message_queue.put(CommunicationMessageBuilder.experiment_status("started", self._current_trial.title))
     log("Timeline experiment started", "info")
 

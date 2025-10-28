@@ -1,8 +1,8 @@
 """
-Filename: control_panel/ui/experiment_editor.py
+Filename: dashboard/ui/experiment_editor.py
 Author: Henry Burgess
 Date: 2025-07-29
-Description: Experiment editor UI component for the control panel
+Description: Experiment editor UI component for the dashboard
 License: MIT
 """
 

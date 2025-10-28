@@ -100,9 +100,9 @@ sudo ./start.sh
 - Use keyboard controls for testing (see Simulation section below)
 - Check logs in `src/device/logs/device.log` for hardware initialization messages
 
-## Control Panel
+## Dashboard
 
-The control panel facilitates wireless monitoring and control via Websockets. To launch the control panel, run `./start.sh`, located in the `control_panel` directory.
+The dashboard facilitates wireless monitoring and control via Websockets. To launch the dashboard, run `./start.sh`, located in the `dashboard` directory.
 
 Use the *Connection* frame to connect to the device using an IP address and port number. The *Console* frame shows the live console output from the device. The *Input Status* frame shows the current state of the device IO with low latency. The *Test Status* frame allows the IO to be tested, specifically the water delivery, levers, and the IR beam.
 

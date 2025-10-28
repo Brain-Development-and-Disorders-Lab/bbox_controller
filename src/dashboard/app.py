@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Filename: control_panel/app.py
+Filename: dashboard/app.py
 Author: Henry Burgess
 Date: 2025-07-29
-Description: Main application for the control panel script, provides a GUI for controlling and monitoring the device
+Description: Main application for the dashboard script, provides a GUI for controlling and monitoring the device
 License: MIT
 """
 
@@ -262,7 +262,7 @@ class ControlPanel(tk.Frame):
 
   def create_layout(self):
     """
-    Creates the layout of the control panel.
+    Creates the layout of the dashboard.
     """
     # Initialize test indicators dictionary
     self.test_indicators = {}
@@ -324,10 +324,10 @@ class ControlPanel(tk.Frame):
     self.connection_status_label = tk.Label(status_frame, text="Disconnected", font=("Arial", 11), anchor="e", fg="red")
     self.connection_status_label.pack(side=tk.RIGHT)
 
-    # Control Panel Version
+    # Dashboard Version
     cp_version_frame = tk.Frame(right_frame)
     cp_version_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
-    tk.Label(cp_version_frame, text="Control Panel Version:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
+    tk.Label(cp_version_frame, text="Dashboard Version:", font=("Arial", 11, "bold"), anchor="w").pack(side=tk.LEFT)
     self.control_panel_version_label = tk.Label(cp_version_frame, text=self.version, font=("Arial", 11), anchor="e")
     self.control_panel_version_label.pack(side=tk.RIGHT)
 
@@ -670,7 +670,7 @@ class ControlPanel(tk.Frame):
 
   def on_disconnect(self):
     """
-    Resets the state of the control panel and disables all buttons.
+    Resets the state of the dashboard and disables all buttons.
     Called when the connection is lost or manually disconnected.
     """
     self.reset_state()
@@ -922,7 +922,7 @@ class ControlPanel(tk.Frame):
 
   def reset_state(self):
     """
-    Resets the state of the control panel.
+    Resets the state of the dashboard.
     """
     self.is_connected = False
     self.input_states = {
@@ -1181,7 +1181,7 @@ class ControlPanel(tk.Frame):
 
 def main():
   root = tk.Tk()
-  root.title("Behavior Box: Control Panel")
+  root.title("Behavior Box: Dashboard")
   root.geometry("846x620")
   root.resizable(False, False)
 
@@ -1194,7 +1194,7 @@ def main():
     pass
 
   view = ControlPanel(root)
-  view.master.title("Behavior Box: Control Panel")
+  view.master.title("Behavior Box: Dashboard")
   view.mainloop()
 
 if __name__ == "__main__":

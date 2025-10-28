@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # =============================================================================
-# Behavior Box: Control Panel Script
+# Behavior Box: Dashboard Script
 # =============================================================================
-# This script sets up the Python path and starts the control panel application
+# This script sets up the Python path and starts the dashboard application
 # =============================================================================
 
 set -e
@@ -61,16 +61,16 @@ setup_python_environment() {
 }
 
 # =============================================================================
-# CONTROL PANEL STARTUP
+# DASHBOARD STARTUP
 # =============================================================================
 
-start_control_panel() {
-    log INFO "Starting control panel application..."
+start_dashboard() {
+    log INFO "Starting dashboard application..."
 
     # Change to the script directory
     cd "$SCRIPT_DIR"
 
-    # Run the control panel
+    # Run the dashboard
     python main.py
 }
 
@@ -79,7 +79,7 @@ start_control_panel() {
 # =============================================================================
 
 log INFO "======================================================"
-log INFO "    Behavior Box: Control Panel Startup Script       "
+log INFO "    Behavior Box: Dashboard Startup Script       "
 log INFO "======================================================"
 log INFO "Directory: $SCRIPT_DIR"
 log INFO "Repository root: $REPO_ROOT"
@@ -88,5 +88,5 @@ log INFO "Timestamp: $(date)"
 # Setup Python environment
 setup_python_environment
 
-# Start control panel
-start_control_panel
+# Start dashboard
+start_dashboard

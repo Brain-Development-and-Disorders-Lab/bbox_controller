@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Filename: control_panel/main.py
+Filename: dashboard/main.py
 Author: Henry Burgess
 Date: 2025-07-29
-Description: Entry point for the control panel script, executed directly from the command line
+Description: Entry point for the dashboard script, executed directly from the command line
 License: MIT
 """
 
@@ -16,7 +16,7 @@ src_dir = os.path.dirname(script_dir)
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from control_panel.app import main
+from dashboard.app import main
 
 if __name__ == "__main__":
     main()

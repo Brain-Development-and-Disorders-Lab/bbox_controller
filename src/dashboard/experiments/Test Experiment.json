@@ -1,0 +1,40 @@
+{
+  "name": "Test Experiment",
+  "trials": [
+    {
+      "type": "Stage4",
+      "id": "Stage4_0",
+      "parameters": {
+        "cue_duration": 5000,
+        "response_limit": 1000,
+        "water_delivery_duration": 2000
+      },
+      "description": ""
+    },
+    {
+      "type": "Interval",
+      "id": "Interval_0",
+      "parameters": {
+        "duration": 800
+      },
+      "description": ""
+    }
+  ],
+  "config": {
+    "iti_minimum": 100,
+    "iti_maximum": 1000,
+    "response_limit": 1000,
+    "cue_minimum": 5000,
+    "cue_maximum": 10000,
+    "hold_minimum": 100,
+    "hold_maximum": 1000,
+    "valve_open": 100,
+    "punish_time": 1000
+  },
+  "description": "",
+  "version": "1.0",
+  "metadata": {},
+  "created_at": "2025-08-01T16:57:35.466174",
+  "modified_at": "2025-10-21T20:35:53.087881",
+  "loop": true
+}

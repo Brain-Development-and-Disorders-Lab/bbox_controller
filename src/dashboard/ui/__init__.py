@@ -1,8 +1,8 @@
 """
-Filename: control_panel/ui/__init__.py
+Filename: dashboard/ui/__init__.py
 Author: Henry Burgess
 Date: 2025-07-29
-Description: Exports for the control panel UI components
+Description: Exports for the dashboard UI components
 License: MIT
 """
 

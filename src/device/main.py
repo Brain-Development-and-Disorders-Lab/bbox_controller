@@ -9,6 +9,7 @@ License: MIT
 
 import sys
 import os
+import argparse
 
 # Add the 'src' directory to Python path to enable imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,4 +20,9 @@ if src_dir not in sys.path:
 from device.app import main
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Behavior Box Device')
+    parser.add_argument('--port', '-p', type=int, default=8765,
+                        help='Port for dashboard connection (default: 8765)')
+    args = parser.parse_args()
+
+    main(port=args.port)

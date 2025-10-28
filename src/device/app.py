@@ -37,8 +37,9 @@ HOST = DEFAULT_HOST
 PORT = DEFAULT_PORT
 
 class Device:
-  def __init__(self):
+  def __init__(self, port=DEFAULT_PORT):
     self._data = None
+    self.port = port
 
     self.version = VERSION
     self.config = None
@@ -174,10 +175,11 @@ class Device:
     main_rect = main_text.get_rect(center=(self.width // 2, center_y))
     self.screen.blit(main_text, main_rect)
 
-    # IP address beneath main text
+    # IP address and port beneath main text
     ip_address = self._get_local_ip()
     ip_font = pygame.font.SysFont("Arial", 32)
-    ip_text = ip_font.render(ip_address, True, (255, 255, 255))
+    ip_text_str = f"{ip_address}:{self.port}"
+    ip_text = ip_font.render(ip_text_str, True, (255, 255, 255))
     ip_rect = ip_text.get_rect(center=(self.width // 2, center_y + 60))
     self.screen.blit(ip_text, ip_rect)
 
@@ -797,13 +799,14 @@ async def handle_json_message(websocket, device: Device, message_data: dict):
   else:
     log(f"Unknown JSON message type: {message_type}", "warning")
 
-async def main_loop(device):
+async def main_loop(device, port=DEFAULT_PORT):
   """Main loop that runs both pygame and websocket communication"""
   log("Starting main loop", "info")
+  log(f"Server listening on port {port}", "info")
   server = await websockets.serve(
     lambda ws: handle_connection(ws, device),
     HOST,
-    PORT
+    port
   )
   device._websocket_server = server
 
@@ -853,16 +856,16 @@ async def main_loop(device):
     device.cleanup()
     log("Main loop stopped", "info")
 
-def main():
+def main(port=DEFAULT_PORT):
   global _device, _device_message_queue
 
   try:
     # Initialize the device
-    _device = Device()
+    _device = Device(port=port)
     _device_message_queue = queue.Queue()
 
     set_message_queue(_device_message_queue)
-    asyncio.run(main_loop(_device))
+    asyncio.run(main_loop(_device, port))
   except KeyboardInterrupt:
     log("Keyboard interrupt received", "info")
   except asyncio.TimeoutError:
@@ -874,4 +877,4 @@ def main():
       _device.cleanup()
 
 if __name__ == "__main__":
-  main()
+  main(port=DEFAULT_PORT)

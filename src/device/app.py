@@ -194,7 +194,7 @@ class Device:
       sim_font = pygame.font.SysFont("Arial", 16)
       input_states = self.gpio.get_gpio_state()
       state_text = [
-        f"Simulated GPIO:",
+        f"Simulated GPIO state:",
         f"Left Lever: {'PRESSED' if input_states['input_lever_left'] else 'RELEASED'}",
         f"Right Lever: {'PRESSED' if input_states['input_lever_right'] else 'RELEASED'}",
         f"Nose Port IR: {'ACTIVE' if input_states['input_ir'] else 'INACTIVE'}",
@@ -210,7 +210,7 @@ class Device:
         top_y = banner_height + 10
 
       for i, line in enumerate(state_text):
-        if "PRESSED" in line or "ACTIVE" in line or "ON" in line:
+        if "PRESSED" in line or ": ACTIVE" in line or "ON" in line:
           color = (0, 255, 0)
         elif "Simulated" in line:
           color = (255, 255, 255)

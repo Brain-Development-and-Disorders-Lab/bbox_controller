@@ -51,6 +51,14 @@ class DeviceDialog(QDialog):
             self.ip_field.setText(device.get('ip_address', ''))
         layout.addRow("IP Address:", self.ip_field)
 
+        self.port_field = QLineEdit()
+        self.port_field.setPlaceholderText("e.g., 8765")
+        if device:
+            self.port_field.setText(str(device.get('port', '8765')))
+        else:
+            self.port_field.setText('8765')
+        layout.addRow("Port:", self.port_field)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
@@ -80,6 +88,7 @@ class DeviceDialog(QDialog):
         """Validate inputs before accepting"""
         name = self.name_field.text().strip()
         ip = self.ip_field.text().strip()
+        port = self.port_field.text().strip()
 
         if not name:
             QMessageBox.warning(self, "Invalid Input", "Device name cannot be empty.")
@@ -93,12 +102,25 @@ class DeviceDialog(QDialog):
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid IP address (e.g., 192.168.1.100)")
             return
 
+        if not port:
+            QMessageBox.warning(self, "Invalid Input", "Port cannot be empty.")
+            return
+
+        try:
+            port_int = int(port)
+            if port_int < 1 or port_int > 65535:
+                raise ValueError()
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Port must be a number between 1 and 65535.")
+            return
+
         self.accept()
 
     def get_device_data(self):
         return {
             'name': self.name_field.text().strip(),
-            'ip_address': self.ip_field.text().strip()
+            'ip_address': self.ip_field.text().strip(),
+            'port': self.port_field.text().strip()
         }
 
     def delete_device(self):
@@ -131,6 +153,11 @@ class MainWindow(QMainWindow):
         self.devices = []
         self.connection_managers = {}  # device_name -> DeviceConnectionManager
         self.device_tabs = {}  # device_name -> DeviceTab
+
+        # Store device info widgets and buttons
+        self.device_connect_btn = None
+        self.device_disconnect_btn = None
+        self.current_device_name = None
 
         self.setup_devices_table()
         self.addDeviceButton.clicked.connect(self.add_device)
@@ -243,6 +270,7 @@ class MainWindow(QMainWindow):
             device = {
                 'name': device_data['name'],
                 'ip_address': device_data['ip_address'],
+                'port': device_data.get('port', '8765'),
                 'status': 'Disconnected'  # Only in memory, not saved to file
             }
             self.devices.append(device)
@@ -306,7 +334,9 @@ class MainWindow(QMainWindow):
             self.devicesTable.setRowHeight(row, 40)
 
         if len(self.devices) > 0:
+            self.devicesTable.blockSignals(True)
             self.devicesTable.selectRow(0)
+            self.devicesTable.blockSignals(False)
 
         self.update_device_info()
 
@@ -345,86 +375,121 @@ class MainWindow(QMainWindow):
 
     def update_device_info(self):
         """Update the device info box with selected device information"""
-        from PyQt6.QtWidgets import QLabel, QHBoxLayout, QWidget
+        selected_indexes = self.devicesTable.selectionModel().selectedRows()
 
-        while self.deviceInfoLayout.count():
-            child = self.deviceInfoLayout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-            elif child.layout():
-                for i in range(child.layout().count()):
-                    item = child.layout().itemAt(i)
-                    if item and item.widget():
+        if not selected_indexes or not self.devices:
+            # Clear existing widgets if any
+            if self.deviceInfoLayout.count() > 0:
+                while self.deviceInfoLayout.count():
+                    item = self.deviceInfoLayout.takeAt(0)
+                    if item.widget():
                         item.widget().deleteLater()
 
-        selected_row = self.devicesTable.currentRow()
-
-        if selected_row >= 0 and selected_row < len(self.devices):
-            device = self.devices[selected_row]
-
-            name_widget = QWidget()
-            name_layout = QHBoxLayout(name_widget)
-            name_layout.setContentsMargins(0, 0, 0, 0)
-            name_layout.addWidget(QLabel("<b>Name:</b>"))
-            name_value = QLabel(device['name'])
-            name_value.setStyleSheet("font-weight: bold;")
-            name_layout.addWidget(name_value)
-            name_layout.addStretch()
-            self.deviceInfoLayout.addWidget(name_widget)
-
-            ip_widget = QWidget()
-            ip_layout = QHBoxLayout(ip_widget)
-            ip_layout.setContentsMargins(0, 0, 0, 0)
-            ip_layout.addWidget(QLabel("<b>IP Address:</b>"))
-            ip_layout.addWidget(QLabel(device['ip_address']))
-            ip_layout.addStretch()
-            self.deviceInfoLayout.addWidget(ip_widget)
-
-            status_widget = QWidget()
-            status_layout = QHBoxLayout(status_widget)
-            status_layout.setContentsMargins(0, 0, 0, 0)
-            status_layout.addWidget(QLabel("<b>Status:</b>"))
-            status_value = QLabel(device.get('status', 'Disconnected'))
-            if status_value.text() == "Connected":
-                status_color = "#00AA00"
-            else:
-                status_color = "#AA0000"
-            status_value.setStyleSheet(f"color: {status_color}; font-weight: bold;")
-            status_layout.addWidget(status_value)
-            status_layout.addStretch()
-            self.deviceInfoLayout.addWidget(status_widget)
-
-            version_widget = QWidget()
-            version_layout = QHBoxLayout(version_widget)
-            version_layout.setContentsMargins(0, 0, 0, 0)
-            version_layout.addWidget(QLabel("<b>Software Version:</b>"))
-            version_layout.addWidget(QLabel(device.get('version', 'Unknown')))
-            version_layout.addStretch()
-            self.deviceInfoLayout.addWidget(version_widget)
-
-            self.deviceInfoLayout.addSpacing(10)
-
-            buttons_widget = QWidget()
-            buttons_layout = QHBoxLayout(buttons_widget)
-            buttons_layout.setContentsMargins(0, 0, 0, 0)
-
-            connect_btn = QPushButton("Connect")
-            connect_btn.setEnabled(device.get('status') != 'Connected')
-            connect_btn.clicked.connect(lambda: self.connect_to_device(selected_row))
-            buttons_layout.addWidget(connect_btn)
-
-            disconnect_btn = QPushButton("Disconnect")
-            disconnect_btn.setEnabled(device.get('status') == 'Connected')
-            disconnect_btn.clicked.connect(lambda: self.disconnect_from_device(selected_row))
-            buttons_layout.addWidget(disconnect_btn)
-
-            buttons_layout.addStretch()
-            self.deviceInfoLayout.addWidget(buttons_widget)
-        else:
             placeholder = QLabel("No Devices\n\nAdd a device to get started")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setStyleSheet("color: #999999;")
             self.deviceInfoLayout.addWidget(placeholder)
+            self.current_device_name = None
+            self.device_connect_btn = None
+            self.device_disconnect_btn = None
+            return
+
+        selected_row = selected_indexes[0].row()
+        if selected_row < 0 or selected_row >= len(self.devices):
+            return
+
+        device = self.devices[selected_row]
+        device_name = device['name']
+
+        # If already showing this device, just update the status
+        if self.current_device_name == device_name and self.device_connect_btn and self.device_disconnect_btn:
+            status = device.get('status', 'Disconnected')
+            self.device_connect_btn.setEnabled(status != 'Connected')
+            self.device_disconnect_btn.setEnabled(status == 'Connected')
+            return
+
+        # First time showing this device - create widgets
+        if self.deviceInfoLayout.count() > 0:
+            while self.deviceInfoLayout.count():
+                item = self.deviceInfoLayout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+
+        from PyQt6.QtWidgets import QLabel, QHBoxLayout, QWidget
+
+        # Name
+        name_label = QLabel(f"<b>Name:</b> {device['name']}")
+        self.deviceInfoLayout.addWidget(name_label)
+
+        # Network address
+        port = device.get('port', '8765')
+        if not isinstance(port, str):
+            port = str(port)
+        network_label = QLabel(f"<b>Network Address:</b> {device['ip_address']}:{port}")
+        self.deviceInfoLayout.addWidget(network_label)
+
+        # Status
+        status = device.get('status', 'Disconnected')
+        status_color = "#00AA00" if status == "Connected" else "#AA0000"
+        status_label = QLabel(f"<b>Status:</b> <span style='color: {status_color}; font-weight: bold;'>{status}</span>")
+        self.deviceInfoLayout.addWidget(status_label)
+
+        # Version
+        version_label = QLabel(f"<b>Software Version:</b> {device.get('version', 'Unknown')}")
+        self.deviceInfoLayout.addWidget(version_label)
+
+        self.deviceInfoLayout.addSpacing(10)
+
+        # Buttons
+        buttons_layout = QHBoxLayout()
+
+        self.device_connect_btn = QPushButton("Connect")
+        self.device_connect_btn.setEnabled(status != 'Connected')
+        self.device_connect_btn.clicked.connect(self._on_connect_clicked)
+        buttons_layout.addWidget(self.device_connect_btn)
+
+        self.device_disconnect_btn = QPushButton("Disconnect")
+        self.device_disconnect_btn.setEnabled(status == 'Connected')
+        self.device_disconnect_btn.clicked.connect(self._on_disconnect_clicked)
+        buttons_layout.addWidget(self.device_disconnect_btn)
+
+        buttons_layout.addStretch()
+
+        buttons_widget = QWidget()
+        buttons_widget.setLayout(buttons_layout)
+        self.deviceInfoLayout.addWidget(buttons_widget)
+
+        self.current_device_name = device_name
+
+    def _on_connect_clicked(self):
+        """Handle connect button click"""
+        if not self.current_device_name:
+            return
+
+        # Find the device by name
+        device_index = -1
+        for i, dev in enumerate(self.devices):
+            if dev['name'] == self.current_device_name:
+                device_index = i
+                break
+
+        if device_index >= 0:
+            self.connect_to_device(device_index)
+
+    def _on_disconnect_clicked(self):
+        """Handle disconnect button click"""
+        if not self.current_device_name:
+            return
+
+        # Find the device by name
+        device_index = -1
+        for i, dev in enumerate(self.devices):
+            if dev['name'] == self.current_device_name:
+                device_index = i
+                break
+
+        if device_index >= 0:
+            self.disconnect_from_device(device_index)
 
     def connect_to_device(self, device_index):
         """Connect to the selected device"""
@@ -432,18 +497,27 @@ class MainWindow(QMainWindow):
             device = self.devices[device_index]
             device_name = device['name']
             ip_address = device['ip_address']
+            port = int(device.get('port', '8765')) if isinstance(device.get('port'), str) else device.get('port', 8765)
 
             try:
-                if device_name not in self.connection_managers:
-                    manager = DeviceConnectionManager(device_name, ip_address)
+                # If connection manager exists and is already connected, just return
+                if device_name in self.connection_managers:
+                    existing_manager = self.connection_managers[device_name]
+                    if existing_manager.is_connected:
+                        return
+                    else:
+                        # Manager exists but not connected, just connect it
+                        existing_manager.connect()
+                        return
 
-                    manager.connected.connect(lambda: self._on_device_connected(device_index))
-                    manager.disconnected.connect(lambda: self._on_device_disconnected(device_index))
-                    manager.message_received.connect(lambda msg, idx=device_index: self._on_device_message(idx, msg))
+                # Create new manager
+                manager = DeviceConnectionManager(device_name, ip_address, port)
 
-                    self.connection_managers[device_name] = manager
+                manager.connected.connect(lambda: self._on_device_connected(device_index))
+                manager.disconnected.connect(lambda: self._on_device_disconnected(device_index))
+                manager.message_received.connect(lambda msg, idx=device_index: self._on_device_message(idx, msg))
 
-                manager = self.connection_managers[device_name]
+                self.connection_managers[device_name] = manager
                 manager.connect()
 
             except Exception as e:
@@ -474,7 +548,11 @@ class MainWindow(QMainWindow):
 
             self.save_devices()
             self.update_devices_table()
-            self.update_device_info()
+
+            # Update button states if showing this device
+            if self.current_device_name == device_name and self.device_connect_btn:
+                self.device_connect_btn.setEnabled(False)
+                self.device_disconnect_btn.setEnabled(True)
 
     def _on_device_disconnected(self, device_index):
         """Handle device disconnection"""
@@ -489,7 +567,11 @@ class MainWindow(QMainWindow):
 
             self.save_devices()
             self.update_devices_table()
-            self.update_device_info()
+
+            # Update button states if showing this device
+            if self.current_device_name == device_name and self.device_connect_btn:
+                self.device_connect_btn.setEnabled(True)
+                self.device_disconnect_btn.setEnabled(False)
 
     def _on_device_message(self, device_index, message):
         """Handle messages from device"""
@@ -507,6 +589,15 @@ class MainWindow(QMainWindow):
                 states = message.get('data', {})
                 for key, value in states.items():
                     tab.update_input_state(key, value)
+
+                # Extract and store version information
+                version = message.get('version', 'Unknown')
+                device['version'] = version
+                # Just update button states, don't recreate
+                if self.current_device_name == device_name and self.device_connect_btn:
+                    status = device.get('status', 'Disconnected')
+                    self.device_connect_btn.setEnabled(status != 'Connected')
+                    self.device_disconnect_btn.setEnabled(status == 'Connected')
 
             elif msg_type == "statistics":
                 stats = message.get('data', {})
@@ -561,16 +652,28 @@ class MainWindow(QMainWindow):
             device_name = device['name']
 
             if device_name in self.connection_managers:
+                manager = self.connection_managers[device_name]
                 try:
-                    self.connection_managers[device_name].disconnect()
+                    manager.disconnect()
                 except Exception as e:
-                    print(f"Error disconnecting from {device_name}: {str(e)}")
+                    pass
 
                 del self.connection_managers[device_name]
 
             device['status'] = 'Disconnected'
+
+            # Update the device tab state
+            if device_name in self.device_tabs:
+                self.device_tabs[device_name].set_connection_state(False)
+                self.device_tabs[device_name].log("Disconnected from device", "info")
+
             self.save_devices()
             self.update_devices_table()
+
+            # Update button states if showing this device
+            if self.current_device_name == device_name and self.device_connect_btn:
+                self.device_connect_btn.setEnabled(True)
+                self.device_disconnect_btn.setEnabled(False)
 
     def update_tabs(self):
         """Update the tab widget based on current devices"""
@@ -578,6 +681,11 @@ class MainWindow(QMainWindow):
 
         for i in range(self.rightPanel.count() - 1, -1, -1):
             self.rightPanel.removeTab(i)
+
+        # Store device statuses before clearing tabs
+        device_statuses = {}
+        for device in self.devices:
+            device_statuses[device['name']] = device.get('status', 'Disconnected')
 
         self.device_tabs.clear()
 
@@ -609,6 +717,19 @@ class MainWindow(QMainWindow):
                 tab = self.create_device_tab()
                 self.device_tabs[device['name']] = tab
                 self.rightPanel.addTab(tab, device['name'])
+
+                # If device was previously connected, reload experiments
+                if device_statuses.get(device['name']) == 'Connected':
+                    tab.set_connection_state(True)
+                    tab.log(f"Reconnected to {device['name']}", "success")
+
+                    # Load experiments for this device
+                    from shared.managers import ExperimentManager
+                    experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
+                    if os.path.exists(experiments_dir):
+                        experiment_manager = ExperimentManager(experiments_dir)
+                        experiments = experiment_manager.list_experiments()
+                        tab.set_experiment_list(experiments)
 
         self.rightPanel.blockSignals(False)
 
@@ -777,6 +898,12 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
+
+    # Set application icon
+    icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon.png')
+    if os.path.exists(icon_path):
+        from PyQt6.QtGui import QIcon
+        app.setWindowIcon(QIcon(icon_path))
 
     window = MainWindow()
     window.show()

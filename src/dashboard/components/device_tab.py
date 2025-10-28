@@ -25,6 +25,7 @@ class DeviceTab(QWidget):
         self.input_states = {}
         self.statistics = {}
         self.test_states = {}
+        self._connected = False
 
         # Timer state
         self.experiment_start_time = None
@@ -47,11 +48,20 @@ class DeviceTab(QWidget):
 
         self.experiment_combo = QComboBox()
         self.experiment_combo.addItems(["No experiments available"])
+        self.experiment_combo.currentTextChanged.connect(self._update_button_states)
 
         self.new_exp_btn = QPushButton("New Experiment")
         self.edit_exp_btn = QPushButton("Edit Experiment")
         self.start_btn = QPushButton("Start")
         self.stop_btn = QPushButton("Stop")
+
+        # Track experiment running state
+        self._experiment_running = False
+
+        # Initially disable experiment buttons (will be enabled when connected with experiments)
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(False)
+        self.edit_exp_btn.setEnabled(False)
 
         self.start_btn.clicked.connect(self._on_start_clicked)
 
@@ -397,14 +407,23 @@ class DeviceTab(QWidget):
 
     def set_connection_state(self, connected):
         """Enable/disable controls based on connection state"""
+        self._connected = connected
         self.animal_id_input.setEnabled(connected)
         self.experiment_combo.setEnabled(connected)
 
         if not connected:
             self.set_test_buttons_enabled(False)
             self.test_running = False
-        elif not self.test_running:
-            self.set_test_buttons_enabled(True)
+            # Disable experiment buttons when disconnected
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(False)
+            self.new_exp_btn.setEnabled(False)
+            self.edit_exp_btn.setEnabled(False)
+        else:
+            if not self.test_running:
+                self.set_test_buttons_enabled(True)
+            # Update button states based on experiment availability
+            self._update_button_states()
 
     def _on_start_clicked(self):
         """Handle start button click"""
@@ -417,18 +436,35 @@ class DeviceTab(QWidget):
         }
         self.experiment_start_requested.emit(data)
 
-    def set_experiment_buttons(self, experiment_running):
-        """Enable/disable experiment control buttons"""
-        if experiment_running:
+    def _update_button_states(self):
+        """Update button states based on connection, experiment availability and running state"""
+        # If not connected, buttons are handled by set_connection_state
+        if not self._connected:
+            return
+
+        # Check if experiments are available
+        has_experiments = (
+            self.experiment_combo.count() > 0 and
+            self.experiment_combo.currentText() != "No experiments available"
+        )
+
+        if self._experiment_running:
+            # Experiment is running
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
             self.new_exp_btn.setEnabled(False)
             self.edit_exp_btn.setEnabled(False)
         else:
-            self.start_btn.setEnabled(True)
+            # Experiment is not running
+            self.start_btn.setEnabled(has_experiments)
             self.stop_btn.setEnabled(False)
             self.new_exp_btn.setEnabled(True)
-            self.edit_exp_btn.setEnabled(True)
+            self.edit_exp_btn.setEnabled(has_experiments)
+
+    def set_experiment_buttons(self, experiment_running):
+        """Enable/disable experiment control buttons"""
+        self._experiment_running = experiment_running
+        self._update_button_states()
 
     def set_experiment_list(self, experiments):
         """Update the experiment combo box"""
@@ -437,6 +473,7 @@ class DeviceTab(QWidget):
             self.experiment_combo.addItems(experiments)
         else:
             self.experiment_combo.addItem("No experiments available")
+        self._update_button_states()
 
     def set_current_experiment(self, experiment_name):
         """Set the current experiment in the combo box"""

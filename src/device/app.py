@@ -796,6 +796,59 @@ async def handle_json_message(websocket, device: Device, message_data: dict):
       log(f"Experiment started: {message}", "success")
     else:
       log(f"Experiment failed: {message}", "error")
+  elif message_type == "request_data_files":
+    # List all JSON files in data directory
+    import os
+    from datetime import datetime
+
+    data_files = []
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    log(f"Looking for data files in: {data_dir}", "info")
+    if os.path.exists(data_dir):
+      all_files = os.listdir(data_dir)
+      log(f"Found {len(all_files)} total files in data directory", "info")
+      for filename in all_files:
+        if filename.endswith('.json'):
+          filepath = os.path.join(data_dir, filename)
+          stat = os.stat(filepath)
+          data_files.append({
+            "filename": filename,
+            "size": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+          })
+    else:
+      log(f"Data directory does not exist: {data_dir}", "warning")
+
+    response = CommunicationMessageBuilder.data_file_list(data_files)
+    await websocket.send(json.dumps(response))
+    log(f"Sent list of {len(data_files)} data files", "info")
+
+  elif message_type == "request_data_file":
+    # Send specific file content
+    import os
+    import hashlib
+
+    requested_filename = message_data.get("filename")
+    if requested_filename:
+      data_dir = os.path.join(os.path.dirname(__file__), "data")
+      filepath = os.path.join(data_dir, requested_filename)
+
+      if os.path.exists(filepath) and requested_filename.endswith('.json'):
+        with open(filepath, 'r') as f:
+          file_content = f.read()
+
+        # Calculate MD5 checksum
+        checksum = hashlib.md5(file_content.encode()).hexdigest()
+
+        response = CommunicationMessageBuilder.data_file_content(
+          requested_filename,
+          file_content,
+          checksum
+        )
+        await websocket.send(json.dumps(response))
+        log(f"Sent data file: {requested_filename}", "info")
+      else:
+        log(f"File not found or invalid: {requested_filename}", "error")
   else:
     log(f"Unknown JSON message type: {message_type}", "warning")
 

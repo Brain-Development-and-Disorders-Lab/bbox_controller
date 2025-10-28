@@ -157,6 +157,7 @@ class MainWindow(QMainWindow):
         # Store device info widgets and buttons
         self.device_connect_btn = None
         self.device_disconnect_btn = None
+        self.device_sync_btn = None
         self.current_device_name = None
 
         self.setup_devices_table()
@@ -453,6 +454,11 @@ class MainWindow(QMainWindow):
         self.device_disconnect_btn.clicked.connect(self._on_disconnect_clicked)
         buttons_layout.addWidget(self.device_disconnect_btn)
 
+        self.device_sync_btn = QPushButton("Sync Files")
+        self.device_sync_btn.setEnabled(status == 'Connected')
+        self.device_sync_btn.clicked.connect(self._on_sync_files_clicked)
+        buttons_layout.addWidget(self.device_sync_btn)
+
         buttons_layout.addStretch()
 
         buttons_widget = QWidget()
@@ -553,6 +559,8 @@ class MainWindow(QMainWindow):
             if self.current_device_name == device_name and self.device_connect_btn:
                 self.device_connect_btn.setEnabled(False)
                 self.device_disconnect_btn.setEnabled(True)
+                if self.device_sync_btn:
+                    self.device_sync_btn.setEnabled(True)
 
     def _on_device_disconnected(self, device_index):
         """Handle device disconnection"""
@@ -637,6 +645,12 @@ class MainWindow(QMainWindow):
                 tab.log(f"Trial complete: {trial_name}", log_level)
                 tab.set_trial_complete()
 
+            elif msg_type == "data_file_list":
+                self._handle_data_file_list(device_name, message.get('data', {}).get('files', []))
+
+            elif msg_type == "data_file_content":
+                self._handle_data_file_content(device_name, message.get('data', {}))
+
     def _on_destroyed(self):
         """Cleanup when window is destroyed"""
         for manager in list(self.connection_managers.values()):
@@ -674,6 +688,146 @@ class MainWindow(QMainWindow):
             if self.current_device_name == device_name and self.device_connect_btn:
                 self.device_connect_btn.setEnabled(True)
                 self.device_disconnect_btn.setEnabled(False)
+                if self.device_sync_btn:
+                    self.device_sync_btn.setEnabled(False)
+
+    def _on_sync_files_clicked(self):
+        """Handle sync files button click"""
+        if not self.current_device_name:
+            return
+
+        device = None
+        for d in self.devices:
+            if d['name'] == self.current_device_name:
+                device = d
+                break
+
+        if not device:
+            return
+
+        device_name = device['name']
+
+        if device_name not in self.connection_managers:
+            QMessageBox.warning(self, "Error", "Not connected to device")
+            return
+
+        from dashboard.components.sync_dialog import SyncProgressDialog
+        import os
+        from datetime import datetime
+
+        # Create destination directory
+        dest_base = os.path.join(os.path.dirname(__file__), 'data')
+        os.makedirs(dest_base, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dest_dir = os.path.join(dest_base, f"{device_name}_{timestamp}")
+
+        dialog = SyncProgressDialog(self, device_name)
+
+        # Store references for message handlers
+        self._current_sync_dialog = dialog
+        self._current_sync_device = device_name
+        self._sync_destination_dir = dest_dir
+        self._sync_files_to_download = []
+        self._sync_files_downloaded = []
+
+        # Request the list of files
+        manager = self.connection_managers[device_name]
+        from shared.managers import CommunicationMessageBuilder
+        manager.send_message(CommunicationMessageBuilder.request_data_files())
+
+        # Show dialog
+        dialog.exec()
+
+    def _handle_data_file_list(self, device_name, files):
+        """Handle incoming data file list"""
+        if device_name != self._current_sync_device if hasattr(self, '_current_sync_device') else None:
+            return
+
+        if not files:
+            if hasattr(self, '_current_sync_dialog'):
+                self._current_sync_dialog.close()
+                QMessageBox.information(self, "No Files", "No data files found on device")
+            return
+
+        # Store files to download
+        self._sync_files_to_download = files
+        dialog = self._current_sync_dialog
+        dialog.set_total_files(len(files))
+
+        # Request each file
+        manager = self.connection_managers[device_name]
+        from shared.managers import CommunicationMessageBuilder
+
+        for file_info in files:
+            filename = file_info['filename']
+            request_msg = CommunicationMessageBuilder.request_data_file(filename)
+            manager.send_message(request_msg)
+
+    def _handle_data_file_content(self, device_name, file_data):
+        """Handle incoming data file content"""
+        if device_name != self._current_sync_device if hasattr(self, '_current_sync_device') else None:
+            return
+
+        import os
+        import hashlib
+
+        filename = file_data.get('filename')
+        content = file_data.get('content')
+        expected_checksum = file_data.get('checksum')
+
+        if not filename or not content:
+            return
+
+        # Validate checksum if provided
+        if expected_checksum:
+            calculated = hashlib.md5(content.encode()).hexdigest()
+            if calculated != expected_checksum:
+                if hasattr(self, '_current_sync_dialog'):
+                    self._current_sync_dialog.update_progress(
+                        filename,
+                        len(self._sync_files_downloaded) + 1,
+                        len(self._sync_files_to_download),
+                        "Checksum mismatch!"
+                    )
+                return
+
+        # Save file
+        try:
+            os.makedirs(self._sync_destination_dir, exist_ok=True)
+            filepath = os.path.join(self._sync_destination_dir, filename)
+            with open(filepath, 'w') as f:
+                f.write(content)
+
+            self._sync_files_downloaded.append(filename)
+
+            if hasattr(self, '_current_sync_dialog'):
+                self._current_sync_dialog.update_progress(
+                    filename,
+                    len(self._sync_files_downloaded),
+                    len(self._sync_files_to_download),
+                    "OK"
+                )
+
+                # Check if all files downloaded
+                if len(self._sync_files_downloaded) == len(self._sync_files_to_download):
+                    self._current_sync_dialog.set_finished(
+                        len(self._sync_files_downloaded),
+                        len(self._sync_files_to_download)
+                    )
+                    QMessageBox.information(
+                        self,
+                        "Sync Complete",
+                        f"Successfully synced {len(self._sync_files_downloaded)} files to:\n{self._sync_destination_dir}"
+                    )
+        except Exception as e:
+            if hasattr(self, '_current_sync_dialog'):
+                self._current_sync_dialog.update_progress(
+                    filename,
+                    len(self._sync_files_downloaded) + 1,
+                    len(self._sync_files_to_download),
+                    f"Error: {str(e)}"
+                )
 
     def update_tabs(self):
         """Update the tab widget based on current devices"""

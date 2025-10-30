@@ -2,6 +2,8 @@
 
 import sys
 import os
+import hashlib
+from datetime import datetime
 import json
 import socket
 from PyQt6.QtWidgets import (
@@ -15,13 +17,22 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QLineEdit,
     QMessageBox,
-    QSizePolicy
+    QSizePolicy,
+    QLabel,
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QIcon
 from PyQt6 import uic
 
 from dashboard.core.connection_manager import DeviceConnectionManager
 from dashboard.components.device_tab import DeviceTab
+from dashboard.components.sync_dialog import SyncProgressDialog
+from dashboard.components.experiment_editor import ExperimentEditor
+from shared.managers import ExperimentManager, CommunicationMessageBuilder
+from shared.constants import TEST_STATES
 
 
 class DeviceDialog(QDialog):
@@ -322,9 +333,9 @@ class MainWindow(QMainWindow):
             status_item = QTableWidgetItem(device.get('status', 'Disconnected'))
             status_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             status_text = status_item.text()
-            from PyQt6.QtGui import QColor
+
             if status_text == "Connected":
-                status_item.setForeground(QColor("#00AA00"))  # Subdued green
+                status_item.setForeground(QColor("#00AA00"))
             else:
                 status_item.setForeground(QColor("#AA0000"))
             self.devicesTable.setItem(row, 1, status_item)
@@ -415,8 +426,6 @@ class MainWindow(QMainWindow):
                 item = self.deviceInfoLayout.takeAt(0)
                 if item.widget():
                     item.widget().deleteLater()
-
-        from PyQt6.QtWidgets import QLabel, QHBoxLayout, QWidget
 
         # Name
         name_label = QLabel(f"<b>Name:</b> {device['name']}")
@@ -711,10 +720,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "Not connected to device")
             return
 
-        from dashboard.components.sync_dialog import SyncProgressDialog
-        import os
-        from datetime import datetime
-
         # Create destination directory
         dest_base = os.path.join(os.path.dirname(__file__), 'data')
         os.makedirs(dest_base, exist_ok=True)
@@ -733,7 +738,6 @@ class MainWindow(QMainWindow):
 
         # Request the list of files
         manager = self.connection_managers[device_name]
-        from shared.managers import CommunicationMessageBuilder
         manager.send_message(CommunicationMessageBuilder.request_data_files())
 
         # Show dialog
@@ -757,7 +761,6 @@ class MainWindow(QMainWindow):
 
         # Request each file
         manager = self.connection_managers[device_name]
-        from shared.managers import CommunicationMessageBuilder
 
         for file_info in files:
             filename = file_info['filename']
@@ -768,9 +771,6 @@ class MainWindow(QMainWindow):
         """Handle incoming data file content"""
         if device_name != self._current_sync_device if hasattr(self, '_current_sync_device') else None:
             return
-
-        import os
-        import hashlib
 
         filename = file_data.get('filename')
         content = file_data.get('content')
@@ -844,8 +844,6 @@ class MainWindow(QMainWindow):
         self.device_tabs.clear()
 
         if not self.devices:
-            from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-
             placeholder = QWidget()
             layout = QVBoxLayout()
             layout.setSpacing(0)
@@ -878,7 +876,6 @@ class MainWindow(QMainWindow):
                     tab.log(f"Reconnected to {device['name']}", "success")
 
                     # Load experiments for this device
-                    from shared.managers import ExperimentManager
                     experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
                     if os.path.exists(experiments_dir):
                         experiment_manager = ExperimentManager(experiments_dir)
@@ -911,7 +908,6 @@ class MainWindow(QMainWindow):
 
             if device_name in self.connection_managers and device_name in self.device_tabs:
                 tab = self.device_tabs[device_name]
-                from shared.constants import TEST_STATES
                 tab.update_test_state(test_name, TEST_STATES["RUNNING"])
 
                 manager = self.connection_managers[device_name]
@@ -968,8 +964,6 @@ class MainWindow(QMainWindow):
         manager = self.connection_managers[device_name]
         tab = self.device_tabs[device_name]
 
-        from shared.managers import ExperimentManager
-
         experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
         if not os.path.exists(experiments_dir):
             os.makedirs(experiments_dir)
@@ -988,7 +982,6 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            import json
             upload_message = {
                 "type": "experiment_upload",
                 "data": experiment.to_dict()
@@ -1017,9 +1010,6 @@ class MainWindow(QMainWindow):
         src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if src_dir not in sys.path:
             sys.path.insert(0, src_dir)
-
-        from dashboard.components.experiment_editor import ExperimentEditor
-        from shared.managers import ExperimentManager
 
         experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
         if not os.path.exists(experiments_dir):
@@ -1056,7 +1046,6 @@ def main():
     # Set application icon
     icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon.png')
     if os.path.exists(icon_path):
-        from PyQt6.QtGui import QIcon
         app.setWindowIcon(QIcon(icon_path))
 
     window = MainWindow()

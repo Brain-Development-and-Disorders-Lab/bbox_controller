@@ -1,0 +1,6 @@
+# GUI runtime
+PyQt6
+
+# Networking (dashboard uses websocket client)
+websocket-client
+

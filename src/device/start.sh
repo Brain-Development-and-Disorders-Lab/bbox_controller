@@ -39,9 +39,9 @@ start_device_controller() {
 
     # Activate Python virtual environment if present
     REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-    if [ -d "$REPO_ROOT/venv" ]; then
-        log INFO "Activating Python virtual environment: $REPO_ROOT/venv"
-        source "$REPO_ROOT/venv/bin/activate"
+    if [ -d "$REPO_ROOT/src/device/venv" ]; then
+        log INFO "Activating Python virtual environment: $REPO_ROOT/src/device/venv"
+        source "$REPO_ROOT/src/device/venv/bin/activate"
     else
         log WARN "No virtual environment found, using system Python"
     fi

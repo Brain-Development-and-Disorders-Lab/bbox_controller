@@ -1,11 +1,17 @@
 # MacOS
 .DS_Store
 
-# Device logs and data
-src/device/data/
+# Virtual environments
+venvs/
 
-# Control experiments
-src/control_panel/experiments/
+# Device logs and data
+apps/device/data/
+apps/device/logs/
+
+# Dashboard logs, data, and experiments
+apps/dashboard/logs/
+apps/dashboard/data/
+apps/dashboard/experiments/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -39,7 +45,6 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
-*.spec
 
 # Installer logs
 pip-log.txt

@@ -6,12 +6,15 @@ Description: Shared library for the bbox_controller project, contains common con
 License: MIT
 """
 
+import sys
+from pathlib import Path
+
+_repo_root = Path(__file__).parent.parent.parent
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 from .constants import *
 from .models import *
 from .managers import *
 
-# Single source of truth for version number
-__version__ = "1.2.3"
-
-# Version info for easy access
-VERSION = __version__
+from version import __version__, VERSION

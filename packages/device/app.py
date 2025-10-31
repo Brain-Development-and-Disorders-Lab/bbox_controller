@@ -37,8 +37,9 @@ HOST = DEFAULT_HOST
 PORT = DEFAULT_PORT
 
 class Device:
-  def __init__(self):
+  def __init__(self, port=DEFAULT_PORT):
     self._data = None
+    self.port = port
 
     self.version = VERSION
     self.config = None
@@ -174,10 +175,11 @@ class Device:
     main_rect = main_text.get_rect(center=(self.width // 2, center_y))
     self.screen.blit(main_text, main_rect)
 
-    # IP address beneath main text
+    # IP address and port beneath main text
     ip_address = self._get_local_ip()
     ip_font = pygame.font.SysFont("Arial", 32)
-    ip_text = ip_font.render(ip_address, True, (255, 255, 255))
+    ip_text_str = f"{ip_address}:{self.port}"
+    ip_text = ip_font.render(ip_text_str, True, (255, 255, 255))
     ip_rect = ip_text.get_rect(center=(self.width // 2, center_y + 60))
     self.screen.blit(ip_text, ip_rect)
 
@@ -192,7 +194,7 @@ class Device:
       sim_font = pygame.font.SysFont("Arial", 16)
       input_states = self.gpio.get_gpio_state()
       state_text = [
-        f"Simulated GPIO:",
+        f"Simulated GPIO state:",
         f"Left Lever: {'PRESSED' if input_states['input_lever_left'] else 'RELEASED'}",
         f"Right Lever: {'PRESSED' if input_states['input_lever_right'] else 'RELEASED'}",
         f"Nose Port IR: {'ACTIVE' if input_states['input_ir'] else 'INACTIVE'}",
@@ -208,7 +210,7 @@ class Device:
         top_y = banner_height + 10
 
       for i, line in enumerate(state_text):
-        if "PRESSED" in line or "ACTIVE" in line or "ON" in line:
+        if "PRESSED" in line or ": ACTIVE" in line or "ON" in line:
           color = (0, 255, 0)
         elif "Simulated" in line:
           color = (255, 255, 255)
@@ -388,6 +390,7 @@ class Device:
     self._current_trial.on_enter()
     self._experiment_started = True
 
+    _device_message_queue.put(CommunicationMessageBuilder.trial_start(self._current_trial.title))
     _device_message_queue.put(CommunicationMessageBuilder.experiment_status("started", self._current_trial.title))
     log("Timeline experiment started", "info")
 
@@ -793,16 +796,70 @@ async def handle_json_message(websocket, device: Device, message_data: dict):
       log(f"Experiment started: {message}", "success")
     else:
       log(f"Experiment failed: {message}", "error")
+  elif message_type == "request_data_files":
+    # List all JSON files in data directory
+    import os
+    from datetime import datetime
+
+    data_files = []
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    log(f"Looking for data files in: {data_dir}", "info")
+    if os.path.exists(data_dir):
+      all_files = os.listdir(data_dir)
+      log(f"Found {len(all_files)} total files in data directory", "info")
+      for filename in all_files:
+        if filename.endswith('.json'):
+          filepath = os.path.join(data_dir, filename)
+          stat = os.stat(filepath)
+          data_files.append({
+            "filename": filename,
+            "size": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+          })
+    else:
+      log(f"Data directory does not exist: {data_dir}", "warning")
+
+    response = CommunicationMessageBuilder.data_file_list(data_files)
+    await websocket.send(json.dumps(response))
+    log(f"Sent list of {len(data_files)} data files", "info")
+
+  elif message_type == "request_data_file":
+    # Send specific file content
+    import os
+    import hashlib
+
+    requested_filename = message_data.get("filename")
+    if requested_filename:
+      data_dir = os.path.join(os.path.dirname(__file__), "data")
+      filepath = os.path.join(data_dir, requested_filename)
+
+      if os.path.exists(filepath) and requested_filename.endswith('.json'):
+        with open(filepath, 'r') as f:
+          file_content = f.read()
+
+        # Calculate MD5 checksum
+        checksum = hashlib.md5(file_content.encode()).hexdigest()
+
+        response = CommunicationMessageBuilder.data_file_content(
+          requested_filename,
+          file_content,
+          checksum
+        )
+        await websocket.send(json.dumps(response))
+        log(f"Sent data file: {requested_filename}", "info")
+      else:
+        log(f"File not found or invalid: {requested_filename}", "error")
   else:
     log(f"Unknown JSON message type: {message_type}", "warning")
 
-async def main_loop(device):
+async def main_loop(device, port=DEFAULT_PORT):
   """Main loop that runs both pygame and websocket communication"""
   log("Starting main loop", "info")
+  log(f"Server listening on port {port}", "info")
   server = await websockets.serve(
     lambda ws: handle_connection(ws, device),
     HOST,
-    PORT
+    port
   )
   device._websocket_server = server
 
@@ -852,16 +909,16 @@ async def main_loop(device):
     device.cleanup()
     log("Main loop stopped", "info")
 
-def main():
+def main(port=DEFAULT_PORT):
   global _device, _device_message_queue
 
   try:
     # Initialize the device
-    _device = Device()
+    _device = Device(port=port)
     _device_message_queue = queue.Queue()
 
     set_message_queue(_device_message_queue)
-    asyncio.run(main_loop(_device))
+    asyncio.run(main_loop(_device, port))
   except KeyboardInterrupt:
     log("Keyboard interrupt received", "info")
   except asyncio.TimeoutError:
@@ -873,4 +930,4 @@ def main():
       _device.cleanup()
 
 if __name__ == "__main__":
-  main()
+  main(port=DEFAULT_PORT)

@@ -115,3 +115,40 @@ class CommunicationMessageBuilder:
             "type": "statistics",
             "data": data
         }
+
+    @staticmethod
+    def request_data_files() -> Dict[str, Any]:
+        """Build a request for data files list"""
+        return {
+            "type": "request_data_files"
+        }
+
+    @staticmethod
+    def data_file_list(files: list) -> Dict[str, Any]:
+        """Build a data file list message"""
+        return {
+            "type": "data_file_list",
+            "data": {"files": files}
+        }
+
+    @staticmethod
+    def request_data_file(filename: str) -> Dict[str, Any]:
+        """Build a request for a specific data file"""
+        return {
+            "type": "request_data_file",
+            "filename": filename
+        }
+
+    @staticmethod
+    def data_file_content(filename: str, content: str, checksum: str = None) -> Dict[str, Any]:
+        """Build a data file content message"""
+        message = {
+            "type": "data_file_content",
+            "data": {
+                "filename": filename,
+                "content": content
+            }
+        }
+        if checksum:
+            message["data"]["checksum"] = checksum
+        return message

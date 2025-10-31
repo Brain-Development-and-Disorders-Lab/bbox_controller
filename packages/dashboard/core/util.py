@@ -28,6 +28,7 @@ def get_app_data_dir():
             os.path.dirname(__file__),
             '..',
             '..',
+            '..',
             'apps',
             'dashboard'
         )

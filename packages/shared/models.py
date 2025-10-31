@@ -11,6 +11,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
+from version import VERSION
+
 @dataclass
 class Trial:
     """A single trial in the experiment timeline"""
@@ -115,7 +117,7 @@ class Experiment:
     timeline: Timeline = None
     config: Config = None
     description: str = ""
-    version: str = "1.0"
+    version: str = VERSION
     metadata: Dict[str, Any] = None
     created_at: str = ""
     modified_at: str = ""

@@ -1048,7 +1048,9 @@ def main():
     app.setStyle('Fusion')
 
     # Set application icon
-    icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon.png')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(os.path.dirname(script_dir))
+    icon_path = os.path.join(repo_root, 'apps', 'dashboard', 'assets', 'icon.png')
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

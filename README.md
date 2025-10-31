@@ -2,6 +2,21 @@
 
 This repository contains the code to control a behavior box utilizing IO and displays.
 
+## Repository Structure
+
+```
+bbox_controller/
+├── packages/              # Source code
+│   ├── dashboard/        # Dashboard application (PyQt6 GUI)
+│   ├── device/           # Device controller (runs on Raspberry Pi)
+│   └── shared/           # Shared code between dashboard and device
+├── apps/                 # Application-specific files
+│   ├── dashboard/        # Dashboard config, requirements, start script
+│   └── device/           # Device config, requirements, start script
+├── tests/                # Test files organized by component
+└── version.py            # Version tracking
+```
+
 ## Requirements
 
 ### Software Dependencies
@@ -23,7 +38,7 @@ This repository contains the code to control a behavior box utilizing IO and dis
 **Optional Development Packages:**
 - `pytest` (testing framework)
 
-All dependencies are listed in `requirements.txt` and will be automatically installed based on the platform.
+Dependencies are listed in `apps/dashboard/requirements.txt` and `apps/device/requirements.txt`. They are installed automatically based on the platform.
 
 ### Hardware Requirements
 
@@ -68,9 +83,16 @@ All dependencies are listed in `requirements.txt` and will be automatically inst
    ```bash
    git clone <repository-url>
    cd bbox_controller
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+
+   # Create virtual environments (recommended)
+   python3 -m venv venvs/device
+   source venvs/device/bin/activate
+   pip install -r apps/device/requirements.txt
+
+   # For dashboard (on development machine)
+   python3 -m venv venvs/dashboard
+   source venvs/dashboard/bin/activate
+   pip install -r apps/dashboard/requirements.txt
    ```
 
 4. **Verify hardware detection:**
@@ -84,25 +106,38 @@ All dependencies are listed in `requirements.txt` and will be automatically inst
 The device must run with root privileges to access GPIO:
 
 ```bash
-cd src/device
+cd apps/device
 sudo ./start.sh
 ```
+
+The script automatically activates the virtual environment (if present) and starts the device controller from `packages/device/main.py`.
 
 ### Troubleshooting
 
 **Display Issues:**
 - Confirm I2C is enabled: `sudo raspi-config` → Interface Options → I2C
 - Check I2C device detection: `sudo i2cdetect -y 1` (should show 0x3C and 0x3D)
-- Verify display addresses match the constants in `src/device/hardware/constants.py`
+- Verify display addresses match the constants in `packages/device/hardware/constants.py`
 
 **Simulation Mode Active:**
 - If running on Raspberry Pi, an orange banner on the display indicates hardware communication issues
 - Use keyboard controls for testing (see Simulation section below)
-- Check logs in `src/device/logs/device.log` for hardware initialization messages
+- Check logs in `apps/device/logs/device.log` for hardware initialization messages
 
 ## Dashboard
 
-The dashboard facilitates wireless monitoring and control via Websockets. To launch the dashboard, run `./start.sh`, located in the `dashboard` directory.
+The dashboard facilitates wireless monitoring and control via Websockets.
+
+![dashboard.png](dashboard.png)
+
+### Running the Dashboard
+
+```bash
+cd apps/dashboard
+./start.sh
+```
+
+The script automatically activates the virtual environment (if present) and starts the dashboard from `packages/dashboard/main.py`.
 
 Use the *Connection* frame to connect to the device using an IP address and port number. The *Console* frame shows the live console output from the device. The *Input Status* frame shows the current state of the device IO with low latency. The *Test Status* frame allows the IO to be tested, specifically the water delivery, levers, and the IR beam.
 
@@ -143,13 +178,13 @@ After the device software has started, the network IP address of the device will
 
 ### Log Files
 
-All logs are saved in the `logs/` directory:
+Logs are saved in the respective `apps/*/logs/` directories:
+- **`apps/device/logs/device.log`** - Device controller startup events, runtime output, and experiment data
+- **`apps/dashboard/logs/dashboard.log`** - Dashboard startup and runtime events
 
-- **`device.log`** - Unified log file containing startup events, runtime output, and experiment data
+### Data Files
 
-## Data Files
-
-Data files are stored under the `src/device/data` directory in individual JSON files named `[Animal ID]_[Date]_[Time].json`. A data file is generated for *each* experiment run. Currently, data files are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS. All timestamps use ISO 8601 format (`YYYY-MM-DDTHH:MM:SS.microseconds`). The major headings within a data file are listed below, and an example is also shown.
+Data files are stored under the device data directory in individual JSON files named `[Animal ID]_[Date]_[Time].json`. A data file is generated for *each* experiment run. Currently, data files are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS. All timestamps use ISO 8601 format (`YYYY-MM-DDTHH:MM:SS.microseconds`). The major headings within a data file are listed below, and an example is also shown.
 
 ### `experiment_metadata`
 

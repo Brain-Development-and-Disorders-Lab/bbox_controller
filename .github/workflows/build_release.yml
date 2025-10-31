@@ -1,8 +1,9 @@
 name: Build and Release Dashboard
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '*'
 
 jobs:
   build-macos:
@@ -35,13 +36,12 @@ jobs:
           cd apps/dashboard/dist
           hdiutil create -volname "Behavior Box Dashboard" -srcfolder "Behavior Box Dashboard.app" -ov -format UDZO "Behavior Box Dashboard.dmg"
 
-      - name: Upload DMG to release
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/x-apple-diskimage" \
-            --data-binary "@apps/dashboard/dist/Behavior Box Dashboard.dmg" \
-            "${{ github.event.release.upload_url }}?name=Behavior%20Box%20Dashboard-macOS.dmg"
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: apps/dashboard/dist/Behavior Box Dashboard.dmg
+          retention-days: 1
 
   build-windows:
     name: Build Windows Application
@@ -75,17 +75,39 @@ jobs:
         run: |
           pyinstaller main.spec --clean --noconfirm
 
-      - name: Upload executable to release
-        shell: powershell
-        run: |
-          $uploadUrl = "${{ github.event.release.upload_url }}?name=Behavior%20Box%20Dashboard-Windows.exe"
-          $filePath = "apps/dashboard/dist/Behavior Box Dashboard/Behavior Box Dashboard.exe"
-          $token = "${{ secrets.GITHUB_TOKEN }}"
+      - name: Upload Windows executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: apps/dashboard/dist/Behavior Box Dashboard/Behavior Box Dashboard.exe
+          retention-days: 1
 
-          $headers = @{
-            "Authorization" = "Bearer $token"
-            "Content-Type" = "application/x-msdownload"
-          }
+  create-release:
+    name: Create Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: success()
 
-          Invoke-WebRequest -Uri $uploadUrl -Method Post -Headers $headers -InFile $filePath
+    steps:
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+
+      - name: Download Windows executable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            macos-dmg/Behavior Box Dashboard.dmg
+            windows-exe/Behavior Box Dashboard.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
+          prerelease: false
 

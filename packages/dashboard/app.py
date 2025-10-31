@@ -28,6 +28,7 @@ from PyQt6.QtGui import QColor, QIcon
 from PyQt6 import uic
 
 from dashboard.core.connection_manager import DeviceConnectionManager
+from dashboard.core.util import get_app_data_dir
 from dashboard.components.device_tab import DeviceTab
 from dashboard.components.sync_dialog import SyncProgressDialog
 from dashboard.components.experiment_editor import ExperimentEditor
@@ -156,15 +157,12 @@ class MainWindow(QMainWindow):
 
         self.destroyed.connect(self._on_destroyed)
 
-        self.devices_file = os.path.join(
-            os.path.dirname(__file__),
-            '..',
-            '..',
-            'apps',
-            'dashboard',
-            'config',
-            'devices.json'
-        )
+        # Set up application data directory
+        app_data_dir = get_app_data_dir()
+        config_dir = os.path.join(app_data_dir, 'config')
+        os.makedirs(config_dir, exist_ok=True)
+
+        self.devices_file = os.path.join(config_dir, 'devices.json')
         self.devices = []
         self.connection_managers = {}  # device_name -> DeviceConnectionManager
         self.device_tabs = {}  # device_name -> DeviceTab
@@ -264,7 +262,11 @@ class MainWindow(QMainWindow):
     def save_devices(self):
         """Save devices to file"""
         try:
-            # Remove 'status' from each device before saving since it should always start as 'Disconnected'
+            # Ensure directory exists
+            config_dir = os.path.dirname(self.devices_file)
+            os.makedirs(config_dir, exist_ok=True)
+
+            # Remove 'status' from each device before saving
             devices_to_save = []
             for device in self.devices:
                 device_copy = device.copy()
@@ -274,8 +276,8 @@ class MainWindow(QMainWindow):
 
             with open(self.devices_file, 'w') as f:
                 json.dump(devices_to_save, f, indent=2)
-        except IOError:
-            QMessageBox.warning(self, "Error", "Failed to save devices configuration.")
+        except (IOError, OSError) as e:
+            QMessageBox.warning(self, "Error", f"Failed to save devices configuration: {str(e)}")
 
     def add_device(self):
         """Show dialog to add a new device"""
@@ -543,7 +545,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Connection Error",
                                    f"Failed to connect to {device_name}: {str(e)}")
                 device['status'] = 'Disconnected'
-                self.save_devices()
                 self.update_devices_table()
 
     def _on_device_connected(self, device_index):
@@ -559,13 +560,13 @@ class MainWindow(QMainWindow):
                 tab.log(f"Connected to {device_name}", "success")
 
                 from shared.managers import ExperimentManager
-                experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
-                if os.path.exists(experiments_dir):
-                    experiment_manager = ExperimentManager(experiments_dir)
-                    experiments = experiment_manager.list_experiments()
-                    tab.set_experiment_list(experiments)
+                app_data_dir = get_app_data_dir()
+                experiments_dir = os.path.join(app_data_dir, 'experiments')
+                os.makedirs(experiments_dir, exist_ok=True)
+                experiment_manager = ExperimentManager(experiments_dir)
+                experiments = experiment_manager.list_experiments()
+                tab.set_experiment_list(experiments)
 
-            self.save_devices()
             self.update_devices_table()
 
             # Update button states if showing this device
@@ -586,7 +587,6 @@ class MainWindow(QMainWindow):
                 self.device_tabs[device_name].set_connection_state(False)
                 self.device_tabs[device_name].log("Disconnected from device", "info")
 
-            self.save_devices()
             self.update_devices_table()
 
             # Update button states if showing this device
@@ -694,7 +694,6 @@ class MainWindow(QMainWindow):
                 self.device_tabs[device_name].set_connection_state(False)
                 self.device_tabs[device_name].log("Disconnected from device", "info")
 
-            self.save_devices()
             self.update_devices_table()
 
             # Update button states if showing this device
@@ -840,11 +839,6 @@ class MainWindow(QMainWindow):
         for i in range(self.rightPanel.count() - 1, -1, -1):
             self.rightPanel.removeTab(i)
 
-        # Store device statuses before clearing tabs
-        device_statuses = {}
-        for device in self.devices:
-            device_statuses[device['name']] = device.get('status', 'Disconnected')
-
         self.device_tabs.clear()
 
         if not self.devices:
@@ -869,22 +863,20 @@ class MainWindow(QMainWindow):
             placeholder.setLayout(layout)
             self.rightPanel.addTab(placeholder, "No Devices")
         else:
+            # Load experiments once for all tabs
+            app_data_dir = get_app_data_dir()
+            experiments_dir = os.path.join(app_data_dir, 'experiments')
+            os.makedirs(experiments_dir, exist_ok=True)
+            experiment_manager = ExperimentManager(experiments_dir)
+            experiments = experiment_manager.list_experiments()
+
             for device in self.devices:
                 tab = self.create_device_tab()
                 self.device_tabs[device['name']] = tab
                 self.rightPanel.addTab(tab, device['name'])
 
-                # If device was previously connected, reload experiments
-                if device_statuses.get(device['name']) == 'Connected':
-                    tab.set_connection_state(True)
-                    tab.log(f"Reconnected to {device['name']}", "success")
-
-                    # Load experiments for this device
-                    experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
-                    if os.path.exists(experiments_dir):
-                        experiment_manager = ExperimentManager(experiments_dir)
-                        experiments = experiment_manager.list_experiments()
-                        tab.set_experiment_list(experiments)
+                # Always load experiments for all tabs
+                tab.set_experiment_list(experiments)
 
         self.rightPanel.blockSignals(False)
 
@@ -968,9 +960,9 @@ class MainWindow(QMainWindow):
         manager = self.connection_managers[device_name]
         tab = self.device_tabs[device_name]
 
-        experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
-        if not os.path.exists(experiments_dir):
-            os.makedirs(experiments_dir)
+        app_data_dir = get_app_data_dir()
+        experiments_dir = os.path.join(app_data_dir, 'experiments')
+        os.makedirs(experiments_dir, exist_ok=True)
 
         experiment_manager = ExperimentManager(experiments_dir)
         experiment = experiment_manager.load_experiment(experiment_name)
@@ -1015,9 +1007,9 @@ class MainWindow(QMainWindow):
         if src_dir not in sys.path:
             sys.path.insert(0, src_dir)
 
-        experiments_dir = os.path.join(os.path.dirname(__file__), 'experiments')
-        if not os.path.exists(experiments_dir):
-            os.makedirs(experiments_dir)
+        app_data_dir = get_app_data_dir()
+        experiments_dir = os.path.join(app_data_dir, 'experiments')
+        os.makedirs(experiments_dir, exist_ok=True)
 
         experiment_manager = ExperimentManager(experiments_dir)
         editor = ExperimentEditor(self, experiment_manager=experiment_manager)

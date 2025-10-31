@@ -174,6 +174,7 @@ class MainWindow(QMainWindow):
         self.device_disconnect_btn = None
         self.device_sync_btn = None
         self.device_status_label = None
+        self.device_version_label = None
         self.current_device_name = None
 
         self.setup_devices_table()
@@ -414,6 +415,7 @@ class MainWindow(QMainWindow):
             self.device_connect_btn = None
             self.device_disconnect_btn = None
             self.device_status_label = None
+            self.device_version_label = None
             return
 
         selected_row = selected_indexes[0].row()
@@ -431,6 +433,17 @@ class MainWindow(QMainWindow):
             # Update status label (same way as table)
             if self.device_status_label:
                 self.device_status_label.setText(f"<b>Status:</b> <span style='color: {status_color}; font-weight: bold;'>{status}</span>")
+
+            # Update version label if available
+            version = device.get('version', 'Unknown')
+            # Check connection manager for version if device doesn't have it yet
+            if version == 'Unknown' and device_name in self.connection_managers:
+                manager = self.connection_managers[device_name]
+                if manager.device_version and manager.device_version != "unknown":
+                    version = manager.device_version
+                    device['version'] = version
+            if self.device_version_label:
+                self.device_version_label.setText(f"<b>Software Version:</b> {version}")
 
             # Update button states
             self.device_connect_btn.setEnabled(status != 'Connected')
@@ -465,7 +478,15 @@ class MainWindow(QMainWindow):
         self.deviceInfoLayout.addWidget(status_label)
 
         # Version
-        version_label = QLabel(f"<b>Software Version:</b> {device.get('version', 'Unknown')}")
+        version = device.get('version', 'Unknown')
+        # Check connection manager for version if device doesn't have it yet
+        if version == 'Unknown' and device_name in self.connection_managers:
+            manager = self.connection_managers[device_name]
+            if manager.device_version and manager.device_version != "unknown":
+                version = manager.device_version
+                device['version'] = version
+        version_label = QLabel(f"<b>Software Version:</b> {version}")
+        self.device_version_label = version_label
         self.deviceInfoLayout.addWidget(version_label)
 
         self.deviceInfoLayout.addSpacing(10)
@@ -557,7 +578,7 @@ class MainWindow(QMainWindow):
 
             except Exception as e:
                 QMessageBox.warning(self, "Connection Error",
-                                   f"Failed to connect to {device_name}: {str(e)}")
+                                   f"{str(e)}")
                 device['status'] = 'Disconnected'
                 self.update_devices_table()
 
@@ -628,6 +649,9 @@ class MainWindow(QMainWindow):
                 # Extract and store version information
                 version = message.get('version', 'Unknown')
                 device['version'] = version
+                # Update version label if showing this device
+                if self.current_device_name == device_name and self.device_version_label:
+                    self.device_version_label.setText(f"<b>Software Version:</b> {version}")
                 # Just update button states, don't recreate
                 if self.current_device_name == device_name and self.device_connect_btn:
                     status = device.get('status', 'Disconnected')

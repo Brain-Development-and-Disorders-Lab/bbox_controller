@@ -173,6 +173,7 @@ class MainWindow(QMainWindow):
         self.device_connect_btn = None
         self.device_disconnect_btn = None
         self.device_sync_btn = None
+        self.device_status_label = None
         self.current_device_name = None
 
         self.setup_devices_table()
@@ -412,6 +413,7 @@ class MainWindow(QMainWindow):
             self.current_device_name = None
             self.device_connect_btn = None
             self.device_disconnect_btn = None
+            self.device_status_label = None
             return
 
         selected_row = selected_indexes[0].row()
@@ -424,8 +426,17 @@ class MainWindow(QMainWindow):
         # If already showing this device, just update the status
         if self.current_device_name == device_name and self.device_connect_btn and self.device_disconnect_btn:
             status = device.get('status', 'Disconnected')
+            status_color = "#00AA00" if status == "Connected" else "#AA0000"
+
+            # Update status label (same way as table)
+            if self.device_status_label:
+                self.device_status_label.setText(f"<b>Status:</b> <span style='color: {status_color}; font-weight: bold;'>{status}</span>")
+
+            # Update button states
             self.device_connect_btn.setEnabled(status != 'Connected')
             self.device_disconnect_btn.setEnabled(status == 'Connected')
+            if self.device_sync_btn:
+                self.device_sync_btn.setEnabled(status == 'Connected')
             return
 
         # First time showing this device - create widgets
@@ -450,6 +461,7 @@ class MainWindow(QMainWindow):
         status = device.get('status', 'Disconnected')
         status_color = "#00AA00" if status == "Connected" else "#AA0000"
         status_label = QLabel(f"<b>Status:</b> <span style='color: {status_color}; font-weight: bold;'>{status}</span>")
+        self.device_status_label = status_label
         self.deviceInfoLayout.addWidget(status_label)
 
         # Version

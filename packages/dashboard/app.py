@@ -34,6 +34,7 @@ from dashboard.components.sync_dialog import SyncProgressDialog
 from dashboard.components.experiment_editor import ExperimentEditor
 from shared.managers import ExperimentManager, CommunicationMessageBuilder
 from shared.constants import TEST_STATES
+from shared import __version__
 
 
 class DeviceDialog(QDialog):
@@ -155,6 +156,7 @@ class MainWindow(QMainWindow):
         ui_file = os.path.join(os.path.dirname(__file__), 'ui', 'form.ui')
         uic.loadUi(ui_file, self)
 
+        self.setWindowTitle(f"Behavior Box Dashboard (v{__version__})")
         self.destroyed.connect(self._on_destroyed)
 
         # Set up application data directory

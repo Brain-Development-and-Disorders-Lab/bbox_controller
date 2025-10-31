@@ -1,5 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+import os
+from pathlib import Path
+
+try:
+    _spec_dir = Path(__file__).parent
+except NameError:
+    _spec_dir = Path(os.getcwd())
+_repo_root = _spec_dir.parent.parent.resolve()
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
+from version import __version__
+
 block_cipher = None
 
 a = Analysis(
@@ -66,5 +80,5 @@ app = BUNDLE(
     name='Behavior Box Dashboard.app',
     icon='assets/icon.icns',
     bundle_identifier='com.behaviorbox.dashboard',
-    version='1.0.0',
+    version=__version__,
 )

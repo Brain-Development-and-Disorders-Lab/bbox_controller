@@ -13,7 +13,6 @@ bbox_controller/
 ├── apps/                 # Application-specific files
 │   ├── dashboard/        # Dashboard config, requirements, start script
 │   └── device/           # Device config, requirements, start script
-├── tests/                # Test files organized by component
 └── version.py            # Version tracking
 ```
 
@@ -34,9 +33,6 @@ bbox_controller/
 - `adafruit-circuitpython-ssd1306` (OLED display driver)
 - `adafruit-blinka` (CircuitPython compatibility)
 - `lgpio` (low-level GPIO access)
-
-**Optional Development Packages:**
-- `pytest` (testing framework)
 
 Dependencies are listed in `apps/dashboard/requirements.txt` and `apps/device/requirements.txt`. They are installed automatically based on the platform.
 

@@ -105,8 +105,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: |
-            macos-dmg/*.zip
-            windows-exe/*.zip
+            macos-dmg.zip
+            windows-exe.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
           prerelease: false

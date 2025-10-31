@@ -63,6 +63,12 @@ jobs:
           pip install -r apps/dashboard/requirements.txt
           pip install pyinstaller==6.14.1
 
+      - name: Convert PNG icon to ICO for Windows
+        working-directory: apps/dashboard
+        shell: cmd
+        run: |
+          python -c "from PIL import Image; img = Image.open('assets/icon.png'); img.save('assets/icon.ico', format='ICO')"
+
       - name: Build application with PyInstaller
         working-directory: apps/dashboard
         shell: cmd

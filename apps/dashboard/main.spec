@@ -16,16 +16,31 @@ from version import __version__
 
 block_cipher = None
 
+# Determine icon file based on platform
+_icon_file = None
+if sys.platform == 'darwin':
+    _icon_file = 'assets/icon.icns'
+elif sys.platform == 'win32':
+    _icon_file = 'assets/icon.ico'
+else:
+    _icon_file = None
+
+# Prepare datas list based on platform
+_datas = [
+    ('../../packages/dashboard/ui/form.ui', 'dashboard/ui'),
+    ('assets/icon.png', 'assets'),
+    ('config/devices.json', 'config'),
+]
+if sys.platform == 'darwin':
+    _datas.append(('assets/icon.icns', 'assets'))
+elif sys.platform == 'win32':
+    _datas.append(('assets/icon.ico', 'assets'))
+
 a = Analysis(
     ['../../packages/dashboard/main.py'],
     pathex=['../../packages'],
     binaries=[],
-    datas=[
-        ('../../packages/dashboard/ui/form.ui', 'dashboard/ui'),
-        ('assets/icon.icns', 'assets'),
-        ('assets/icon.png', 'assets'),
-        ('config/devices.json', 'config'),
-    ],
+    datas=_datas,
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui',
@@ -61,7 +76,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.icns',
+    icon=_icon_file,
 )
 
 coll = COLLECT(
@@ -75,10 +90,12 @@ coll = COLLECT(
     name='Behavior Box Dashboard',
 )
 
-app = BUNDLE(
-    coll,
-    name='Behavior Box Dashboard.app',
-    icon='assets/icon.icns',
-    bundle_identifier='com.behaviorbox.dashboard',
-    version=__version__,
-)
+# Only create BUNDLE on macOS
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='Behavior Box Dashboard.app',
+        icon='assets/icon.icns',
+        bundle_identifier='com.behaviorbox.dashboard',
+        version=__version__,
+    )

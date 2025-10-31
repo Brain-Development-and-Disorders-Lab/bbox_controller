@@ -35,12 +35,13 @@ jobs:
         run: |
           cd apps/dashboard/dist
           hdiutil create -volname "Behavior Box Dashboard" -srcfolder "Behavior Box Dashboard.app" -ov -format UDZO "Behavior Box Dashboard.dmg"
+          mv "Behavior Box Dashboard.dmg" "BehaviorBoxDashboard.dmg"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: apps/dashboard/dist/Behavior Box Dashboard.dmg
+          path: apps/dashboard/dist/BehaviorBoxDashboard.dmg
           retention-days: 1
 
   build-windows:
@@ -75,11 +76,17 @@ jobs:
         run: |
           pyinstaller main.spec --clean --noconfirm
 
+      - name: Rename Windows executable
+        working-directory: apps/dashboard/dist
+        shell: cmd
+        run: |
+          copy "Behavior Box Dashboard\Behavior Box Dashboard.exe" "BehaviorBoxDashboard.exe"
+
       - name: Upload Windows executable artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: apps/dashboard/dist/Behavior Box Dashboard/Behavior Box Dashboard.exe
+          path: apps/dashboard/dist/BehaviorBoxDashboard.exe
           retention-days: 1
 
   create-release:
@@ -105,8 +112,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: |
-            Behavior Box Dashboard.dmg
-            Behavior Box Dashboard.exe
+            BehaviorBoxDashboard.dmg
+            BehaviorBoxDashboard.exe
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
           prerelease: false

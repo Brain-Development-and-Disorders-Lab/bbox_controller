@@ -99,14 +99,21 @@ jobs:
         with:
           name: windows-exe
 
+      - name: Verify downloaded files
+        run: |
+          echo "Artifact structure:"
+          find . -name "*.dmg" -o -name "*.exe" | head -20
+          ls -la macos-dmg/ || true
+          ls -la windows-exe/ || true
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: |
-            macos-dmg.zip
-            windows-exe.zip
+            macos-dmg/*.dmg
+            windows-exe/*.exe
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
           prerelease: false

@@ -11,11 +11,11 @@ import sys
 import os
 import argparse
 
-# Add the 'src' directory to Python path to enable imports
+# Add packages to path
 script_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.dirname(script_dir)
-if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
+packages_dir = os.path.dirname(script_dir)
+if packages_dir not in sys.path:
+    sys.path.insert(0, packages_dir)
 
 from device.app import main
 

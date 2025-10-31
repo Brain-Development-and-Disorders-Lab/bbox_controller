@@ -158,6 +158,10 @@ class MainWindow(QMainWindow):
 
         self.devices_file = os.path.join(
             os.path.dirname(__file__),
+            '..',
+            '..',
+            'apps',
+            'dashboard',
             'config',
             'devices.json'
         )

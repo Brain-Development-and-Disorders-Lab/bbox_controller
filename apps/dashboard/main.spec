@@ -20,10 +20,8 @@ block_cipher = None
 _icon_file = None
 if sys.platform == 'darwin':
     _icon_file = 'assets/icon.icns'
-elif sys.platform == 'win32':
-    _icon_file = 'assets/icon.ico'
 else:
-    _icon_file = None
+    _icon_file = 'assets/icon.ico'
 
 # Prepare datas list based on platform
 _datas = [

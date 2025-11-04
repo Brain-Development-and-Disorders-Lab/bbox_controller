@@ -19,9 +19,9 @@ block_cipher = None
 # Determine icon file based on platform
 _icon_file = None
 if sys.platform == 'darwin':
-    _icon_file = 'assets/icon.icns'
+    _icon_file = str(_spec_dir / 'assets' / 'icon.icns')
 else:
-    _icon_file = 'assets/icon.ico'
+    _icon_file = str(_spec_dir / 'assets' / 'icon.ico')
 
 # Prepare datas list based on platform
 _datas = [
@@ -58,42 +58,65 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='Behavior Box Dashboard',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=_icon_file,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='Behavior Box Dashboard',
-)
-
-# Only create BUNDLE on macOS
-if sys.platform == 'darwin':
-    app = BUNDLE(
-        coll,
-        name='Behavior Box Dashboard.app',
-        icon='assets/icon.icns',
-        bundle_identifier='com.behaviorbox.dashboard',
-        version=__version__,
+if sys.platform == 'win32':
+    # One file for Windows platforms
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        [],
+        name='Behavior Box Dashboard',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=_icon_file,
     )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='Behavior Box Dashboard',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=_icon_file,
+    )
+
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name='Behavior Box Dashboard',
+    )
+
+    # Only create BUNDLE on macOS
+    if sys.platform == 'darwin':
+        app = BUNDLE(
+            coll,
+            name='Behavior Box Dashboard.app',
+            icon=str(_spec_dir / 'assets' / 'icon.icns'),
+            bundle_identifier='com.behaviorbox.dashboard',
+            version=__version__,
+        )

@@ -1,0 +1,28 @@
+{
+  "name": "dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard for managing behavior box devices",
+  "author": "Henry Burgess",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "vite:dev": "vite",
+    "vite:build": "vite build",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron:build": "npm run vite:build && electron-builder"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "cross-env": "^10.1.0",
+    "electron": "^44.4.2",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@blueprintjs/core": "^6.20.0",
+    "@blueprintjs/table": "^6.2.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

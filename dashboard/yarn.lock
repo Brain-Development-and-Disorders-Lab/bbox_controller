@@ -38,6 +38,17 @@
     classnames "^2.3.1"
     tslib "~2.6.2"
 
+"@blueprintjs/select@^6.3.6":
+  version "6.3.6"
+  resolved "https://registry.yarnpkg.com/@blueprintjs/select/-/select-6.3.6.tgz#50e232517b92dfd570ee421e8ac2341f3a8eaac0"
+  integrity sha512-BxvAiWDh9frJKZQbN6I0nUzWO2w3RRtq2M8KgxYMYOIi4JSInoQFASuSBTG8BZU83btopGMu6gfBinElWdvyYQ==
+  dependencies:
+    "@blueprintjs/colors" "^5.1.16"
+    "@blueprintjs/core" "^6.20.0"
+    "@blueprintjs/icons" "^6.14.1"
+    classnames "^2.3.1"
+    tslib "~2.6.2"
+
 "@blueprintjs/table@^6.2.6":
   version "6.2.6"
   resolved "https://registry.yarnpkg.com/@blueprintjs/table/-/table-6.2.6.tgz#557b8b435dceb1642b3585ccd47d5898dce7cd47"
@@ -791,6 +802,11 @@ concat-map@0.0.1:
   resolved "https://registry.yarnpkg.com/concat-map/-/concat-map-0.0.1.tgz#d8a96bd77fd68df7793a73036a3ba0d5405d477b"
   integrity sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==
 
+consola@^3.4.2:
+  version "3.4.2"
+  resolved "https://registry.yarnpkg.com/consola/-/consola-3.4.2.tgz#5af110145397bb67afdab77013fdc34cae590ea7"
+  integrity sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==
+
 constant-case@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/constant-case/-/constant-case-3.0.4.tgz#3b84a9aeaf4cf31ec45e6bf5de91bdfb0589faf1"
@@ -1522,7 +1538,7 @@ lightningcss@^1.33.0:
     lightningcss-win32-arm64-msvc "1.33.0"
     lightningcss-win32-x64-msvc "1.33.0"
 
-lodash@^4.17.15:
+lodash@^4.17.15, lodash@^4.18.1:
   version "4.18.1"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.18.1.tgz#ff2b66c1f6326d59513de2407bf881439812771c"
   integrity sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==

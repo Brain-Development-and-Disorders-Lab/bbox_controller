@@ -1,0 +1,14 @@
+{
+  "TEST_COMMANDS": [
+    "test_water_delivery",
+    "test_input_levers",
+    "test_input_ir",
+    "test_led_port",
+    "test_displays",
+    "test_led_levers"
+  ],
+  "EXPERIMENT_COMMANDS": [
+      "experiment_start",
+      "experiment_stop"
+  ]
+}

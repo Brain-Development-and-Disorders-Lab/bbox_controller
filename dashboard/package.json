@@ -4,7 +4,8 @@
   "description": "Dashboard for managing behavior box devices",
   "author": "Henry Burgess",
   "license": "MIT",
-  "main": "main.js",
+  "main": "main.ts",
+  "type": "module",
   "scripts": {
     "vite:dev": "vite",
     "vite:build": "vite build",
@@ -12,6 +13,7 @@
     "electron:build": "npm run vite:build && electron-builder"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.25",
     "@types/react": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "cross-env": "^10.1.0",

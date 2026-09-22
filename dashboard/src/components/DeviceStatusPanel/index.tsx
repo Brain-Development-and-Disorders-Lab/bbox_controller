@@ -13,6 +13,7 @@ import { Device, Experiment } from "../../../types";
 
 // Utilities
 import _ from "lodash";
+import ExperimentEditDialog from "../ExperimentEditDialog";
 
 const EXAMPLE_EXPERIMENTS: Experiment[] = [
   {
@@ -43,9 +44,18 @@ const renderExperiment: ItemRenderer<Experiment> = (experiment, { handleClick, h
 };
 
 const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) => {
+  // Device status state
+  const [animalID, setAnimalID] = useState("");
   const [experiments, setExperiments] = useState(props.experiments);
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment>();
-  const [animalID, setAnimalID] = useState("");
+  const [consoleOutput, setConsoleOutput] = useState("");
+  
+  // Create, edit experiment state
+  const [experimentEditOpen, setExperimentEditOpen] = useState(false);
+  
+  const onExperimentSave = (experiment: Experiment) => {
+    console.info("Experiment:", experiment);
+  };
   
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px", height: "100%" }}>
@@ -67,7 +77,7 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
           </Select>
         </div>
         <div style={{ display: "flex", flexDirection: "row", gap: "8px" }}>
-          <Button text={"New Experiment"} icon={"add"} size={"small"} />
+          <Button text={"New Experiment"} icon={"add"} size={"small"} onClick={() => setExperimentEditOpen(true)} />
           <Button text={"Edit Experiment"} icon={"edit"} size={"small"} disabled={_.isUndefined(selectedExperiment?.name) || experiments.length === 0} />
           <Button text={"Start Experiment"} icon={"play"} intent={"success"} size={"small"} disabled={_.isUndefined(selectedExperiment?.name)} />
           <Button text={"Stop Experiment"} icon={"stop"} intent={"danger"} size={"small"} disabled={_.isUndefined(selectedExperiment?.name)} />
@@ -217,10 +227,12 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
       {/* Console */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", height: "100%" }}>
         <p style={{ marginBottom: "0px" }}>Console</p>
-        <TextArea style={{ backgroundColor: "black", color: "white", fontSize: "10px", height: "100%", width: "100%", resize: "none" }} value={"Test Values"} readOnly />
+        <TextArea style={{ backgroundColor: "black", color: "white", fontSize: "10px", minHeight: "320px", width: "100%", resize: "none" }} value={consoleOutput} readOnly />
       </div>
+      
+      <ExperimentEditDialog isOpen={experimentEditOpen} setIsOpen={setExperimentEditOpen} onSave={onExperimentSave} />
     </div>
-  )
+  );
 };
 
 const DeviceStatusPanel = (props: { devices: Device[] }) => {

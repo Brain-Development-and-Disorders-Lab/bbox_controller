@@ -39,18 +39,18 @@ const DeviceEditDialog = (props: DeviceEditDialogProps) => {
   }
 
   return (
-    <Dialog title={`Edit Device: ${props.device.name}`} icon={"edit"} isOpen={props.isOpen}>
+    <Dialog title={`Edit Device: ${props.device.name}`} icon={"edit"} isOpen={props.isOpen} style={{ width: "340px" }}>
       <DialogBody style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <p style={{ marginBottom: "0px" }}>Device Name:</p>
           <input type={"text"} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
         </div>
-        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <p style={{ marginBottom: "0px" }}>Device IP Address:</p>
           <input type={"text"} value={deviceAddress} onChange={(event) => setDeviceAddress(event.target.value)} />
           {!isValidIPAddress(deviceAddress) && <p style={{ marginBottom: "0px", fontSize: "12px", color: "red" }}>Must be a valid IP address or "localhost"</p>}
         </div>
-        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <p style={{ marginBottom: "0px" }}>Device Port:</p>
           <input type={"number"} value={devicePort} onChange={(event) => setDevicePort(parseInt(event.target.value))} />
         </div>

@@ -2,7 +2,7 @@
 export type Device = {
   id: string;
   name: string;
-  status: "disconnected" | "connected" | "connecting";
+  status: "disconnected" | "disconnecting" | "connected" | "connecting";
   network: {
     ip: string;
     port: number;

@@ -19,10 +19,12 @@ const EXAMPLE_EXPERIMENTS: Experiment[] = [
   {
     id: "e_00",
     name: "Experiment 1",
+    trials: [],
   },
   {
     id: "e_01",
     name: "Experiment 2",
+    trials: [],
   },
 ];
 
@@ -227,7 +229,7 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
       {/* Console */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", height: "100%" }}>
         <p style={{ marginBottom: "0px" }}>Console</p>
-        <TextArea style={{ backgroundColor: "black", color: "white", fontSize: "10px", minHeight: "320px", width: "100%", resize: "none" }} value={consoleOutput} readOnly />
+        <TextArea style={{ backgroundColor: "black", color: "white", fontSize: "10px", minHeight: "240px", width: "100%", resize: "none" }} value={consoleOutput} readOnly />
       </div>
       
       <ExperimentEditDialog isOpen={experimentEditOpen} setIsOpen={setExperimentEditOpen} onSave={onExperimentSave} />

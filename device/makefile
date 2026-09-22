@@ -7,8 +7,12 @@ SRC_DIR  := src
 BUILD_DIR := dist
 TARGET := behavior_box_device
 
+# Vendored dependencies
+IXWEBSOCKET_DIR := third_party/ixwebsocket
+
 # Source files
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(IXWEBSOCKET_DIR)/ixwebsocket/*.cpp)
+INCLUDES := -I$(IXWEBSOCKET_DIR)
 
 # Default rule
 .PHONY: help
@@ -22,14 +26,14 @@ help:
 .PHONY: mac
 mac:
 	@mkdir -p $(BUILD_DIR)/mac
-	$(HOST_CXX) -std=c++17 $(SRCS) -o $(BUILD_DIR)/mac/$(TARGET)
+	$(HOST_CXX) -std=c++17 -pthread $(INCLUDES) $(SRCS) -o $(BUILD_DIR)/mac/$(TARGET)
 	@echo "MacOS Build Complete: $(BUILD_DIR)/mac/$(TARGET)"
 
 # Build for Raspberry Pi
 .PHONY: pi
 pi:
 	@mkdir -p $(BUILD_DIR)/pi
-	$(PI_CXX) -std=c++17 -DTARGET_PI $(SRCS) -o $(BUILD_DIR)/pi/$(TARGET)
+	$(PI_CXX) -std=c++17 -pthread -DTARGET_PI $(INCLUDES) $(SRCS) -o $(BUILD_DIR)/pi/$(TARGET) -latomic
 	@echo "Raspberry Pi Build Complete -> $(BUILD_DIR)/pi/$(TARGET)"
 
 # Clean up

@@ -2,33 +2,38 @@
 import { useState } from "react";
 
 // Blueprint components
-import { Button, Card, Colors, MenuItem, Tab, Tabs, TextArea } from "@blueprintjs/core";
 import { ItemRenderer, Select } from "@blueprintjs/select";
+import { Button, Card, Colors, MenuItem, TextArea } from "@blueprintjs/core";
 
 // Custom components
 import StatusIndicator from "../StatusIndicator";
+import ExperimentEditDialog from "../ExperimentEditDialog";
 
 // Custom types
 import { Device, Experiment } from "../../../types";
 
-// Utilities
+// Utility libraries
+import consola from "consola";
 import _ from "lodash";
-import ExperimentEditDialog from "../ExperimentEditDialog";
 
-const EXAMPLE_EXPERIMENTS: Experiment[] = [
-  {
-    id: "e_00",
-    name: "Experiment 1",
-    trials: [],
-  },
-  {
-    id: "e_01",
-    name: "Experiment 2",
-    trials: [],
-  },
-];
+// Valid commands
+import { TEST_COMMANDS, EXPERIMENT_COMMANDS } from "../../../../shared/commands.json";
 
-const renderExperiment: ItemRenderer<Experiment> = (experiment, { handleClick, handleFocus, modifiers, query }) => {
+const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
+  const { device } = props;
+  const [animalID, setAnimalID] = useState("");
+  const [experiments, setExperiments] = useState(props.experiments);
+  const [selectedExperiment, setSelectedExperiment] = useState<Experiment>();
+  const [consoleOutput, setConsoleOutput] = useState("");
+  
+  // Create, edit experiment state
+  const [experimentEditOpen, setExperimentEditOpen] = useState(false);
+  
+  const onExperimentSave = (experiment: Experiment) => {
+    console.info("Experiment:", experiment);
+  };
+  
+  const renderExperiment: ItemRenderer<Experiment> = (experiment, { handleClick, handleFocus, modifiers, query }) => {
     if (!modifiers.matchesPredicate) {
       return null;
     }
@@ -43,20 +48,20 @@ const renderExperiment: ItemRenderer<Experiment> = (experiment, { handleClick, h
         text={experiment.name}
       />
     );
-};
-
-const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) => {
-  // Device status state
-  const [animalID, setAnimalID] = useState("");
-  const [experiments, setExperiments] = useState(props.experiments);
-  const [selectedExperiment, setSelectedExperiment] = useState<Experiment>();
-  const [consoleOutput, setConsoleOutput] = useState("");
+  };
   
-  // Create, edit experiment state
-  const [experimentEditOpen, setExperimentEditOpen] = useState(false);
+  // Test parameters
+  const [testWaterDuration, setTestWaterDuration] = useState(1000);
+  const [testLeverLightDuration, setTestLeverLightDuration] = useState(1000);
+  const [testNoseLightDuration, setTestNoseLightDuration] = useState(1000);
+  const [testDisplayDuration, setTestDisplayDuration] = useState(1000);
   
-  const onExperimentSave = (experiment: Experiment) => {
-    console.info("Experiment:", experiment);
+  const sendTestCommand = (command: string, parameter?: number) => {
+    if (TEST_COMMANDS.includes(command)) {
+      window.dashboardAPI.deviceCommand(device, { command: command, parameter: parameter ?? 0 });
+    } else {
+      consola.error("Unknown test command:", command);
+    }
   };
   
   return (
@@ -70,7 +75,7 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
           <p style={{ marginBottom: "0px" }}>Experiment:</p>
           <Select<Experiment>
-            items={EXAMPLE_EXPERIMENTS}
+            items={props.experiments}
             itemRenderer={renderExperiment}
             noResults={<MenuItem disabled={true} text={"No results."} roleStructure={"listoption"} />}
             onItemSelect={setSelectedExperiment}
@@ -126,12 +131,12 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <p style={{ marginBottom: "0px" }}>Test Water Delivery</p>
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <input type={"number"} style={{ width: "60px" }} value={1000} />
+                <input type={"number"} style={{ width: "60px" }} value={testWaterDuration} onChange={(event) => setTestWaterDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
                 <StatusIndicator />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_water_delivery", testWaterDuration)} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
@@ -139,18 +144,18 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
                 <StatusIndicator />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <p style={{ marginBottom: "0px" }}>Test Lever Lights</p>
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <input type={"number"} style={{ width: "60px" }} value={1000} />
+                <input type={"number"} style={{ width: "60px" }} value={testLeverLightDuration} onChange={(event) => setTestLeverLightDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
                 <StatusIndicator />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_led_levers", testLeverLightDuration)} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
@@ -158,29 +163,29 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
                 <StatusIndicator />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <p style={{ marginBottom: "0px" }}>Test Nose Light</p>
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <input type={"number"} style={{ width: "60px" }} value={1000} />
+                <input type={"number"} style={{ width: "60px" }} value={testNoseLightDuration} onChange={(event) => setTestNoseLightDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
                 <StatusIndicator />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_led_port", testNoseLightDuration)} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <p style={{ marginBottom: "0px" }}>Test Displays</p>
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <input type={"number"} style={{ width: "60px" }} value={1000} />
+                <input type={"number"} style={{ width: "60px" }} value={testDisplayDuration} onChange={(event) => setTestDisplayDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
                 <StatusIndicator />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_displays", testDisplayDuration)} />
               </div>
             </div>
           </Card>
@@ -237,18 +242,4 @@ const DeviceStatusTab = (props: { device: Device, experiments: Experiment[] }) =
   );
 };
 
-const DeviceStatusPanel = (props: { devices: Device[] }) => {
-  return (
-    <div style={{ padding: "8px", width: "100%", height: "100%" }}>
-      <Tabs id={"DeviceTabs"} animate>
-        {props.devices.map((device) => {
-          return (
-            <Tab id={device.id} title={device.name} style={{ height: "100%" }} panel={<DeviceStatusTab device={device} experiments={EXAMPLE_EXPERIMENTS} />} />
-          );
-        })}
-      </Tabs>
-    </div>
-  );
-};
-
-export default DeviceStatusPanel;
+export default DeviceTab;

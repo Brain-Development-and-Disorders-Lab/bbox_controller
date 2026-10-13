@@ -4,62 +4,77 @@ import consola from "consola";
 import { WebSocket } from "ws";
 
 let mainWindow;
+
+// Active sockets, keyed by `Device.id`
 const connectedDevices = new Map();
+
+// Push a status update for a single device to the renderer
+const sendDeviceUpdate = (id, status, error) => {
+  if (mainWindow) {
+    mainWindow.webContents.send("device-update", { id, status, error });
+  }
+};
 
 ipcMain.on("device-connect", (event, device) => {
   const url = `ws://${device.network.ip}:${device.network.port}`;
-  const targetKey = `${device.network.ip}:${device.network.port}`;
   consola.start(`Connecting to: ${url}`);
 
-  // Close any existing connection to this target before opening a new one,
+  // Close any existing connection to this device before opening a new one,
   // otherwise repeated connect attempts leak sockets that are never closed.
-  const existing = connectedDevices.get(targetKey);
+  const existing = connectedDevices.get(device.id);
   if (existing) {
     existing.removeAllListeners();
     existing.terminate();
-    connectedDevices.delete(targetKey);
+    connectedDevices.delete(device.id);
   }
 
+  let ws;
   try {
-    const ws = new WebSocket(url);
-
-    ws.on("open", () => {
-      consola.success(`Successfully connected to device: ${url}`);
-      connectedDevices.set(targetKey, ws);
-      mainWindow.webContents.send("device-update", `Connected to ${targetKey}`);
-    });
-
-    ws.on("message", (data) => {
-      consola.info(`Data from ${targetKey}:`, data.toString());
-    });
-
-    ws.on("close", () => {
-      consola.info(`Disconnected from ${targetKey}`);
-      connectedDevices.delete(targetKey);
-      mainWindow.webContents.send("device-update", "Disconnected");
-    });
-
-    ws.on("error", (err) => {
-      consola.error(`Socket error on ${targetKey}:`, err.message !== "" ? err.message : "No additional information.");
-      mainWindow.webContents.send("device-update", `Error: ${err.message !== "" ? err.message : "No additional information."}`);
-    });
-
+    ws = new WebSocket(url);
   } catch (error) {
-    mainWindow.webContents.send("device-update", `Failed to initialize: ${error.message}`);
+    sendDeviceUpdate(device.id, "disconnected", error.message);
+    return;
   }
+  connectedDevices.set(device.id, ws);
+
+  ws.on("open", () => {
+    consola.success(`Successfully connected to device: ${url}`);
+    sendDeviceUpdate(device.id, "connected");
+  });
+
+  ws.on("message", (data) => {
+    consola.info(`Data from ${url}:`, data.toString());
+  });
+
+  ws.on("error", (err) => {
+    const message = err.message !== "" ? err.message : "No additional information.";
+    consola.error(`Socket error on ${url}:`, message);
+    sendDeviceUpdate(device.id, "disconnected", message);
+  });
+
+  ws.on("close", () => {
+    consola.info(`Disconnected from ${url}`);
+    if (connectedDevices.get(device.id) === ws) {
+      connectedDevices.delete(device.id);
+    }
+    sendDeviceUpdate(device.id, "disconnected");
+  });
 });
 
 ipcMain.on("device-disconnect", (event, device) => {
-  const targetKey = `${device.network.ip}:${device.network.port}`;
-  const ws = connectedDevices.get(targetKey);
-
+  const ws = connectedDevices.get(device.id);
   if (!ws) {
-    consola.warn(`No active connection to disconnect: ${targetKey}`);
+    consola.warn(`No active connection to disconnect: ${device.id}`);
+    sendDeviceUpdate(device.id, "disconnected");
     return;
   }
 
-  consola.start(`Disconnecting from: ${targetKey}`);
+  consola.start(`Disconnecting from: ${device.id}`);
   ws.close();
+});
+
+ipcMain.on("device-command", (event, device, command) => {
+  sendCommandToDevice(device.id, command);
 });
 
 // Helper function to target specific device

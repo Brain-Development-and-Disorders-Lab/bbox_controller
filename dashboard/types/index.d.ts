@@ -10,6 +10,13 @@ export type Device = {
   version: string;
 };
 
+// Status update pushed from the main process over the `device-update` channel
+export type DeviceUpdate = {
+  id: Device["id"];
+  status: "connected" | "disconnected";
+  error?: string;
+};
+
 export type Trial = {
   id: string;
   name: string;

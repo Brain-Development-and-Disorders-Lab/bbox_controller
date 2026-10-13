@@ -1,68 +1,51 @@
-#include <atomic>
-#include <chrono>
-#include <csignal>
-#include <iostream>
-#include <thread>
+#include <cstdlib>
+#include <memory>
 
-#include <ixwebsocket/IXNetSystem.h>
-#include <ixwebsocket/IXWebSocketServer.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+
+#include "application.h"
+#include "network/dashboard_sink.h"
 
 namespace {
     constexpr int kDefaultPort = 8765;
-    constexpr const char* kBindHost = "0.0.0.0";
-
-    std::atomic<bool> g_keepRunning{true};
-
-    void HandleShutdownSignal(int) {
-        g_keepRunning = false;
-    }
-}
-
-int main() {
-    std::iostream::sync_with_stdio(false);
-    std::cout << "Behavior Box Device" << std::endl;
+    constexpr size_t kLogHistorySize = 200;
 
     #ifdef TARGET_PI
-        std::cout << "[Target: Raspberry Pi] Running on ARM Linux." << std::endl;
+        constexpr bool kSimulate = false;
     #else
-        std::cout << "[Target: macOS] Simulating functionality on Mac." << std::endl;
+        constexpr bool kSimulate = true;
     #endif
+}
 
-    std::signal(SIGINT, HandleShutdownSignal);
-    std::signal(SIGTERM, HandleShutdownSignal);
+int main(int argc, char* argv[]) {
+    // Log to the console and to connected dashboards
+    auto dashboardSink = std::make_shared<DashboardSink>(kLogHistorySize);
+    spdlog::init_thread_pool(8192, 1);
+    auto logger = std::make_shared<spdlog::async_logger>(
+        "device",
+        spdlog::sinks_init_list{std::make_shared<spdlog::sinks::stdout_color_sink_mt>(), dashboardSink},
+        spdlog::thread_pool(),
+        spdlog::async_overflow_policy::overrun_oldest);
+    spdlog::set_default_logger(logger);
 
-    ix::initNetSystem();
+    spdlog::info("Behavior Box Device");
+    if (kSimulate) {
+        spdlog::info("[Target: macOS] Simulating hardware with the keyboard.");
+    } else {
+        spdlog::info("[Target: Raspberry Pi] Running on ARM Linux.");
+    }
 
-    ix::WebSocketServer server(kDefaultPort, kBindHost);
-    server.disablePerMessageDeflate();
-
-    server.setOnClientMessageCallback(
-        [](std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket,
-           const ix::WebSocketMessagePtr& msg) {
-            if (msg->type == ix::WebSocketMessageType::Open) {
-                std::cout << "[Networking] Client connected: " << connectionState->getRemoteIp() << std::endl;
-            } else if (msg->type == ix::WebSocketMessageType::Close) {
-                std::cout << "[Networking] Client disconnected" << std::endl;
-            } else if (msg->type == ix::WebSocketMessageType::Message) {
-                std::cout << "[Networking] Received: " << msg->str << std::endl;
-            }
-        });
-
-    auto result = server.listen();
-    if (!result.first) {
-        std::cerr << "[Networking] Failed to listen: " << result.second << std::endl;
+    // Optional first argument overrides the listening port
+    const int port = argc > 1 ? std::atoi(argv[1]) : kDefaultPort;
+    if (port <= 0 || port > 65535) {
+        spdlog::error("Invalid port: {}", argv[1]);
+        spdlog::shutdown();
         return 1;
     }
 
-    std::cout << "[Networking] Listening on ws://" << kBindHost << ":" << kDefaultPort << std::endl;
-    server.start();
-
-    while (g_keepRunning) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
-
-    std::cout << "[Networking] Shutting down..." << std::endl;
-    server.stop();
-
-    return 0;
+    const int result = Application(port, kSimulate, dashboardSink).run();
+    spdlog::shutdown();
+    return result;
 }

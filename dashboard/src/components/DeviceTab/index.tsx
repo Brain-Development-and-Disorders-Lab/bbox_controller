@@ -1,5 +1,5 @@
 // React
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Blueprint components
 import { ItemRenderer, Select } from "@blueprintjs/select";
@@ -10,7 +10,7 @@ import StatusIndicator from "../StatusIndicator";
 import ExperimentEditDialog from "../ExperimentEditDialog";
 
 // Custom types
-import { Device, Experiment } from "../../../types";
+import { Device, DeviceLog, DeviceTestState, Experiment, InputChannel } from "../../../types";
 
 // Utility libraries
 import consola from "consola";
@@ -19,12 +19,94 @@ import _ from "lodash";
 // Valid commands
 import { TEST_COMMANDS, EXPERIMENT_COMMANDS } from "../../../../shared/commands.json";
 
+// Oldest console lines are dropped past this limit
+const MAX_CONSOLE_LINES = 1000;
+
+// Rows of the "Input Status" card, in display order
+const INPUT_CHANNELS: { channel: InputChannel; label: string }[] = [
+  { channel: "left_lever", label: "Left Lever" },
+  { channel: "left_lever_light", label: "Left Lever Light" },
+  { channel: "right_lever", label: "Right Lever" },
+  { channel: "right_lever_light", label: "Right Lever Light" },
+  { channel: "nose_poke", label: "Nose Poke" },
+  { channel: "nose_light", label: "Nose Light" },
+  { channel: "water_valve", label: "Water Valve" },
+];
+
+// Untested tests keep the indicator's default color
+const testIndicatorStatus = (state?: DeviceTestState["state"]) => {
+  if (state === "running") return "neutral";
+  if (state === "passed") return "good";
+  if (state === "failed") return "bad";
+  return undefined;
+};
+
+const formatLog = (log: DeviceLog) => {
+  const time = new Date(log.timestamp);
+  const milliseconds = String(time.getMilliseconds()).padStart(3, "0");
+  // Pad the level to the longest name ("critical") so messages start in the same column
+  const level = `[${log.level}]`.padEnd(10);
+  return `${time.toTimeString().slice(0, 8)}.${milliseconds}\t${level} ${log.message}`;
+};
+
 const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
   const { device } = props;
   const [animalID, setAnimalID] = useState("");
   const [experiments, setExperiments] = useState(props.experiments);
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment>();
-  const [consoleOutput, setConsoleOutput] = useState("");
+  
+  // Console state
+  const [consoleLines, setConsoleLines] = useState<string[]>([]);
+  const consoleRef = useRef<HTMLTextAreaElement>(null);
+  const consoleAtBottom = useRef(true);
+  
+  // Append live logs from this device
+  useEffect(() => {
+    return window.dashboardAPI.onDeviceLog((log) => {
+      if (log.id !== device.id) return;
+      setConsoleLines((current) => [...current, formatLog(log)].slice(-MAX_CONSOLE_LINES));
+    });
+  }, [device.id]);
+  
+  // Live input and test state from this device
+  const [inputState, setInputState] = useState<Partial<Record<InputChannel, boolean>>>({});
+  const [testStates, setTestStates] = useState<Record<string, DeviceTestState["state"]>>({});
+
+  useEffect(() => {
+    const unsubscribeInput = window.dashboardAPI.onDeviceInputState((update) => {
+      if (update.id === device.id) setInputState(update.state);
+    });
+    const unsubscribeTest = window.dashboardAPI.onDeviceTestState((update) => {
+      if (update.id === device.id) setTestStates((current) => ({ ...current, [update.test]: update.state }));
+    });
+    return () => {
+      unsubscribeInput();
+      unsubscribeTest();
+    };
+  }, [device.id]);
+
+  // The device replays its recent history on connect, so start each connection fresh
+  useEffect(() => {
+    if (device.status === "connecting") {
+      setConsoleLines([]);
+      setInputState({});
+      setTestStates({});
+    }
+  }, [device.status]);
+  
+  // Keep the console scrolled to the newest line, unless the user has scrolled up
+  useEffect(() => {
+    if (consoleRef.current && consoleAtBottom.current) {
+      consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+    }
+  }, [consoleLines]);
+  
+  const onConsoleScroll = () => {
+    const element = consoleRef.current;
+    if (element) {
+      consoleAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 16;
+    }
+  };
   
   // Create, edit experiment state
   const [experimentEditOpen, setExperimentEditOpen] = useState(false);
@@ -65,7 +147,7 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
   };
   
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1, minHeight: 0 }}>
       <p style={{ marginBottom: "0px" }}>Experiment Management</p>
       <Card style={{ display: "flex", flexDirection: "column", gap:"8px", padding: "8px" }}>
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
@@ -97,30 +179,12 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "20%" }}>
           <p style={{ marginBottom: "0px" }}>Input Status</p>
           <Card style={{ display: "flex", flexDirection: "column", gap:"8px", padding: "8px" }}>
-            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px" }}>Left Lever</p>
-              <StatusIndicator status={"bad"} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px" }}>Left Lever Light</p>
-              <StatusIndicator status={"bad"} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px" }}>Right Lever</p>
-              <StatusIndicator status={"bad"} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px" }}>Right Lever Light</p>
-              <StatusIndicator status={"bad"} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px" }}>Nose Poke</p>
-              <StatusIndicator status={"bad"} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px" }}>Nose Light</p>
-              <StatusIndicator status={"bad"} />
-            </div>
+            {INPUT_CHANNELS.map(({ channel, label }) => (
+              <div key={channel} style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+                <p style={{ marginBottom: "0px" }}>{label}</p>
+                <StatusIndicator status={inputState[channel] ? "good" : "bad"} />
+              </div>
+            ))}
           </Card>
         </div>
 
@@ -134,7 +198,7 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
                 <input type={"number"} style={{ width: "60px" }} value={testWaterDuration} onChange={(event) => setTestWaterDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
-                <StatusIndicator />
+                <StatusIndicator status={testIndicatorStatus(testStates["test_water_delivery"])} />
                 <div style={{ width: "2px" }} />
                 <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_water_delivery", testWaterDuration)} />
               </div>
@@ -142,9 +206,9 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <p style={{ marginBottom: "0px" }}>Test Levers</p>
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <StatusIndicator />
+                <StatusIndicator status={testIndicatorStatus(testStates["test_input_levers"])} />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_input_levers")} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
@@ -153,7 +217,7 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
                 <input type={"number"} style={{ width: "60px" }} value={testLeverLightDuration} onChange={(event) => setTestLeverLightDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
-                <StatusIndicator />
+                <StatusIndicator status={testIndicatorStatus(testStates["test_led_levers"])} />
                 <div style={{ width: "2px" }} />
                 <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_led_levers", testLeverLightDuration)} />
               </div>
@@ -161,9 +225,9 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
               <p style={{ marginBottom: "0px" }}>Test IR</p>
               <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                <StatusIndicator />
+                <StatusIndicator status={testIndicatorStatus(testStates["test_input_ir"])} />
                 <div style={{ width: "2px" }} />
-                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} />
+                <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_input_ir")} />
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
@@ -172,7 +236,7 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
                 <input type={"number"} style={{ width: "60px" }} value={testNoseLightDuration} onChange={(event) => setTestNoseLightDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
-                <StatusIndicator />
+                <StatusIndicator status={testIndicatorStatus(testStates["test_led_port"])} />
                 <div style={{ width: "2px" }} />
                 <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_led_port", testNoseLightDuration)} />
               </div>
@@ -183,7 +247,7 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
                 <input type={"number"} style={{ width: "60px" }} value={testDisplayDuration} onChange={(event) => setTestDisplayDuration(parseInt(event.target.value))} />
                 <p style={{ marginBottom: "0px" }}>ms</p>
                 <div style={{ width: "2px" }} />
-                <StatusIndicator />
+                <StatusIndicator status={testIndicatorStatus(testStates["test_displays"])} />
                 <div style={{ width: "2px" }} />
                 <Button text={"Test"} size={"small"} disabled={device.status !== "connected"} onClick={() => sendTestCommand("test_displays", testDisplayDuration)} />
               </div>
@@ -232,9 +296,9 @@ const DeviceTab = (props: { device: Device, experiments: Experiment[] }) => {
       </div>
 
       {/* Console */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", height: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", flex: 1, minHeight: 0 }}>
         <p style={{ marginBottom: "0px" }}>Console</p>
-        <TextArea style={{ backgroundColor: "black", color: "white", fontSize: "10px", minHeight: "240px", width: "100%", resize: "none" }} value={consoleOutput} readOnly />
+        <TextArea style={{ backgroundColor: "black", color: "white", fontFamily: "monospace", fontSize: "10px", flex: 1, minHeight: "240px", width: "100%", resize: "none" }} value={consoleLines.join("\n")} inputRef={consoleRef} onScroll={onConsoleScroll} readOnly />
       </div>
       
       <ExperimentEditDialog isOpen={experimentEditOpen} setIsOpen={setExperimentEditOpen} onSave={onExperimentSave} />

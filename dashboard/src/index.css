@@ -1,0 +1,18 @@
+/* Device tabs fill the right-hand column, active panel takes remaining height */
+.device-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.device-tab-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Blueprint hides inactive panels with `display: none` */
+.device-tab-panel[aria-hidden="true"] {
+  display: none;
+}

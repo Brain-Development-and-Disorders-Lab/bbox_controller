@@ -1,9 +1,19 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Subscribe to a main process channel. Returns an unsubscribe function so multiple
+// components can listen to the same channel independently.
+const subscribe = (channel, callback) => {
+  const listener = (_event, payload) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+};
+
 contextBridge.exposeInMainWorld("dashboardAPI", {
   deviceConnect: (device) => ipcRenderer.send("device-connect", device),
   deviceDisconnect: (device) => ipcRenderer.send("device-disconnect", device),
   deviceCommand: (device, command) => ipcRenderer.send("device-command", device, command),
-  onDeviceUpdate: (callback) => ipcRenderer.on("device-update", callback),
-  removeDeviceListeners: () => ipcRenderer.removeAllListeners("device-update")
+  onDeviceUpdate: (callback) => subscribe("device-update", callback),
+  onDeviceLog: (callback) => subscribe("device-log", callback),
+  onDeviceTestState: (callback) => subscribe("device-test-state", callback),
+  onDeviceInputState: (callback) => subscribe("device-input-state", callback),
 });

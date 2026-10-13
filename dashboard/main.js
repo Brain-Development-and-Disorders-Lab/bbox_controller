@@ -15,6 +15,13 @@ const sendDeviceUpdate = (id, status, error) => {
   }
 };
 
+// Forward a log record from a device to the renderer
+const sendDeviceLog = (id, log) => {
+  if (mainWindow) {
+    mainWindow.webContents.send("device-log", { id, level: log.level, timestamp: log.timestamp, message: log.message });
+  }
+};
+
 ipcMain.on("device-connect", (event, device) => {
   const url = `ws://${device.network.ip}:${device.network.port}`;
   consola.start(`Connecting to: ${url}`);
@@ -43,7 +50,23 @@ ipcMain.on("device-connect", (event, device) => {
   });
 
   ws.on("message", (data) => {
-    consola.info(`Data from ${url}:`, data.toString());
+    let message;
+    try {
+      message = JSON.parse(data.toString());
+    } catch {
+      consola.warn(`Unparseable message from ${url}:`, data.toString());
+      return;
+    }
+
+    if (message.type === "log") {
+      sendDeviceLog(device.id, message);
+    } else if (message.type === "test_state") {
+      notifyDashboard("device-test-state", { id: device.id, test: message.test, state: message.state });
+    } else if (message.type === "input_state") {
+      notifyDashboard("device-input-state", { id: device.id, state: message.state });
+    } else {
+      consola.info(`Data from ${url}:`, message);
+    }
   });
 
   ws.on("error", (err) => {

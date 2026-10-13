@@ -75,7 +75,7 @@ const App = () => {
   };
 
   useEffect(() => {
-    window.dashboardAPI.onDeviceUpdate((_event: unknown, update: DeviceUpdate) => {
+    return window.dashboardAPI.onDeviceUpdate((update: DeviceUpdate) => {
       setDeviceStatus(update.id, update.status);
       if (update.error) {
         toasterRef.current?.show({
@@ -93,10 +93,6 @@ const App = () => {
         });
       }
     });
-
-    return () => {
-      window.dashboardAPI.removeDeviceListeners();
-    };
   }, []);
 
   const handleConnectClick = (device: Device) => {
@@ -240,10 +236,10 @@ const App = () => {
       {/* Right: Device state */}
       <div style={{ width: "70%", height: "100%" }}>
         <div style={{ padding: "8px", width: "100%", height: "100%" }}>
-          <Tabs id={"DeviceTabs"} animate>
+          <Tabs id={"DeviceTabs"} className={"device-tabs"} animate>
             {devices.map((device) => {
               return (
-                <Tab key={device.id} id={device.id} title={device.name} style={{ height: "100%" }} panel={<DeviceTab device={device} experiments={EXAMPLE_EXPERIMENTS} />} />
+                <Tab key={device.id} id={device.id} title={device.name} panelClassName={"device-tab-panel"} panel={<DeviceTab device={device} experiments={EXAMPLE_EXPERIMENTS} />} />
               );
             })}
           </Tabs>

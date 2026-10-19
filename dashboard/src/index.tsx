@@ -13,6 +13,10 @@ import ReactDOM from "react-dom/client";
 // Dashboard application
 import App from "./App";
 
+// Get the current version
+import { version } from "../package.json";
+document.title = `Behavior Box Dashboard (v${version})`;
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />

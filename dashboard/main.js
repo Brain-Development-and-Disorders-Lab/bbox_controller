@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { writeFile } from "fs/promises";
 import path from "path";
 import consola from "consola";
 import { WebSocket } from "ws";
@@ -98,6 +99,27 @@ ipcMain.on("device-disconnect", (event, device) => {
 
 ipcMain.on("device-command", (event, device, command) => {
   sendCommandToDevice(device.id, command);
+});
+
+// Ask where to save an experiment file then write it to the selected location
+ipcMain.handle("experiment-save", async (event, defaultPath, contents) => {
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: "Save Experiment",
+    defaultPath: path.isAbsolute(defaultPath) ? defaultPath : path.join(app.getPath("documents"), defaultPath),
+    filters: [{ name: "Experiment", extensions: ["json"] }],
+  });
+  if (canceled || !filePath) {
+    return { status: "canceled" };
+  }
+
+  try {
+    await writeFile(filePath, contents, "utf8");
+    consola.success(`Saved experiment: ${filePath}`);
+    return { status: "saved", filePath };
+  } catch (error) {
+    consola.error(`Failed to save experiment: ${filePath}`, error);
+    return { status: "error", message: error.message };
+  }
 });
 
 // Helper function to target specific device

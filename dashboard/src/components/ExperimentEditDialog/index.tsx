@@ -2,113 +2,90 @@
 import { useEffect, useState } from "react";
 
 // Blueprint components
-import { Button, Card, Colors, Dialog, DialogBody, DialogFooter, Icon, NonIdealState, Tooltip, Tree, TreeNodeInfo } from "@blueprintjs/core";
+import { Button, Dialog, DialogBody, DialogFooter } from "@blueprintjs/core";
+
+// Custom components
+import ErrorCallout from "../ErrorCallout";
+import ExperimentParameterList from "../ExperimentParameterList";
+import ExperimentTimeline from "../ExperimentTimeline";
 
 // Custom types
-import { Device, Experiment, ExperimentEditDialogProps } from "../../../types";
+import { Experiment, ExperimentEditDialogProps, ExperimentParameters, TimelineItem } from "../../../types";
 
-// Utility libraries
-import _ from "lodash";
+// Experiment format
+import { createExperiment, experimentFileName, serializeExperiment, validateExperiment } from "../../lib/experiment";
 
-const EXAMPLE_TRIALS = [
-  {
-    leftContent: <Icon icon={"lab-test"} color={Colors.GRAY3} />,
-    label: <div>Training: Stage 01</div>,
-    rightContent: <Icon icon={"info-sign"} color={Colors.GRAY2} />,
-    tooltip: "Training stage 01, requiring...",
-  },
-  {
-    leftContent: <Icon icon={"stopwatch"} color={Colors.GRAY3} />,
-    label: <div>Interval (2000ms)</div>,
-    rightContent: <Icon icon={"info-sign"} color={Colors.GRAY2} />,
-    tooltip: "Inter-trial interval",
-  },
-  {
-    leftContent: <Icon icon={"lab-test"} color={Colors.GRAY3} />,
-    label: <div>Training: Stage 02</div>,
-    rightContent: <Icon icon={"info-sign"} color={Colors.GRAY2} />,
-    tooltip: "Training stage 02, requiring...",
-  }
+const EXAMPLE_TRIALS: TimelineItem[] = [
+  { id: "stage_1", type: "training", stage: 1, repeat: 1, description: "Training stage 01, requiring..." },
+  { id: "interval_1", type: "interval", duration_ms: 2000, repeat: 1, description: "Inter-trial interval" },
+  { id: "stage_2", type: "training", stage: 2, repeat: 1, description: "Training stage 02, requiring..." },
 ];
 
 const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
-  // Determine if creating or editing an Experiment
-  const isCreating = _.isUndefined(props.experiment);
-  
-  // Experiment state
-  const [experimentID,] = useState(props.experiment?.id ?? "test_00");
-  const [experimentName, setExperimentName] = useState(props.experiment?.name ?? "");
-  const isValidExperiment = experimentName !== "";
-  
-  // Timeline state
-  const [trials, setTrials] = useState(EXAMPLE_TRIALS);
-  const [selectedTrialIndex, setSelectedTrialIndex] = useState(-1);
-  
-  // Synchronize the state
+  const isCreating = props.loaded === undefined;
+
+  // The experiment being edited and the selected timeline item
+  const [draft, setDraft] = useState<Experiment>(() => createExperiment("", EXAMPLE_TRIALS));
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const items = draft.timeline.items;
+
+  // Save state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveErrors, setSaveErrors] = useState<string[]>([]);
+
+  // Start from the loaded experiment or a new one each time the dialog opens
   useEffect(() => {
-    if (props.experiment) {
-      setExperimentName(props.experiment.name);
+    if (props.isOpen) {
+      setDraft(props.loaded?.experiment ?? createExperiment("", EXAMPLE_TRIALS));
+      setSelectedIndex(-1);
+      setSaveErrors([]);
     }
-  }, [props.experiment]);
-  
-  const handleSaveClick = () => {
-    const experiment: Experiment = {
-      id: experimentID,
-      name: experimentName,
-      trials: [],
-    };
-    props.onSave(experiment);
+  }, [props.isOpen, props.loaded]);
 
-    setSelectedTrialIndex(-1);
-    props.setIsOpen(false);
+  const setName = (name: string) => setDraft((current) => ({ ...current, metadata: { ...current.metadata, name } }));
+  const setItems = (updated: TimelineItem[]) => setDraft((current) => ({ ...current, timeline: { ...current.timeline, items: updated } }));
+  const setParameter = (key: keyof ExperimentParameters, value: number) => {
+    setDraft((current) => ({ ...current, parameters: { ...current.parameters, [key]: value } }));
   };
-  
-  const handleTrialMoveUp = () => {
-    if (selectedTrialIndex === 0) return;
-    
-    // Get all trials around that index
-    const selectedTrial = _.cloneDeep(trials[selectedTrialIndex]);
-    const priorTrials = trials.slice(0, selectedTrialIndex);
-    const immediatePriorTrial = priorTrials.pop();
-    const remainingTrials = selectedTrialIndex < trials.length - 1 ? trials.slice(selectedTrialIndex + 1) : [];
-    
-    // Rebuild the trial order and update state
-    if (_.isUndefined(immediatePriorTrial)) return;
-    const updatedTrials = [...priorTrials, selectedTrial, immediatePriorTrial, ...remainingTrials];
-    setTrials([...updatedTrials]);
-    setSelectedTrialIndex(selectedTrialIndex - 1);
-  };
-  
-  const handleTrialMoveDown = () => {
-    if (selectedTrialIndex === trials.length - 1) return;
-    
-    // Get all trials around that index
-    const selectedTrial = _.cloneDeep(trials[selectedTrialIndex]);
-    const priorTrials = trials.slice(0, selectedTrialIndex);
-    const remainingTrials = trials.slice(selectedTrialIndex + 1);
-    
-    // Handle cases near the end of the experiment timeline
-    let updatedTrials = [];
-    if (remainingTrials.length === 1) {
-      updatedTrials = [...priorTrials, ...remainingTrials, selectedTrial];
-    } else {
-      const immediateRemainingTrial = _.cloneDeep(remainingTrials[0]);
-      const reducedRemainingTrials = remainingTrials.slice(1);
-      updatedTrials = [...priorTrials, immediateRemainingTrial, selectedTrial, ...reducedRemainingTrials];
+
+  /**
+   * Validate the experiment, then ask where to save it. Edits default to the file they were
+   * loaded from. The dialog stays open if validation or saving fails, or the save is canceled.
+   */
+  const handleSaveClick = async () => {
+    const result = validateExperiment(draft);
+    if (!result.success) {
+      setSaveErrors(result.errors);
+      return;
     }
 
-    setTrials([...updatedTrials]);
-    setSelectedTrialIndex(selectedTrialIndex + 1);
+    setIsSaving(true);
+    const defaultPath = props.loaded?.filePath ?? experimentFileName(result.experiment.metadata.name);
+    const saved = await window.dashboardAPI.experimentSave(defaultPath, serializeExperiment(result.experiment));
+    setIsSaving(false);
+
+    if (saved.status === "error") {
+      setSaveErrors([`Could not save file: ${saved.message}`]);
+    } else if (saved.status === "saved") {
+      props.onSave({ filePath: saved.filePath, experiment: result.experiment });
+      props.onClose();
+    }
   };
-  
+
+  // Swap the selected item with its neighbour, `offset` places away
+  const handleTrialMove = (offset: number) => {
+    const target = selectedIndex + offset;
+    if (target < 0 || target >= items.length) return;
+
+    const updated = [...items];
+    [updated[selectedIndex], updated[target]] = [updated[target], updated[selectedIndex]];
+    setItems(updated);
+    setSelectedIndex(target);
+  };
+
   const handleTrialRemove = () => {
-    if (selectedTrialIndex === 0) {
-      setTrials([...trials.slice(1)]);
-    } else if (selectedTrialIndex === trials.length - 1) {
-      setTrials([...trials.slice(0, trials.length - 2)]);
-    } else {
-      setTrials([...trials.slice(0, selectedTrialIndex), ...trials.slice(selectedTrialIndex + 1)]);
-    }
+    setItems(items.filter((_item, index) => index !== selectedIndex));
+    setSelectedIndex(-1);
   };
 
   return (
@@ -116,138 +93,32 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
       <DialogBody style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px" }}>
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Name</p>
-          <input type={"text"} style={{ width: "520px" }} value={experimentName} placeholder={"Specify an Experiment name"} onChange={(event) => setExperimentName(event.target.value)} />
+          <input type={"text"} style={{ width: "520px" }} value={draft.metadata.name} placeholder={"Specify an Experiment name"} onChange={(event) => setName(event.target.value)} />
         </div>
+        <ErrorCallout title={"Experiment not saved"} errors={saveErrors} />
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "nowrap", alignItems: "stretch" }}>
           <div style={{ display: "flex", flexDirection: "column", flex: "1", gap: "8px", width: "50%" }}>
             <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Timeline</p>
-            <Card style={{ padding: "8px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
-                {trials.length === 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px", width: "100%", alignItems: "center", justifyContent: "center" }}>
-                    <Icon icon={"lab-test"} color={Colors.GRAY3} />
-                    <p style={{ marginBottom: "0px" }}>No Trials</p>
-                  </div>
-                )}
-                {trials.map((trial, index) => {
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <div style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        gap: "8px",
-                        padding: "4px",
-                        width: "100%",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        backgroundColor: selectedTrialIndex === index ? Colors.LIGHT_GRAY1 : Colors.LIGHT_GRAY4,
-                        borderRadius: "4px",
-                        userSelect: "none",
-                        cursor: "pointer",
-                      }} onClick={() => setSelectedTrialIndex(index)}>
-                        <div style={{ display: "flex", flexDirection: "row", gap: "8px" }}>
-                          {trial.leftContent}
-                          {trial.label}
-                        </div>
-                        <Tooltip content={trial.tooltip}>
-                          {trial.rightContent}
-                        </Tooltip>
-                      </div>
-                      {index < trials.length - 1 && (
-                        <div style={{ display: "flex", width: "100%", justifyContent: "center" }}>
-                          <Icon icon={"arrow-down"} color={Colors.GRAY3} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+            <ExperimentTimeline items={items} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
             <div style={{ display: "flex", flexDirection: "row", gap: "8px" }}>
-              <Button icon={"caret-up"} size={"small"} text={"Up"} disabled={selectedTrialIndex < 0 || trials.length === 0} onClick={handleTrialMoveUp} />
-              <Button icon={"caret-down"} size={"small"} text={"Down"} disabled={selectedTrialIndex < 0 || trials.length === 0} onClick={handleTrialMoveDown} />
-              <Button intent={"danger"} icon={"remove"} size={"small"} text={"Remove"} disabled={selectedTrialIndex < 0 || trials.length === 0} onClick={handleTrialRemove} />
+              <Button icon={"caret-up"} size={"small"} text={"Up"} disabled={selectedIndex <= 0} onClick={() => handleTrialMove(-1)} />
+              <Button icon={"caret-down"} size={"small"} text={"Down"} disabled={selectedIndex < 0 || selectedIndex >= items.length - 1} onClick={() => handleTrialMove(1)} />
+              <Button intent={"danger"} icon={"remove"} size={"small"} text={"Remove"} disabled={selectedIndex < 0} onClick={handleTrialRemove} />
               <Button intent={"success"} icon={"add"} size={"small"} text={"Add"} />
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", flex: "1", gap: "8px", width: "50%", height: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", flex: "1", gap: "8px", width: "50%" }}>
             <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Parameters</p>
-            <Card style={{ padding: "8px", height: "100%" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>ITI Minimum</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={100} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>ITI Maximum</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={1000} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Response Limit</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={1000} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Cue Minimum</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={5000} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Cue Maximum</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={10000} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Hold Minimum</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={100} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Hold Maximum</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={1000} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Valve Open</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={100} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                  <p style={{ marginBottom: "0px" }}>Punishment Time</p>
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input type={"number"} style={{ width: "80px" }} value={1000} />
-                    <p style={{ marginBottom: "0px" }}>ms</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <ExperimentParameterList parameters={draft.parameters} onChange={setParameter} />
           </div>
         </div>
       </DialogBody>
       <DialogFooter
         actions={
           <div>
-            <Button intent={"danger"} icon={"cross-circle"} text={"Cancel"} onClick={() => props.setIsOpen(false)} />
-            <Button intent={"success"} icon={"tick-circle"} text={"Save"} disabled={!isValidExperiment} onClick={() => handleSaveClick()} />
+            <Button intent={"danger"} icon={"cross-circle"} text={"Cancel"} disabled={isSaving} onClick={props.onClose} />
+            <Button intent={"success"} icon={"floppy-disk"} text={"Save"} loading={isSaving} disabled={draft.metadata.name.trim() === ""} onClick={handleSaveClick} />
           </div>
         }
       />

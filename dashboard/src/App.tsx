@@ -2,8 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Blueprint components
-import { Button, Card, Colors, Intent, MenuItem, OverlayToaster, Tab, Tabs, TextArea } from "@blueprintjs/core";
-import { ItemRenderer, Select } from "@blueprintjs/select";
+import { Button, Card, Colors, Icon, Intent, OverlayToaster, Spinner, Tab, Tabs } from "@blueprintjs/core";
 import { Cell, Column, SelectionModes, Table } from "@blueprintjs/table";
 
 // Custom components
@@ -11,7 +10,7 @@ import DeviceEditDialog from "./components/DeviceEditDialog";
 import DeviceTab from "./components/DeviceTab";
 
 // Custom types
-import { Device, DeviceUpdate, Experiment } from "../types";
+import { Device, DeviceUpdate } from "../types";
 
 // Utility libraries
 import _ from "lodash";
@@ -25,7 +24,7 @@ const EXAMPLE_DEVICES: Device[] = [
       ip: "localhost",
       port: 1111,
     },
-    version: "1.0.0",
+    version: "Unknown",
   },
   {
     id: "2",
@@ -35,20 +34,7 @@ const EXAMPLE_DEVICES: Device[] = [
       ip: "localhost",
       port: 2222,
     },
-    version: "1.0.0",
-  },
-];
-
-const EXAMPLE_EXPERIMENTS: Experiment[] = [
-  {
-    id: "e_00",
-    name: "Experiment 1",
-    trials: [],
-  },
-  {
-    id: "e_01",
-    name: "Experiment 2",
-    trials: [],
+    version: "Unknown",
   },
 ];
 
@@ -239,7 +225,22 @@ const App = () => {
           <Tabs id={"DeviceTabs"} className={"device-tabs"} animate>
             {devices.map((device) => {
               return (
-                <Tab key={device.id} id={device.id} title={device.name} panelClassName={"device-tab-panel"} panel={<DeviceTab device={device} experiments={EXAMPLE_EXPERIMENTS} />} />
+                <Tab
+                  key={device.id}
+                  id={device.id}
+                  title={
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {device.name}
+                      {device.status === "connecting" ? (
+                        <Spinner size={15} />
+                      ) : (
+                        <Icon icon={"offline"} color={device.status !== "connected" ? "red" : "green"} />
+                      )}
+                    </div>
+                  }
+                  panelClassName={"device-tab-panel"}
+                  panel={<DeviceTab device={device} />}
+                />
               );
             })}
           </Tabs>

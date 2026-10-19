@@ -1,7 +1,10 @@
 // Blueprint colors
 import { Colors } from "@blueprintjs/core";
 
-const StatusIndicator = (props: { status?: "good" | "neutral" | "bad" }) => {
+// Custom types
+import { StatusIndicatorProps } from "../../../types";
+
+const StatusIndicator = (props: StatusIndicatorProps) => {
   // Set the indicator color
   let color = Colors.BLUE3;
   if (props.status === "good") color = Colors.GREEN3;

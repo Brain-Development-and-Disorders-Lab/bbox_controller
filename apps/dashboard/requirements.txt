@@ -1,8 +1,0 @@
-# GUI runtime
-PyQt6
-
-# Networking (dashboard uses websocket client)
-websocket-client
-
-# Image processing for icon conversion
-Pillow

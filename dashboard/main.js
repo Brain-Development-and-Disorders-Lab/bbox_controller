@@ -51,18 +51,21 @@ const DeviceMessageSchema = z.discriminatedUnion("type", [
   }),
   // Elapsed times are measured when the device sends the message
   z.object({
-    type: z.literal("experiment_state"),
+    type: z.literal("session_state"),
     state: z.enum(["idle", "running", "completed", "stopped"]),
-    experiment_name: z.string().default(""),
-    animal_id: z.string().default(""),
-    experiment_elapsed_ms: count,
-    trial: z.object({ index: count, id: z.string(), elapsed_ms: count }).nullable(),
+    protocol_name: z.string().default(""),
+    subject: z.string().default(""),
+    // Relative to the device data root, empty before the first session
+    session_path: z.string().default(""),
+    session_elapsed_ms: count,
+    trial: z.object({ trial_num: count, item_id: z.string(), elapsed_ms: count }).nullable(),
     statistics: z.object({
-      trials: count,
-      nose_pokes: count,
-      left_lever_presses: count,
-      right_lever_presses: count,
-      water_deliveries: count,
+      n_trials: count,
+      n_correct_trials: count,
+      n_nose_pokes: count,
+      n_left_lever_presses: count,
+      n_right_lever_presses: count,
+      n_rewards: count,
     }),
   }),
   z.object({
@@ -81,7 +84,7 @@ const deviceMessageHandlers = {
   test_state: (id, { test, state }) => notifyDashboard("device-test-state", { id, test, state }),
   input_state: (id, { state }) => notifyDashboard("device-input-state", { id, state }),
   // Stamped on arrival so the renderer can run its timers between updates
-  experiment_state: (id, { type, ...state }) => notifyDashboard("device-experiment-state", { id, received_at: Date.now(), ...state }),
+  session_state: (id, { type, ...state }) => notifyDashboard("device-session-state", { id, received_at: Date.now(), ...state }),
   data_file: (id, file) => receiveDataFile(id, file),
   data_sync_complete: (id, { error }) => completeDataSync(id, error),
 };
@@ -169,8 +172,10 @@ ipcMain.on("device-command", (event, device, command) => {
 });
 
 // ----- Data sync -----
-// The dashboard lists the files it already has, and the device sends each missing
-// file followed by `data_sync_complete`. The device keeps its own copies.
+// Device files are named relative to its data root, e.g. `Subjects/<subject>/<date>/<number>/...`,
+// and are written to the same paths under the sync folder. The dashboard lists the files it
+// already has under `Subjects`, and the device sends each missing file followed by
+// `data_sync_complete`. The device keeps its own copies.
 
 const DATA_SYNC_TIMEOUT_MS = 30000;
 
@@ -212,9 +217,19 @@ ipcMain.handle("device-data-sync", async (event, device) => {
   });
 });
 
-// Relative, `/`-separated paths of every file under `directory`, as the device names them
+// Device data lives under this folder, other files in the sync folder are ignored
+const DATA_SUBJECTS_FOLDER = "Subjects";
+
+// Paths of every file under `directory/Subjects`, relative to `directory` and `/`-separated, as the device names them
 const listFiles = async (directory) => {
-  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(path.join(directory, DATA_SUBJECTS_FOLDER), { recursive: true, withFileTypes: true });
+  } catch (error) {
+    // Nothing has been synced to this folder yet
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
   return entries
     .filter((entry) => entry.isFile())
     .map((entry) => path.relative(directory, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"));
@@ -282,13 +297,13 @@ const finishDataSync = (id, result) => {
   sync.resolve(result);
 };
 
-// ----- Experiment files -----
+// ----- Protocol files -----
 
-ipcMain.handle("experiment-save", async (event, defaultPath, contents) => {
+ipcMain.handle("protocol-save", async (event, defaultPath, contents) => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: "Save Experiment",
+    title: "Save Task Protocol",
     defaultPath: path.isAbsolute(defaultPath) ? defaultPath : path.join(app.getPath("documents"), defaultPath),
-    filters: [{ name: "Experiment", extensions: ["json"] }],
+    filters: [{ name: "Protocol", extensions: ["json"] }],
   });
   if (canceled || !filePath) {
     return { status: "canceled" };
@@ -296,10 +311,10 @@ ipcMain.handle("experiment-save", async (event, defaultPath, contents) => {
 
   try {
     await writeFile(filePath, contents, "utf8");
-    consola.success(`Saved experiment: ${filePath}`);
+    consola.success(`Saved protocol: ${filePath}`);
     return { status: "saved", filePath };
   } catch (error) {
-    consola.error(`Failed to save experiment: ${filePath}`, error);
+    consola.error(`Failed to save protocol: ${filePath}`, error);
     return { status: "error", message: error.message };
   }
 });

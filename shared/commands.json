@@ -7,9 +7,9 @@
     "test_displays",
     "test_led_levers"
   ],
-  "EXPERIMENT_COMMANDS": [
-    "experiment_start",
-    "experiment_stop"
+  "SESSION_COMMANDS": [
+    "session_start",
+    "session_stop"
   ],
   "DATA_COMMANDS": [
     "data_sync"

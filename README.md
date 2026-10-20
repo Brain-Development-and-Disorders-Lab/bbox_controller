@@ -18,14 +18,14 @@ This repository contains the code to control a behavior box utilizing IO and dis
   - [Troubleshooting](#troubleshooting)
 - [Dashboard](#dashboard)
   - [Running the Dashboard](#running-the-dashboard)
-  - [Experiment Management](#experiment-management)
+  - [Session Management](#session-management)
 - [Device](#device)
   - [Simulation](#simulation)
   - [Controls in Simulation Mode](#controls-in-simulation-mode)
   - [Hardware Usage](#hardware-usage)
 - [Device Operation](#device-operation)
   - [Log Files](#log-files)
-  - [Data Files](#data-files)
+  - [Data](#data)
   - [Version Tracking](#version-tracking)
 - [Issues and Feedback](#issues-and-feedback)
 - [License](#license)
@@ -244,15 +244,19 @@ The start script automatically activates the virtual environment and launches th
 
 Use the *Connection* frame to connect to the device using an IP address and port number. The *Console* frame shows the live console output from the device. The *Input Status* frame shows the current state of the device IO with low latency. The *Test Status* frame allows the IO to be tested, specifically the water delivery, levers, and the IR beam.
 
-### Experiment Management
+### Session Management
 
-**Basic Experiments**: To run a basic experiment, enter the animal ID in the *Experiment Management* frame and click the *Start* button.
+A session runs a task protocol for one subject. In the *Session Management* frame, enter the subject, choose a protocol file, and click *Start Session*. The *Session Statistics* frame shows live trial counts, the active trial, and the session folder on the device.
 
-**Timeline Experiments**: For advanced experiment protocols, use the timeline management system:
+**Task Protocols**: Click *New Protocol* or *Edit Protocol* to open the protocol editor:
 
-1. Click *Edit Timeline* to open the timeline editor
-2. Create custom experiment protocols with multiple trial types
-3. Save and manage timelines
+1. Add training stages and intervals to the protocol timeline
+2. Set the protocol parameters, and override them for individual trials
+3. Save the protocol as a JSON file (`"format": "bbox-protocol"`), see `shared/protocols/example.json`
+
+Protocol files saved by older dashboards (`"format": "bbox-experiment"`) still load, and are saved in the current format.
+
+**Commands**: The dashboard sends `session_start` (with the `subject` and `protocol`), `session_stop`, `data_sync`, and the hardware test commands listed in `shared/commands.json`. The device reports progress with `session_state` messages, and sends files with `data_file` and `data_sync_complete`.
 
 ## Device
 
@@ -283,92 +287,19 @@ After the device software has started, the network IP address of the device will
 
 Logs are saved in the respective `apps/*/logs/` directories:
 
-- **`apps/device/logs/device.log`** - Device controller startup events, runtime output, and experiment data
+- **`apps/device/logs/device.log`** - Device controller startup events, runtime output, and session data
 - **`apps/dashboard/logs/dashboard.log`** - Dashboard startup and runtime events
 
-### Data Files
+### Data
 
-Data files are stored under the device data directory in individual JSON files named `[Animal ID]_[Date]_[Time].json`. A data file is generated for *each* experiment run. Currently, data files are only stored locally and must be copied via USB or uploaded online to platforms such as Box or RIS. All timestamps use ISO 8601 format (`YYYY-MM-DDTHH:MM:SS.microseconds`). The major headings within a data file are listed below, and an example is also shown.
+The device stores data under its data root, `~/bbox_data`. Each session is saved to `Subjects/<subject>/<yyyy-mm-dd>/<NNN>/`, following IBL's [ALF](https://int-brain-lab.github.io/ONE/alf_intro.html) convention, where `<NNN>` is the session number for that subject and day:
 
-### `experiment_metadata`
+- **`raw_task_data_00/_bbox_taskData.raw.jsonable`** - One JSON object per trial, in the style of iblrig. Each has a `behavior_data` object holding Bpod-style `"States timestamps"` and `"Events timestamps"`, relative to the trial start.
+- **`raw_task_data_00/_bbox_taskSettings.raw.json`** - Session settings and totals, using iblrig-style uppercase keys.
+- **`raw_task_data_00/_bbox_taskProtocol.raw.json`** - The protocol file as run.
+- **`alf/_ibl_trials.table.csv`** - One row per trial using IBL trials column names, with times in seconds from the session start and `NaN` where a value is not applicable.
 
-Contains metadata about the experiment session including animal identification, timing, configuration parameters, and the experiment definition with trial specifications.
-
-### `experiment_trials`
-
-Records all trials during the experiment, including behavioral events, trial outcomes, and timings. Each trial contains a chronological sequence of events with timestamps.
-
-### `experiment_statistics`
-
-Provides summary statistics for the entire experiment session, including counts of lever presses, nose pokes, and water deliveries.
-
-Example Output:
-
-```json
-{
-  "experiment_metadata": {
-    "animal_id": "test_00",
-    "experiment_start": "2025-08-29T11:12:18.836449",
-    "experiment_end": "2025-08-29T11:12:35.709546",
-    "config": {
-      "iti_minimum": 100,
-      "iti_maximum": 1000,
-      "response_limit": 1000,
-      "cue_minimum": 5000,
-      "cue_maximum": 10000,
-      "hold_minimum": 100,
-      "hold_maximum": 1000,
-      "valve_open": 100,
-      "punish_time": 1000
-    },
-    "experiment_file": {
-      "name": "Test Experiment",
-      "trials": [
-        {
-          "type": "Stage3",
-          "id": "Stage3_0",
-          "parameters": {
-            "cue_duration": 5000,
-            "response_limit": 1000,
-            "water_delivery_duration": 2000
-          }
-        }
-      ],
-      "version": "1.0",
-      "loop": true
-    }
-  },
-  "experiment_trials": [
-    {
-      "trial_outcome": "success",
-      "events": [
-        {
-          "type": "left_lever_press",
-          "timestamp": "2025-08-29T11:12:26.558849"
-        },
-        {
-          "type": "nose_port_entry",
-          "timestamp": "2025-08-29T11:12:28.607925"
-        },
-        {
-          "type": "reward_triggered",
-          "timestamp": "2025-08-29T11:12:30.101765"
-        }
-      ],
-      "trial_start": "2025-08-29T11:12:31.892916",
-      "trial_end": "2025-08-29T11:12:31.892917",
-      "trial_type": "trial_stage_3"
-    }
-  ],
-  "experiment_statistics": {
-    "nose_pokes": 3,
-    "left_lever_presses": 2,
-    "right_lever_presses": 2,
-    "trial_count": 4,
-    "water_deliveries": 1
-  }
-}
-```
+Click *Sync Files* in the dashboard and choose a folder to copy the device's data. New files are copied into `<chosen folder>/Subjects/...`, and existing files are never overwritten.
 
 ### Version Tracking
 

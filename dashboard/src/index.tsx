@@ -13,7 +13,7 @@ import ReactDOM from "react-dom/client";
 // Dashboard application
 import App from "./App";
 
-// Get the current version
+// Show the version in the window title
 import { version } from "../package.json";
 document.title = `Behavior Box Dashboard (v${version})`;
 

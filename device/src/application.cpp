@@ -130,7 +130,7 @@ void Application::syncClients() {
     const int clientCount = server_.clientCount();
     if (clientCount != lastClientCount_) {
         lastClientCount_ = clientCount;
-        displays_.setMessage({clientCount > 0 ? "Dashboard connected" : "Waiting for connection...", address_});
+        displays_.setMessage({clientCount > 0 ? "Connected to Dashboard" : "Waiting for connection...", address_});
     }
 }
 

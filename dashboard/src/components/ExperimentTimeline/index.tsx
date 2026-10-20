@@ -1,6 +1,9 @@
 // Blueprint components
 import { Card, Colors, Icon, Tooltip } from "@blueprintjs/core";
 
+// Custom components
+import EmptyState from "../EmptyState";
+
 // Custom types
 import { ExperimentTimelineProps } from "../../../types";
 
@@ -14,12 +17,7 @@ const ExperimentTimeline = (props: ExperimentTimelineProps) => {
   return (
     <Card style={{ padding: "8px", maxHeight: "360px", overflowY: "auto" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
-        {props.items.length === 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px", width: "100%", alignItems: "center", justifyContent: "center" }}>
-            <Icon icon={"lab-test"} color={Colors.GRAY3} />
-            <p style={{ marginBottom: "0px" }}>No Trials</p>
-          </div>
-        )}
+        {props.items.length === 0 && <EmptyState icon={"lab-test"} message={"No Trials"} />}
         {props.items.map((item, index) => (
           <div key={item.id} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             <div style={{
@@ -30,7 +28,8 @@ const ExperimentTimeline = (props: ExperimentTimelineProps) => {
               width: "100%",
               alignItems: "center",
               justifyContent: "space-between",
-              backgroundColor: props.selectedIndex === index ? Colors.LIGHT_GRAY1 : Colors.LIGHT_GRAY4,
+              backgroundColor: props.selectedIndex === index ? "rgba(45, 114, 210, 0.1)" : Colors.LIGHT_GRAY4,
+              boxShadow: props.selectedIndex === index ? `inset 3px 0 0 ${Colors.BLUE3}` : "none",
               borderRadius: "4px",
               userSelect: "none",
               cursor: isSelectable ? "pointer" : "default",

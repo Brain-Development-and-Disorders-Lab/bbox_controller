@@ -1,4 +1,7 @@
-// `Device` type to manage device information
+import { IconName } from "@blueprintjs/core";
+
+// ----- Devices -----
+
 export type Device = {
   id: string;
   name: string;
@@ -10,14 +13,25 @@ export type Device = {
   version: string;
 };
 
-// Status update pushed from the main process over the `device-update` channel
+// Persisted subset of `Device`
+export type StoredDevice = Pick<Device, "id" | "name" | "network">;
+
+export type DevicesLoadResult =
+  | { status: "loaded"; devices: StoredDevice[] }
+  | { status: "error"; message: string; devices: StoredDevice[] };
+
+export type DevicesSaveResult =
+  | { status: "saved" }
+  | { status: "error"; message: string };
+
+// ----- Device communication -----
+
 export type DeviceUpdate = {
   id: Device["id"];
   status: "connected" | "disconnected";
   error?: string;
 };
 
-// Log record forwarded from a device over the `device-log` channel
 export type DeviceLog = {
   id: Device["id"];
   level: "trace" | "debug" | "info" | "warning" | "error" | "critical";
@@ -25,7 +39,6 @@ export type DeviceLog = {
   message: string;
 };
 
-// Result of a hardware test forwarded over the `device-test-state` channel
 export type DeviceTestState = {
   id: Device["id"];
   test: string;
@@ -47,13 +60,43 @@ export type DeviceInputState = {
   state: Record<InputChannel, boolean>;
 };
 
-// Row of the "Input Status" card
-export type InputChannelRow = {
-  channel: InputChannel;
-  label: string;
+// Running totals for the active experiment
+export type ExperimentStatistics = {
+  trials: number;
+  nose_pokes: number;
+  left_lever_presses: number;
+  right_lever_presses: number;
+  water_deliveries: number;
 };
 
-// Experiment-wide task parameters, in milliseconds
+// Elapsed times were measured when the device sent the update, `received_at` is when it arrived
+export type DeviceExperimentState = {
+  id: Device["id"];
+  received_at: number;
+  state: "idle" | "running" | "completed" | "stopped";
+  experiment_name: string;
+  animal_id: string;
+  experiment_elapsed_ms: number;
+  trial: { index: number; id: TimelineItem["id"]; elapsed_ms: number } | null;
+  statistics: ExperimentStatistics;
+};
+
+// Device messages are defined in `main.js`
+export type DeviceCommand =
+  // Hardware tests, named in `shared/commands.json`
+  | { command: string; parameter: number }
+  | { command: "experiment_start"; animal_id: string; experiment: Experiment }
+  | { command: "experiment_stop" };
+
+// `failed` names files that could not be written
+export type DataSyncResult =
+  | { status: "synced"; directory: string; written: number; failed: string[] }
+  | { status: "canceled" }
+  | { status: "error"; message: string };
+
+// ----- Experiments -----
+
+// Task parameters, in milliseconds
 export type ExperimentParameters = {
   iti_minimum_ms: number;
   iti_maximum_ms: number;
@@ -66,7 +109,6 @@ export type ExperimentParameters = {
   punishment_ms: number;
 };
 
-// Fields shared by every timeline item
 type TimelineItemBase = {
   id: string;
   description?: string;
@@ -84,7 +126,6 @@ export type IntervalTrial = TimelineItemBase & {
   duration_ms: number;
 };
 
-// Timeline items, discriminated by `type`
 export type TimelineItem = TrainingTrial | IntervalTrial;
 
 export type Experiment = {
@@ -105,67 +146,69 @@ export type Experiment = {
   };
 };
 
-// Experiment with defaults applied
 export type ExperimentParseResult =
   | { success: true; experiment: Experiment }
   | { success: false; errors: string[] };
 
-// Experiment file that has been checked and loaded onto a device
+// Checked and loaded onto a device
 export type LoadedExperiment = {
   filePath: string;
   experiment: Experiment;
 };
 
-// Experiment file picked for review prior to loading
+// Picked for review before loading
 export type PendingExperimentFile = {
   filePath: string;
   result: ExperimentParseResult;
 };
 
-// Outcome of saving an experiment file
 export type ExperimentSaveResult =
   | { status: "saved"; filePath: string }
   | { status: "canceled" }
   | { status: "error"; message: string };
 
-// `DeviceTab` component props
+// ----- Component props -----
+
 export type DeviceTabProps = {
   device: Device;
 };
 
-// `StatusIndicator` component props
+export type EmptyStateProps = {
+  icon: IconName;
+  message: string;
+};
+
 export type StatusIndicatorProps = {
   status?: "good" | "neutral" | "bad";
 };
 
-// `ErrorCallout` component props
 export type ErrorCalloutProps = {
   title: string;
   errors: string[];
 };
 
-// `ExperimentTimeline` component props
 export type ExperimentTimelineProps = {
   items: TimelineItem[];
   selectedIndex?: number;
   onSelect?: (index: number) => void;
 };
 
-// `ExperimentParameterList` component props
 export type ExperimentParameterListProps = {
   parameters: ExperimentParameters;
   onChange?: (key: keyof ExperimentParameters, value: number) => void;
 };
 
-// `DeviceEditDialog` component props
+// Adds a new device unless `device` is given
 export type DeviceEditDialogProps = {
   isOpen: boolean;
-  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  device: Device;
+  device?: Device;
+  onClose: () => void;
   onSave: (device: Device) => void;
+  // Called once removal of the edited device has been confirmed
+  onRemove: (device: Device) => void;
 };
 
-// `ExperimentEditDialog` component props. Creates a new experiment unless `loaded` is given.
+// Creates a new experiment unless `loaded` is given
 export type ExperimentEditDialogProps = {
   isOpen: boolean;
   loaded?: LoadedExperiment;
@@ -174,7 +217,6 @@ export type ExperimentEditDialogProps = {
   onSave: (saved: LoadedExperiment) => void;
 };
 
-// `ExperimentLoadDialog` component props
 export type ExperimentLoadDialogProps = {
   isOpen: boolean;
   file?: PendingExperimentFile;
@@ -182,11 +224,18 @@ export type ExperimentLoadDialogProps = {
   onConfirm: (loaded: LoadedExperiment) => void;
 };
 
-// API exposed to the renderer by `preload.js`
+// ----- Preload -----
+
+// Exposed to the renderer by `preload.js`
 export type DashboardAPI = {
   deviceConnect: (device: Device) => void;
   deviceDisconnect: (device: Device) => void;
-  deviceCommand: (device: Device, command: { command: string; parameter: number }) => void;
+  deviceCommand: (device: Device, command: DeviceCommand) => void;
+  // Shows a folder picker, then copies the device's data files that aren't already there
+  deviceDataSync: (device: Device) => Promise<DataSyncResult>;
+  // Devices persisted between launches
+  devicesLoad: () => Promise<DevicesLoadResult>;
+  devicesSave: (devices: StoredDevice[]) => Promise<DevicesSaveResult>;
   // Shows a save dialog starting at `defaultPath`
   experimentSave: (defaultPath: string, contents: string) => Promise<ExperimentSaveResult>;
   // Full path of a file picked in a file input
@@ -196,6 +245,7 @@ export type DashboardAPI = {
   onDeviceLog: (callback: (log: DeviceLog) => void) => () => void;
   onDeviceTestState: (callback: (update: DeviceTestState) => void) => () => void;
   onDeviceInputState: (callback: (update: DeviceInputState) => void) => () => void;
+  onDeviceExperimentState: (callback: (update: DeviceExperimentState) => void) => () => void;
 };
 
 declare global {

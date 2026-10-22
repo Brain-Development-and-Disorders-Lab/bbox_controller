@@ -21,10 +21,13 @@ class Gpio {
 public:
     virtual ~Gpio() = default;
 
+    /// True while the input is active, e.g. a lever is pressed
     virtual bool read(Input input) const = 0;
+    /// True while the output is switched on
     virtual bool state(Output output) const = 0;
     virtual void write(Output output, bool on) = 0;
 
+    /// Switches every output off
     void resetOutputs() {
         for (size_t i = 0; i < kOutputCount; i++) {
             write(static_cast<Output>(i), false);

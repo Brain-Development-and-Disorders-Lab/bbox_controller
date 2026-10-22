@@ -2,17 +2,17 @@
 import { Card } from "@blueprintjs/core";
 
 // Custom types
-import { ExperimentParameterListProps, ExperimentParameters } from "../../../types";
+import { ProtocolParameterListProps, ProtocolParameters } from "../../../types";
 
-// Experiment format
-import { PARAMETER_LABELS } from "../../lib/experiment";
+// Protocol format
+import { PARAMETER_LABELS } from "../../lib/protocol";
 
-// Experiment-wide parameters, editable when `onChange` is given
-const ExperimentParameterList = (props: ExperimentParameterListProps) => {
+// Protocol-wide parameters, editable when `onChange` is given
+const ProtocolParameterList = (props: ProtocolParameterListProps) => {
   return (
     <Card style={{ padding: "8px", height: "100%" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
-        {(Object.keys(PARAMETER_LABELS) as (keyof ExperimentParameters)[]).map((key) => (
+        {(Object.keys(PARAMETER_LABELS) as (keyof ProtocolParameters)[]).map((key) => (
           <div key={key} style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
             <p style={{ marginBottom: "0px" }}>{PARAMETER_LABELS[key]}</p>
             {props.onChange ? (
@@ -31,4 +31,4 @@ const ExperimentParameterList = (props: ExperimentParameterListProps) => {
   );
 };
 
-export default ExperimentParameterList;
+export default ProtocolParameterList;

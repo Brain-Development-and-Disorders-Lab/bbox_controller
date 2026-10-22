@@ -8,7 +8,7 @@ import { Alert, Button, Dialog, DialogBody, DialogFooter } from "@blueprintjs/co
 import { Device, DeviceEditDialogProps } from "../../../types";
 
 // Utility functions
-import { isValidIPAddress, isValidPort } from "../../lib/util";
+import { isSameAddress, isValidIPAddress, isValidPort } from "../../lib/util";
 
 // Defaults for a newly added device
 const DEFAULT_ADDRESS = "localhost";
@@ -35,6 +35,7 @@ const DeviceEditDialog = (props: DeviceEditDialogProps) => {
   const isNameValid = deviceName.trim() !== "";
   const isAddressValid = isValidIPAddress(deviceAddress);
   const isPortValid = isValidPort(devicePort);
+  const duplicate = props.devices.find((other) => other.id !== device?.id && isSameAddress(other.network, { ip: deviceAddress, port: devicePort }));
 
   const handleSaveClick = () => {
     const updated: Device = {
@@ -45,7 +46,7 @@ const DeviceEditDialog = (props: DeviceEditDialogProps) => {
         port: devicePort,
       },
       status: device?.status ?? "disconnected",
-      version: device?.version ?? "Unknown",
+      info: device?.info,
     };
 
     props.onSave(updated);
@@ -82,6 +83,7 @@ const DeviceEditDialog = (props: DeviceEditDialogProps) => {
           <input type={"number"} min={1} max={65535} value={Number.isNaN(devicePort) ? "" : devicePort} onChange={(event) => setDevicePort(parseInt(event.target.value))} />
           {!isPortValid && <p style={{ marginBottom: "0px", fontSize: "12px", color: "red" }}>Must be a port between 1 and 65535</p>}
         </div>
+        {duplicate && <p style={{ marginBottom: "0px", fontSize: "12px", color: "red" }}>This address and port are already used by <b>{duplicate.name}</b></p>}
       </DialogBody>
       <DialogFooter
         actions={
@@ -91,7 +93,7 @@ const DeviceEditDialog = (props: DeviceEditDialogProps) => {
               intent={"success"}
               icon={"tick-circle"}
               text={isAdding ? "Add" : "Save"}
-              disabled={!isNameValid || !isAddressValid || !isPortValid}
+              disabled={!isNameValid || !isAddressValid || !isPortValid || duplicate !== undefined}
               onClick={handleSaveClick}
             />
           </div>

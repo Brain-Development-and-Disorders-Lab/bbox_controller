@@ -7,6 +7,7 @@
 
 #include "application.h"
 #include "network/dashboard_sink.h"
+#include "version.h"
 
 namespace {
     constexpr int kDefaultPort = 8765;
@@ -30,7 +31,7 @@ int main(int argc, char* argv[]) {
         spdlog::async_overflow_policy::overrun_oldest);
     spdlog::set_default_logger(logger);
 
-    spdlog::info("Behavior Box Device");
+    spdlog::info("Behavior Box Device v{}", kDeviceVersion);
     if (kSimulate) {
         spdlog::info("[Target: macOS] Simulating hardware with the keyboard.");
     } else {

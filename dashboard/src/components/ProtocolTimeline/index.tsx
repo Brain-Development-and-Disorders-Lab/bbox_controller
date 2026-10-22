@@ -5,13 +5,13 @@ import { Card, Colors, Icon, Tooltip } from "@blueprintjs/core";
 import EmptyState from "../EmptyState";
 
 // Custom types
-import { ExperimentTimelineProps } from "../../../types";
+import { ProtocolTimelineProps } from "../../../types";
 
-// Experiment format
-import { timelineItemDetails, timelineItemLabel } from "../../lib/experiment";
+// Protocol format
+import { timelineItemDetails, timelineItemLabel } from "../../lib/protocol";
 
 // Timeline items in run order, selectable when `onSelect` is given
-const ExperimentTimeline = (props: ExperimentTimelineProps) => {
+const ProtocolTimeline = (props: ProtocolTimelineProps) => {
   const isSelectable = props.onSelect !== undefined;
 
   return (
@@ -54,4 +54,4 @@ const ExperimentTimeline = (props: ExperimentTimelineProps) => {
   );
 };
 
-export default ExperimentTimeline;
+export default ProtocolTimeline;

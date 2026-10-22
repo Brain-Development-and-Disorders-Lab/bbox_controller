@@ -7,25 +7,25 @@ import { Button, Card, Checkbox, Dialog, DialogBody, DialogFooter, Menu, MenuDiv
 // Custom components
 import EmptyState from "../EmptyState";
 import ErrorCallout from "../ErrorCallout";
-import ExperimentParameterList from "../ExperimentParameterList";
-import ExperimentTimeline from "../ExperimentTimeline";
+import ProtocolParameterList from "../ProtocolParameterList";
+import ProtocolTimeline from "../ProtocolTimeline";
 
 // Custom types
-import { Experiment, ExperimentEditDialogProps, ExperimentParameters, TimelineItem } from "../../../types";
+import { Protocol, ProtocolEditDialogProps, ProtocolParameters, TimelineItem } from "../../../types";
 
-// Experiment format
+// Protocol format
 import {
   INTERVAL_DESCRIPTION,
   TRAINING_STAGES,
-  createExperiment,
   createIntervalTrial,
+  createProtocol,
   createTrainingTrial,
-  experimentFileName,
   formatStage,
-  serializeExperiment,
+  protocolFileName,
+  serializeProtocol,
   timelineItemLabel,
-  validateExperiment,
-} from "../../lib/experiment";
+  validateProtocol,
+} from "../../lib/protocol";
 
 // Menu entry showing a timeline component and its description
 const ComponentMenuText = (props: { title: string; description: string }) => (
@@ -35,11 +35,11 @@ const ComponentMenuText = (props: { title: string; description: string }) => (
   </div>
 );
 
-const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
+const ProtocolEditDialog = (props: ProtocolEditDialogProps) => {
   const isCreating = props.loaded === undefined;
 
-  // The experiment being edited and the selected timeline item
-  const [draft, setDraft] = useState<Experiment>(() => createExperiment(""));
+  // The protocol being edited and the selected timeline item
+  const [draft, setDraft] = useState<Protocol>(() => createProtocol(""));
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const items = draft.timeline.items;
   const selectedItem: TimelineItem | undefined = items[selectedIndex];
@@ -48,10 +48,10 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
 
-  // Start from the loaded experiment or a new one each time the dialog opens
+  // Start from the loaded protocol or a new one each time the dialog opens
   useEffect(() => {
     if (props.isOpen) {
-      setDraft(props.loaded?.experiment ?? createExperiment(""));
+      setDraft(props.loaded?.protocol ?? createProtocol(""));
       setSelectedIndex(-1);
       setSaveErrors([]);
     }
@@ -60,27 +60,27 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
   const setName = (name: string) => setDraft((current) => ({ ...current, metadata: { ...current.metadata, name } }));
   const setLoop = (loop: boolean) => setDraft((current) => ({ ...current, timeline: { ...current.timeline, loop } }));
   const setItems = (updated: TimelineItem[]) => setDraft((current) => ({ ...current, timeline: { ...current.timeline, items: updated } }));
-  const setParameter = (key: keyof ExperimentParameters, value: number) => {
+  const setParameter = (key: keyof ProtocolParameters, value: number) => {
     setDraft((current) => ({ ...current, parameters: { ...current.parameters, [key]: value } }));
   };
 
   // Edits default to the file they were loaded from. Stays open if the save fails or is canceled.
   const handleSaveClick = async () => {
-    const result = validateExperiment(draft);
+    const result = validateProtocol(draft);
     if (!result.success) {
       setSaveErrors(result.errors);
       return;
     }
 
     setIsSaving(true);
-    const defaultPath = props.loaded?.filePath ?? experimentFileName(result.experiment.metadata.name);
-    const saved = await window.dashboardAPI.experimentSave(defaultPath, serializeExperiment(result.experiment));
+    const defaultPath = props.loaded?.filePath ?? protocolFileName(result.protocol.metadata.name);
+    const saved = await window.dashboardAPI.protocolSave(defaultPath, serializeProtocol(result.protocol));
     setIsSaving(false);
 
     if (saved.status === "error") {
       setSaveErrors([`Could not save file: ${saved.message}`]);
     } else if (saved.status === "saved") {
-      props.onSave({ filePath: saved.filePath, experiment: result.experiment });
+      props.onSave({ filePath: saved.filePath, protocol: result.protocol });
       props.onClose();
     }
   };
@@ -113,17 +113,17 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
   };
 
   return (
-    <Dialog title={`${isCreating ? "Create" : "Edit"} Experiment`} icon={isCreating ? "add" : "edit"} isOpen={props.isOpen} style={{ width: "680px" }}>
+    <Dialog title={`${isCreating ? "Create" : "Edit"} Task Protocol`} icon={isCreating ? "add" : "edit"} isOpen={props.isOpen} style={{ width: "680px" }}>
       <DialogBody style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px" }}>
-        <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-          <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Name</p>
-          <input type={"text"} style={{ width: "520px" }} value={draft.metadata.name} placeholder={"Specify an Experiment name"} onChange={(event) => setName(event.target.value)} />
+        <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Protocol Name:</p>
+          <input type={"text"} style={{ width: "520px" }} value={draft.metadata.name} placeholder={"Specify a Protocol name"} onChange={(event) => setName(event.target.value)} />
         </div>
-        <ErrorCallout title={"Experiment not saved"} errors={saveErrors} />
+        <ErrorCallout title={"Protocol not saved"} errors={saveErrors} />
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "nowrap", alignItems: "flex-start" }}>
           <div style={{ display: "flex", flexDirection: "column", flex: "1", minWidth: "0px", gap: "8px" }}>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Timeline</p>
+              <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Protocol Timeline</p>
               <PopoverNext
                 placement={"bottom-end"}
                 content={
@@ -139,7 +139,7 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
                 <Button intent={"success"} icon={"add"} size={"small"} text={"Add Trial"} />
               </PopoverNext>
             </div>
-            <ExperimentTimeline items={items} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
+            <ProtocolTimeline items={items} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
             <Card style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px" }}>
               {selectedItem ? (
                 <>
@@ -174,18 +174,18 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
                   </div>
                 </>
               ) : items.length === 0 ? (
-                <EmptyState icon={"add"} message={"Add Trials to Experiment Timeline"} />
+                <EmptyState icon={"add"} message={"Add Trials to Protocol Timeline"} />
               ) : (
                 <EmptyState icon={"select"} message={"Select a Trial"} />
               )}
             </Card>
-            <Checkbox style={{ marginBottom: "0px" }} label={"Loop Experiment Timeline"} checked={draft.timeline.loop} onChange={(event) => setLoop(event.currentTarget.checked)} />
+            <Checkbox style={{ marginBottom: "0px" }} label={"Loop Protocol Timeline"} checked={draft.timeline.loop} onChange={(event) => setLoop(event.currentTarget.checked)} />
           </div>
 
-          {/* Overall Experiment parameters */}
+          {/* Overall Protocol parameters */}
           <div style={{ display: "flex", flexDirection: "column", flex: "0 0 auto", gap: "8px" }}>
-            <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Parameters</p>
-            <ExperimentParameterList parameters={draft.parameters} onChange={setParameter} />
+            <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Protocol Parameters</p>
+            <ProtocolParameterList parameters={draft.parameters} onChange={setParameter} />
           </div>
         </div>
       </DialogBody>
@@ -201,4 +201,4 @@ const ExperimentEditDialog = (props: ExperimentEditDialogProps) => {
   );
 };
 
-export default ExperimentEditDialog;
+export default ProtocolEditDialog;

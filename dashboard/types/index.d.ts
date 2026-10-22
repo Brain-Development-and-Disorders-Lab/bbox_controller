@@ -10,7 +10,19 @@ export type Device = {
     ip: string;
     port: number;
   };
+  // Reported by the device when connected
+  info?: DeviceInfo;
+};
+
+// Sent by the device when the dashboard connects
+export type DeviceInfo = {
   version: string;
+  simulated: boolean;
+  hostname: string;
+  os: string;
+  started_at: number;
+  // Free space at connection time, -1 if unknown
+  storage_free_bytes: number;
 };
 
 // Persisted subset of `Device`
@@ -60,33 +72,36 @@ export type DeviceInputState = {
   state: Record<InputChannel, boolean>;
 };
 
-// Running totals for the active experiment
-export type ExperimentStatistics = {
-  trials: number;
-  nose_pokes: number;
-  left_lever_presses: number;
-  right_lever_presses: number;
-  water_deliveries: number;
+// Running totals for the active session
+export type SessionStatistics = {
+  n_trials: number;
+  n_correct_trials: number;
+  n_nose_pokes: number;
+  n_left_lever_presses: number;
+  n_right_lever_presses: number;
+  n_rewards: number;
 };
 
 // Elapsed times were measured when the device sent the update, `received_at` is when it arrived
-export type DeviceExperimentState = {
+export type DeviceSessionState = {
   id: Device["id"];
   received_at: number;
   state: "idle" | "running" | "completed" | "stopped";
-  experiment_name: string;
-  animal_id: string;
-  experiment_elapsed_ms: number;
-  trial: { index: number; id: TimelineItem["id"]; elapsed_ms: number } | null;
-  statistics: ExperimentStatistics;
+  protocol_name: string;
+  subject: string;
+  // Relative to the device data root, e.g. `Subjects/M001/2026-10-20/001`. Empty before the first session.
+  session_path: string;
+  session_elapsed_ms: number;
+  trial: { trial_num: number; item_id: TimelineItem["id"]; elapsed_ms: number } | null;
+  statistics: SessionStatistics;
 };
 
 // Device messages are defined in `main.js`
 export type DeviceCommand =
   // Hardware tests, named in `shared/commands.json`
   | { command: string; parameter: number }
-  | { command: "experiment_start"; animal_id: string; experiment: Experiment }
-  | { command: "experiment_stop" };
+  | { command: "session_start"; subject: string; protocol: Protocol }
+  | { command: "session_stop" };
 
 // `failed` names files that could not be written
 export type DataSyncResult =
@@ -94,10 +109,10 @@ export type DataSyncResult =
   | { status: "canceled" }
   | { status: "error"; message: string };
 
-// ----- Experiments -----
+// ----- Protocols -----
 
 // Task parameters, in milliseconds
-export type ExperimentParameters = {
+export type ProtocolParameters = {
   iti_minimum_ms: number;
   iti_maximum_ms: number;
   response_limit_ms: number;
@@ -118,7 +133,7 @@ type TimelineItemBase = {
 export type TrainingTrial = TimelineItemBase & {
   type: "training";
   stage: number;
-  parameters?: Partial<ExperimentParameters>;
+  parameters?: Partial<ProtocolParameters>;
 };
 
 export type IntervalTrial = TimelineItemBase & {
@@ -128,8 +143,8 @@ export type IntervalTrial = TimelineItemBase & {
 
 export type TimelineItem = TrainingTrial | IntervalTrial;
 
-export type Experiment = {
-  format: "bbox-experiment";
+export type Protocol = {
+  format: "bbox-protocol";
   format_version: 1;
   metadata: {
     name: string;
@@ -139,30 +154,30 @@ export type Experiment = {
     modified_at: string;
     dashboard_version?: string;
   };
-  parameters: ExperimentParameters;
+  parameters: ProtocolParameters;
   timeline: {
     loop: boolean;
     items: TimelineItem[];
   };
 };
 
-export type ExperimentParseResult =
-  | { success: true; experiment: Experiment }
+export type ProtocolParseResult =
+  | { success: true; protocol: Protocol }
   | { success: false; errors: string[] };
 
 // Checked and loaded onto a device
-export type LoadedExperiment = {
+export type LoadedProtocol = {
   filePath: string;
-  experiment: Experiment;
+  protocol: Protocol;
 };
 
 // Picked for review before loading
-export type PendingExperimentFile = {
+export type PendingProtocolFile = {
   filePath: string;
-  result: ExperimentParseResult;
+  result: ProtocolParseResult;
 };
 
-export type ExperimentSaveResult =
+export type ProtocolSaveResult =
   | { status: "saved"; filePath: string }
   | { status: "canceled" }
   | { status: "error"; message: string };
@@ -187,41 +202,43 @@ export type ErrorCalloutProps = {
   errors: string[];
 };
 
-export type ExperimentTimelineProps = {
+export type ProtocolTimelineProps = {
   items: TimelineItem[];
   selectedIndex?: number;
   onSelect?: (index: number) => void;
 };
 
-export type ExperimentParameterListProps = {
-  parameters: ExperimentParameters;
-  onChange?: (key: keyof ExperimentParameters, value: number) => void;
+export type ProtocolParameterListProps = {
+  parameters: ProtocolParameters;
+  onChange?: (key: keyof ProtocolParameters, value: number) => void;
 };
 
 // Adds a new device unless `device` is given
 export type DeviceEditDialogProps = {
   isOpen: boolean;
   device?: Device;
+  // Existing devices, used to block duplicate addresses
+  devices: Device[];
   onClose: () => void;
   onSave: (device: Device) => void;
   // Called once removal of the edited device has been confirmed
   onRemove: (device: Device) => void;
 };
 
-// Creates a new experiment unless `loaded` is given
-export type ExperimentEditDialogProps = {
+// Creates a new protocol unless `loaded` is given
+export type ProtocolEditDialogProps = {
   isOpen: boolean;
-  loaded?: LoadedExperiment;
+  loaded?: LoadedProtocol;
   onClose: () => void;
   // Called with the saved file once it has been written
-  onSave: (saved: LoadedExperiment) => void;
+  onSave: (saved: LoadedProtocol) => void;
 };
 
-export type ExperimentLoadDialogProps = {
+export type ProtocolLoadDialogProps = {
   isOpen: boolean;
-  file?: PendingExperimentFile;
+  file?: PendingProtocolFile;
   onClose: () => void;
-  onConfirm: (loaded: LoadedExperiment) => void;
+  onConfirm: (loaded: LoadedProtocol) => void;
 };
 
 // ----- Preload -----
@@ -237,15 +254,16 @@ export type DashboardAPI = {
   devicesLoad: () => Promise<DevicesLoadResult>;
   devicesSave: (devices: StoredDevice[]) => Promise<DevicesSaveResult>;
   // Shows a save dialog starting at `defaultPath`
-  experimentSave: (defaultPath: string, contents: string) => Promise<ExperimentSaveResult>;
+  protocolSave: (defaultPath: string, contents: string) => Promise<ProtocolSaveResult>;
   // Full path of a file picked in a file input
   getFilePath: (file: File) => string;
   // Subscriptions return an unsubscribe function
   onDeviceUpdate: (callback: (update: DeviceUpdate) => void) => () => void;
+  onDeviceInfo: (callback: (update: { id: Device["id"]; info: DeviceInfo }) => void) => () => void;
   onDeviceLog: (callback: (log: DeviceLog) => void) => () => void;
   onDeviceTestState: (callback: (update: DeviceTestState) => void) => () => void;
   onDeviceInputState: (callback: (update: DeviceInputState) => void) => () => void;
-  onDeviceExperimentState: (callback: (update: DeviceExperimentState) => void) => () => void;
+  onDeviceSessionState: (callback: (update: DeviceSessionState) => void) => () => void;
 };
 
 declare global {

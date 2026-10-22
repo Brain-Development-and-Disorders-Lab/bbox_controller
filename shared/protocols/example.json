@@ -1,0 +1,49 @@
+{
+  "format": "bbox-protocol",
+  "format_version": 1,
+  "metadata": {
+    "name": "Example Training Protocol",
+    "description": "Stage 1 and Stage 2 training, separated by fixed intervals.",
+    "author": "Henry Burgess",
+    "created_at": "2026-10-19T12:00:00.000Z",
+    "modified_at": "2026-10-19T12:00:00.000Z",
+    "dashboard_version": "1.4.0"
+  },
+  "parameters": {
+    "iti_minimum_ms": 100,
+    "iti_maximum_ms": 1000,
+    "response_limit_ms": 1000,
+    "cue_minimum_ms": 5000,
+    "cue_maximum_ms": 10000,
+    "hold_minimum_ms": 100,
+    "hold_maximum_ms": 1000,
+    "valve_open_ms": 100,
+    "punishment_ms": 1000
+  },
+  "timeline": {
+    "loop": false,
+    "items": [
+      {
+        "id": "stage_1",
+        "type": "training",
+        "stage": 1,
+        "description": "Any lever press after the cue delivers water.",
+        "repeat": 10
+      },
+      {
+        "id": "interval_1",
+        "type": "interval",
+        "duration_ms": 2000
+      },
+      {
+        "id": "stage_2",
+        "type": "training",
+        "stage": 2,
+        "repeat": 20,
+        "parameters": {
+          "response_limit_ms": 2000
+        }
+      }
+    ]
+  }
+}

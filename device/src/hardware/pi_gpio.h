@@ -8,6 +8,7 @@
 // Raspberry Pi GPIO backend
 class PiGpio final : public Gpio {
 public:
+    /// Always false until the Pi's inputs are wired up
     bool read(Input) const override { return false; }
     bool state(Output output) const override { return outputs_[static_cast<size_t>(output)]; }
     void write(Output output, bool on) override { outputs_[static_cast<size_t>(output)] = on; }

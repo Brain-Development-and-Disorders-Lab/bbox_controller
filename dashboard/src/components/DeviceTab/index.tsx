@@ -6,24 +6,24 @@ import { Button, Card, Colors, FileInput, Tag, TextArea } from "@blueprintjs/cor
 
 // Custom components
 import StatusIndicator from "../StatusIndicator";
-import ExperimentEditDialog from "../ExperimentEditDialog";
-import ExperimentLoadDialog from "../ExperimentLoadDialog";
+import ProtocolEditDialog from "../ProtocolEditDialog";
+import ProtocolLoadDialog from "../ProtocolLoadDialog";
 
 // Custom types
 import {
-  DeviceExperimentState,
   DeviceLog,
+  DeviceSessionState,
   DeviceTabProps,
   DeviceTestState,
-  ExperimentStatistics,
   InputChannel,
-  LoadedExperiment,
-  PendingExperimentFile,
+  LoadedProtocol,
+  PendingProtocolFile,
+  SessionStatistics,
   StatusIndicatorProps,
 } from "../../../types";
 
-// Experiment format
-import { fileNameFromPath, parseExperiment, timelineItemLabel } from "../../lib/experiment";
+// Protocol format
+import { fileNameFromPath, parseProtocol, timelineItemLabel } from "../../lib/protocol";
 
 // Utility libraries
 import consola from "consola";
@@ -57,16 +57,17 @@ const TESTS: { command: string; label: string; hasDuration: boolean }[] = [
 ];
 const DEFAULT_TEST_DURATION_MS = 1000;
 
-// Counters of the "Experiment Statistics" card
-const STATISTICS_ROWS: { key: keyof ExperimentStatistics; label: string }[] = [
-  { key: "trials", label: "Total Trials" },
-  { key: "nose_pokes", label: "Total Nose Pokes" },
-  { key: "left_lever_presses", label: "Total Left Lever Presses" },
-  { key: "right_lever_presses", label: "Total Right Lever Presses" },
-  { key: "water_deliveries", label: "Total Water Deliveries" },
+// Counters of the "Session Statistics" card
+const STATISTICS_ROWS: { key: keyof SessionStatistics; label: string }[] = [
+  { key: "n_trials", label: "Trials" },
+  { key: "n_correct_trials", label: "Correct Trials" },
+  { key: "n_nose_pokes", label: "Nose Pokes" },
+  { key: "n_left_lever_presses", label: "Left Lever Presses" },
+  { key: "n_right_lever_presses", label: "Right Lever Presses" },
+  { key: "n_rewards", label: "Rewards" },
 ];
 
-// How often the experiment and trial timers redraw while running
+// How often the session and trial timers redraw while running
 const TIMER_INTERVAL_MS = 250;
 
 // Untested tests keep the indicator's default color
@@ -102,19 +103,19 @@ const formatEvent = (event: string) => `----- ${event} at ${formatTime(Date.now(
 const DeviceTab = (props: DeviceTabProps) => {
   const { device } = props;
 
-  // ----- Experiment -----
+  // ----- Session -----
 
-  const [animalID, setAnimalID] = useState("");
-  const [loadedExperiment, setLoadedExperiment] = useState<LoadedExperiment>();
+  const [subject, setSubject] = useState("");
+  const [loadedProtocol, setLoadedProtocol] = useState<LoadedProtocol>();
 
   // Kept after the review closes so the dialog doesn't empty mid-transition
-  const [pendingFile, setPendingFile] = useState<PendingExperimentFile>();
+  const [pendingFile, setPendingFile] = useState<PendingProtocolFile>();
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // `isEditing` is kept after closing for the same reason
-  const [experimentDialog, setExperimentDialog] = useState({ isOpen: false, isEditing: false });
+  const [protocolDialog, setProtocolDialog] = useState({ isOpen: false, isEditing: false });
 
-  const onExperimentFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const onProtocolFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const file = input.files?.[0];
     // Clear the input so selecting the same file again still fires a change
@@ -123,32 +124,32 @@ const DeviceTab = (props: DeviceTabProps) => {
 
     const filePath = window.dashboardAPI.getFilePath(file) || file.name;
     try {
-      setPendingFile({ filePath, result: parseExperiment(await file.text()) });
+      setPendingFile({ filePath, result: parseProtocol(await file.text()) });
     } catch (error) {
       setPendingFile({ filePath, result: { success: false, errors: [`Could not read file: ${(error as Error).message}`] } });
     }
     setIsReviewOpen(true);
   };
 
-  const onExperimentConfirm = (loaded: LoadedExperiment) => {
-    setLoadedExperiment(loaded);
+  const onProtocolConfirm = (loaded: LoadedProtocol) => {
+    setLoadedProtocol(loaded);
     setIsReviewOpen(false);
   };
 
-  // The device confirms with `experiment_state`, which enables stopping
-  const startExperiment = () => {
-    if (!loadedExperiment) return;
-    window.dashboardAPI.deviceCommand(device, { command: "experiment_start", animal_id: animalID.trim(), experiment: loadedExperiment.experiment });
+  // The device confirms with `session_state`, which enables stopping
+  const startSession = () => {
+    if (!loadedProtocol) return;
+    window.dashboardAPI.deviceCommand(device, { command: "session_start", subject: subject.trim(), protocol: loadedProtocol.protocol });
   };
 
-  const stopExperiment = () => window.dashboardAPI.deviceCommand(device, { command: "experiment_stop" });
+  const stopSession = () => window.dashboardAPI.deviceCommand(device, { command: "session_stop" });
 
   // ----- Live device state -----
 
   const [inputState, setInputState] = useState<Partial<Record<InputChannel, boolean>>>({});
   const [testStates, setTestStates] = useState<Record<string, DeviceTestState["state"]>>({});
-  const [experimentState, setExperimentState] = useState<DeviceExperimentState>();
-  const isExperimentRunning = experimentState?.state === "running";
+  const [sessionState, setSessionState] = useState<DeviceSessionState>();
+  const isSessionRunning = sessionState?.state === "running";
 
   useEffect(() => {
     const unsubscribeInput = window.dashboardAPI.onDeviceInputState((update) => {
@@ -157,32 +158,35 @@ const DeviceTab = (props: DeviceTabProps) => {
     const unsubscribeTest = window.dashboardAPI.onDeviceTestState((update) => {
       if (update.id === device.id) setTestStates((current) => ({ ...current, [update.test]: update.state }));
     });
-    const unsubscribeExperiment = window.dashboardAPI.onDeviceExperimentState((update) => {
-      if (update.id === device.id) setExperimentState(update);
+    const unsubscribeSession = window.dashboardAPI.onDeviceSessionState((update) => {
+      if (update.id === device.id) setSessionState(update);
     });
     return () => {
       unsubscribeInput();
       unsubscribeTest();
-      unsubscribeExperiment();
+      unsubscribeSession();
     };
   }, [device.id]);
 
   // Timers add the time since the last update to the device's elapsed times
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!isExperimentRunning) return;
+    if (!isSessionRunning) return;
     const interval = setInterval(() => setNow(Date.now()), TIMER_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [isExperimentRunning]);
+  }, [isSessionRunning]);
 
-  const sinceUpdate = experimentState && isExperimentRunning ? Math.max(0, now - experimentState.received_at) : 0;
-  const experimentElapsed = experimentState ? experimentState.experiment_elapsed_ms + sinceUpdate : 0;
-  const trialElapsed = experimentState?.trial ? experimentState.trial.elapsed_ms + sinceUpdate : 0;
+  const sinceUpdate = sessionState && isSessionRunning ? Math.max(0, now - sessionState.received_at) : 0;
+  const sessionElapsed = sessionState ? sessionState.session_elapsed_ms + sinceUpdate : 0;
+  const trialElapsed = sessionState?.trial ? sessionState.trial.elapsed_ms + sinceUpdate : 0;
 
   // Named from the loaded timeline, falling back to the ID the device reported
-  const activeTrial = experimentState?.trial;
-  const activeTrialItem = activeTrial ? loadedExperiment?.experiment.timeline.items.find((item) => item.id === activeTrial.id) : undefined;
-  const activeTrialLabel = activeTrial ? (activeTrialItem ? timelineItemLabel(activeTrialItem) : activeTrial.id) : "None";
+  const activeTrial = sessionState?.trial;
+  const activeTrialItem = activeTrial ? loadedProtocol?.protocol.timeline.items.find((item) => item.id === activeTrial.item_id) : undefined;
+  const activeTrialLabel = activeTrial ? (activeTrialItem ? timelineItemLabel(activeTrialItem) : activeTrial.item_id) : "None";
+
+  // Folder on the device holding the session's data, relative to its data root
+  const sessionPath = sessionState?.session_path || "None";
 
   // Output test durations, keyed by command
   const [testDurations, setTestDurations] = useState<Record<string, number>>({});
@@ -234,7 +238,7 @@ const DeviceTab = (props: DeviceTabProps) => {
       setConsoleLines([]);
       setInputState({});
       setTestStates({});
-      setExperimentState(undefined);
+      setSessionState(undefined);
     } else if (device.status === "connected") {
       appendConsoleLine(formatEvent("Connected"));
     } else if (device.status === "disconnected") {
@@ -244,27 +248,27 @@ const DeviceTab = (props: DeviceTabProps) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1, minHeight: 0 }}>
-      <p style={{ marginBottom: "0px" }}>Experiment Management</p>
+      <p style={{ marginBottom: "0px" }}>Session Management</p>
       <Card style={{ display: "flex", flexDirection: "column", gap:"8px", padding: "8px" }}>
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-          <p style={{ marginBottom: "0px" }}>Animal ID:</p>
-          <input type={"text"} placeholder={"Enter animal ID"} style={{ minWidth: "320px" }} value={animalID} disabled={isExperimentRunning} onChange={(event) => setAnimalID(event.target.value)} />
+          <p style={{ marginBottom: "0px" }}>Subject:</p>
+          <input type={"text"} placeholder={"Enter subject"} style={{ minWidth: "320px" }} value={subject} disabled={isSessionRunning} onChange={(event) => setSubject(event.target.value)} />
         </div>
         <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-          <p style={{ marginBottom: "0px" }}>Experiment:</p>
-          {loadedExperiment ? (
-            <Tag icon={"document"} size={"large"} minimal onRemove={isExperimentRunning ? undefined : () => setLoadedExperiment(undefined)} title={loadedExperiment.filePath}>
-              {fileNameFromPath(loadedExperiment.filePath)}
+          <p style={{ marginBottom: "0px" }}>Protocol:</p>
+          {loadedProtocol ? (
+            <Tag icon={"document"} size={"large"} minimal onRemove={isSessionRunning ? undefined : () => setLoadedProtocol(undefined)} title={loadedProtocol.filePath}>
+              {fileNameFromPath(loadedProtocol.filePath)}
             </Tag>
           ) : (
-            <FileInput text={"Choose an experiment file..."} inputProps={{ accept: ".json,application/json" }} onInputChange={onExperimentFileChange} style={{ minWidth: "320px" }} />
+            <FileInput text={"Choose a protocol file..."} inputProps={{ accept: ".json,application/json" }} onInputChange={onProtocolFileChange} style={{ minWidth: "320px" }} />
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "row", gap: "8px" }}>
-          <Button text={"New Experiment"} icon={"add"} size={"small"} disabled={!_.isUndefined(loadedExperiment)} onClick={() => setExperimentDialog({ isOpen: true, isEditing: false })} />
-          <Button text={"Edit Experiment"} icon={"edit"} size={"small"} disabled={_.isUndefined(loadedExperiment) || isExperimentRunning} onClick={() => setExperimentDialog({ isOpen: true, isEditing: true })} />
-          <Button text={"Start Experiment"} icon={"play"} intent={"success"} size={"small"} disabled={device.status !== "connected" || _.isUndefined(loadedExperiment) || animalID.trim() === "" || isExperimentRunning} onClick={startExperiment} />
-          <Button text={"Stop Experiment"} icon={"stop"} intent={"danger"} size={"small"} disabled={device.status !== "connected" || !isExperimentRunning} onClick={stopExperiment} />
+          <Button text={"New Protocol"} icon={"add"} size={"small"} disabled={!_.isUndefined(loadedProtocol)} onClick={() => setProtocolDialog({ isOpen: true, isEditing: false })} />
+          <Button text={"Edit Protocol"} icon={"edit"} size={"small"} disabled={_.isUndefined(loadedProtocol) || isSessionRunning} onClick={() => setProtocolDialog({ isOpen: true, isEditing: true })} />
+          <Button text={"Start Session"} icon={"play"} intent={"success"} size={"small"} disabled={device.status !== "connected" || _.isUndefined(loadedProtocol) || subject.trim() === "" || isSessionRunning} onClick={startSession} />
+          <Button text={"Stop Session"} icon={"stop"} intent={"danger"} size={"small"} disabled={device.status !== "connected" || !isSessionRunning} onClick={stopSession} />
         </div>
       </Card>
       
@@ -307,14 +311,14 @@ const DeviceTab = (props: DeviceTabProps) => {
           </Card>
         </div>
 
-        {/* Experiment Statistics */}
+        {/* Session Statistics */}
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "40%" }}>
-          <p style={{ marginBottom: "0px" }}>Experiment Statistics</p>
+          <p style={{ marginBottom: "0px" }}>Session Statistics</p>
           <Card style={{ display: "flex", flexDirection: "column", gap:"8px", padding: "8px" }}>
             {STATISTICS_ROWS.map(({ key, label }) => (
               <div key={key} style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
                 <p style={{ marginBottom: "0px", fontWeight: "bold" }}>{label}</p>
-                <p style={{ marginBottom: "0px", fontWeight: "bold" }}>{experimentState?.statistics[key] ?? 0}</p>
+                <p style={{ marginBottom: "0px", fontWeight: "bold" }}>{sessionState?.statistics[key] ?? 0}</p>
               </div>
             ))}
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
@@ -326,8 +330,12 @@ const DeviceTab = (props: DeviceTabProps) => {
               <p style={{ marginBottom: "0px", fontWeight: "bold" }}>{activeTrialLabel}</p>
             </div>
             <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Experiment Time</p>
-              <p style={{ marginBottom: "0px", fontWeight: "bold", color: Colors.BLUE3 }}>{formatDuration(experimentElapsed)}</p>
+              <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Session Time</p>
+              <p style={{ marginBottom: "0px", fontWeight: "bold", color: Colors.BLUE3 }}>{formatDuration(sessionElapsed)}</p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", gap: "8px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ marginBottom: "0px", fontWeight: "bold" }}>Session</p>
+              <p style={{ marginBottom: "0px", fontWeight: "bold" }}>{sessionPath}</p>
             </div>
           </Card>
         </div>
@@ -339,13 +347,13 @@ const DeviceTab = (props: DeviceTabProps) => {
         <TextArea style={{ backgroundColor: "black", color: "white", fontFamily: "monospace", fontSize: "10px", flex: 1, minHeight: "240px", width: "100%", resize: "none" }} value={consoleLines.join("\n")} placeholder={"Connect to this device to see logs"} inputRef={consoleRef} onScroll={onConsoleScroll} readOnly />
       </div>
 
-      <ExperimentEditDialog
-        isOpen={experimentDialog.isOpen}
-        loaded={experimentDialog.isEditing ? loadedExperiment : undefined}
-        onClose={() => setExperimentDialog((current) => ({ ...current, isOpen: false }))}
-        onSave={setLoadedExperiment}
+      <ProtocolEditDialog
+        isOpen={protocolDialog.isOpen}
+        loaded={protocolDialog.isEditing ? loadedProtocol : undefined}
+        onClose={() => setProtocolDialog((current) => ({ ...current, isOpen: false }))}
+        onSave={setLoadedProtocol}
       />
-      <ExperimentLoadDialog isOpen={isReviewOpen} file={pendingFile} onClose={() => setIsReviewOpen(false)} onConfirm={onExperimentConfirm} />
+      <ProtocolLoadDialog isOpen={isReviewOpen} file={pendingFile} onClose={() => setIsReviewOpen(false)} onConfirm={onProtocolConfirm} />
     </div>
   );
 };

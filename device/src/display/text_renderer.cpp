@@ -15,6 +15,7 @@ namespace {
         {"IBMPlexSans-SemiBold.ttf", 11.0f},  // Heading
         {"IBMPlexSans-Regular.ttf", 14.0f},   // Label
         {"IBMPlexMono-Regular.ttf", 12.0f},   // Detail
+        {"IBMPlexSans-Regular.ttf", 22.0f},   // Title
     }};
 
     // Fonts are copied next to the executable by the makefile

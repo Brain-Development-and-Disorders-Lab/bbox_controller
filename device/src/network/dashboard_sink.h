@@ -15,9 +15,10 @@
 // Recent messages are kept in a ring buffer and replayed to each dashboard when it connects
 class DashboardSink final : public spdlog::sinks::base_sink<std::mutex> {
 public:
+    /// @param historySize Number of recent messages replayed to each new dashboard
     explicit DashboardSink(size_t historySize) : history_(historySize) {}
 
-    // Replay history to `client`, then start forwarding live messages to it
+    /// Replays the history to `client`, then starts forwarding live messages to it
     void addClient(ix::WebSocket& client) {
         std::lock_guard<std::mutex> lock(mutex_);
         for (size_t i = 0; i < history_.size(); i++) {
@@ -26,6 +27,7 @@ public:
         clients_.insert(&client);
     }
 
+    /// Stops forwarding messages to `client`, call before it is destroyed
     void removeClient(ix::WebSocket& client) {
         std::lock_guard<std::mutex> lock(mutex_);
         clients_.erase(&client);

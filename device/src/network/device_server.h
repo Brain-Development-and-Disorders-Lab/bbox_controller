@@ -13,23 +13,28 @@
 // WebSocket server the dashboard connects to
 class DeviceServer {
 public:
+    /// @param logSink Has dashboards added and removed as they connect, so they receive the log
     DeviceServer(int port, std::shared_ptr<DashboardSink> logSink);
     ~DeviceServer();
 
+    /// Starts listening on every interface in a background thread
+    /// @return False if the port couldn't be bound
     bool start();
     void stop();
 
-    // Messages received since the last call, oldest first
+    /// Messages received since the last call, oldest first, safe to call from the main loop
     std::vector<nlohmann::json> takeMessages();
 
+    /// Sends `message` to every connected dashboard
     void broadcast(const nlohmann::json& message);
+    /// Dashboards currently connected
     int clientCount() const { return clientCount_; }
 
-    // Total connections since starting, used to spot new clients even if another left
+    /// Total connections since starting, used to spot new clients even if another left
     int connectionCount() const { return connectionCount_; }
-    int port() const { return port_; }
 
 private:
+    /// Tracks connections and queues valid JSON objects for `takeMessages()`, runs on the server's threads
     void onMessage(std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket,
                    const ix::WebSocketMessagePtr& msg);
 

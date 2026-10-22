@@ -11,6 +11,7 @@ public:
     bool state(Output output) const override { return outputs_[static_cast<size_t>(output)]; }
     void write(Output output, bool on) override { outputs_[static_cast<size_t>(output)] = on; }
 
+    /// Sets an input as if its sensor had changed, e.g. from a simulator key
     void simulate(Input input, bool active) { inputs_[static_cast<size_t>(input)] = active; }
 
 private:

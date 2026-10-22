@@ -1,5 +1,12 @@
 #include "application.h"
 
+#include <filesystem>
+#include <set>
+#include <system_error>
+
+#include <sys/utsname.h>
+#include <unistd.h>
+
 #include <SDL3_ttf/SDL_ttf.h>
 #include <spdlog/spdlog.h>
 
@@ -8,10 +15,9 @@
 #include "simulation/banner.h"
 #include "simulation/controls.h"
 #include "simulation/status_view.h"
+#include "version.h"
 
 namespace {
-    constexpr const char* kDataDirectory = "data";
-
     std::unique_ptr<Gpio> createGpio(bool simulate) {
         if (simulate) {
             return std::make_unique<MockGpio>();
@@ -25,12 +31,12 @@ Application::Application(int port, bool simulate, std::shared_ptr<DashboardSink>
       address_(localIpAddress() + ":" + std::to_string(port)),
       gpio_(createGpio(simulate)),
       server_(port, std::move(logSink)),
-      storage_(kDataDirectory),
       tests_(*gpio_, displays_,
              [this](const std::string& test, const std::string& state) {
                  server_.broadcast({{"type", "test_state"}, {"test", test}, {"state", state}});
              }),
-      experiment_(*gpio_) {
+      session_(*gpio_, displays_, storage_.root(),
+               [this](const nlohmann::json& message) { server_.broadcast(message); }) {
     if (simulate_) {
         mockGpio_ = static_cast<MockGpio*>(gpio_.get());
     }
@@ -61,14 +67,14 @@ int Application::run() {
         }
 
         tests_.update();
-        experiment_.update();
+        session_.update();
         syncClients();
         publishInputState();
         render();
     }
 
     spdlog::info("Shutting down...");
-    experiment_.stop();
+    session_.stop();
     gpio_->resetOutputs();
     server_.stop();
     displays_.close();
@@ -78,7 +84,8 @@ int Application::run() {
 }
 
 void Application::handleEvent(const SDL_Event& event) {
-    if (event.type == SDL_EVENT_QUIT) {
+    // Closing either simulator window shuts down the device, SDL only sends a quit event once every window is closed
+    if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
         running_ = false;
         return;
     }
@@ -104,27 +111,61 @@ void Application::handleEvent(const SDL_Event& event) {
 void Application::handleMessage(const nlohmann::json& message) {
     const std::string command = message.value("command", "");
 
-    if (command == "experiment_start") {
+    if (command == "session_start") {
         try {
-            auto experiment = message.at("experiment").get<Experiment>();
-            storage_.save("experiments/" + experiment.id + ".json", message.at("experiment"));
-            experiment_.start(std::move(experiment), message.value("animal_id", ""));
-        } catch (const nlohmann::json::exception& error) {
-            spdlog::error("[Experiment] Invalid experiment: {}", error.what());
+            const auto& data = message.at("protocol");
+            session_.start(parseProtocol(data), data, message.value("subject", ""));
+        } catch (const std::exception& error) {
+            spdlog::error("[Session] Invalid protocol: {}", error.what());
         }
-    } else if (command == "experiment_stop") {
-        experiment_.stop();
+    } else if (command == "session_stop") {
+        session_.stop();
+    } else if (command == "data_sync") {
+        syncData(message.value("exclude", std::vector<std::string>{}));
     } else if (!tests_.start(command, message.value("parameter", 0))) {
-        spdlog::warn("[Networking] Unknown command: {}", message.dump());
+        // Only the name, other fields can be large
+        spdlog::warn("[Networking] Unknown command: \"{}\"", command);
     }
 }
 
+void Application::syncData(const std::vector<std::string>& exclude) {
+    const std::set<std::string> existing(exclude.begin(), exclude.end());
+
+    // Files of a session still being recorded are left for the next sync, since the dashboard never overwrites
+    const std::string activeSession = session_.activeSessionPath();
+    if (!activeSession.empty()) {
+        spdlog::warn("[Storage] Skipping {} until its session ends", activeSession);
+    }
+
+    int sent = 0;
+    for (const std::string& name : storage_.list()) {
+        if (existing.count(name) || (!activeSession.empty() && name.rfind(activeSession + "/", 0) == 0)) {
+            continue;
+        }
+        const auto contents = storage_.read(name);
+        if (!contents) {
+            continue;
+        }
+        try {
+            server_.broadcast({{"type", "data_file"}, {"name", name}, {"contents", *contents}});
+            sent++;
+        } catch (const nlohmann::json::exception& error) {
+            spdlog::error("[Storage] Unable to send {}: {}", name, error.what());
+        }
+    }
+
+    spdlog::info("[Storage] Data sync sent {} file(s)", sent);
+    server_.broadcast({{"type", "data_sync_complete"}});
+}
+
 void Application::syncClients() {
-    // Input state is only sent when it changes, so new dashboards need a fresh copy
+    // New dashboards are sent the device info and session state, and a fresh copy of the input state since it is only sent when it changes
     const int connectionCount = server_.connectionCount();
     if (connectionCount != lastConnectionCount_) {
         lastConnectionCount_ = connectionCount;
         lastInputState_ = nullptr;
+        server_.broadcast(deviceInfo());
+        session_.publishState();
     }
 
     const int clientCount = server_.clientCount();
@@ -132,6 +173,29 @@ void Application::syncClients() {
         lastClientCount_ = clientCount;
         displays_.setMessage({clientCount > 0 ? "Connected to Dashboard" : "Waiting for connection...", address_});
     }
+}
+
+nlohmann::json Application::deviceInfo() const {
+    char hostname[256] = {};
+    gethostname(hostname, sizeof(hostname) - 1);
+
+    utsname system{};
+    const std::string os = uname(&system) == 0 ? std::string(system.sysname) + " " + system.release : "Unknown";
+
+    // Free space is a snapshot at connection time, -1 if it can't be read
+    std::error_code error;
+    const auto space = std::filesystem::space(storage_.root(), error);
+    const long long storageFree = error ? -1 : static_cast<long long>(space.available);
+
+    return {
+        {"type", "device_info"},
+        {"version", kDeviceVersion},
+        {"simulated", simulate_},
+        {"hostname", hostname},
+        {"os", os},
+        {"started_at", std::chrono::duration_cast<std::chrono::milliseconds>(startedAt_.time_since_epoch()).count()},
+        {"storage_free_bytes", storageFree},
+    };
 }
 
 void Application::publishInputState() {
@@ -151,9 +215,12 @@ void Application::publishInputState() {
 
 void Application::render() {
     if (mockGpio_) {
-        displays_.render([this](SDL_Renderer* renderer, TextRenderer& text) {
+        displays_.render([this](size_t index, SDL_Renderer* renderer, TextRenderer& text) {
             const float bannerHeight = drawSimulationBanner(renderer, text);
-            drawStatusView(renderer, text, *gpio_, bannerHeight);
+            // Input status is shared by both displays, so only show it on the primary
+            if (index == 0) {
+                drawStatusView(renderer, text, *gpio_, bannerHeight);
+            }
         });
     } else {
         displays_.render();

@@ -27,6 +27,7 @@ constexpr std::array<Control, 7> kControls = {{
     {"Water Valve", SDL_SCANCODE_UNKNOWN, nullptr, Output::WaterValve},
 }};
 
+/// True while the control's input is active or its output is on
 inline bool isActive(const Gpio& gpio, const Channel& channel) {
     if (const auto* input = std::get_if<Input>(&channel)) {
         return gpio.read(*input);

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("dashboardAPI", {
   protocolSave: (defaultPath, contents) => ipcRenderer.invoke("protocol-save", defaultPath, contents),
   getFilePath: (file) => webUtils.getPathForFile(file),
   onDeviceUpdate: (callback) => subscribe("device-update", callback),
+  onDeviceInfo: (callback) => subscribe("device-info", callback),
   onDeviceLog: (callback) => subscribe("device-log", callback),
   onDeviceTestState: (callback) => subscribe("device-test-state", callback),
   onDeviceInputState: (callback) => subscribe("device-input-state", callback),

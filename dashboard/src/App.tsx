@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Blueprint components
-import { Button, Card, Colors, Icon, Intent, OverlayToaster, Spinner, Tab, Tabs } from "@blueprintjs/core";
+import { Button, Card, Colors, Icon, Intent, OverlayToaster, Tab, Tabs } from "@blueprintjs/core";
 import { Cell, Column, SelectionModes, Table } from "@blueprintjs/table";
 
 // Custom components
@@ -14,14 +14,21 @@ import EmptyState from "./components/EmptyState";
 import { Device, DeviceUpdate, StoredDevice } from "../types";
 
 // Utility functions
-import { DEVICE_ICON } from "./lib/util";
+import { DEVICE_ICON, formatBytes } from "./lib/util";
 
 // Utility libraries
 import _ from "lodash";
 
 // Stored devices have no runtime state until connected
-const fromStoredDevice = (stored: StoredDevice): Device => ({ ...stored, status: "disconnected", version: "Unknown" });
+const fromStoredDevice = (stored: StoredDevice): Device => ({ ...stored, status: "disconnected" });
 const toStoredDevice = ({ id, name, network }: Device): StoredDevice => ({ id, name, network });
+
+// Tab icon reflects the device state, pulsing while connecting or running a session
+const tabIconStyle = (status: Device["status"], isRunning: boolean) => {
+  if (status === "connected") return { color: Colors.GREEN3, className: isRunning ? "status-pulse" : undefined };
+  if (status === "connecting") return { color: Colors.ORANGE3, className: "status-pulse" };
+  return { color: Colors.RED3, className: undefined };
+};
 
 const App = () => {
   // Single source of truth for device state, including connection status
@@ -36,6 +43,19 @@ const App = () => {
 
   // Devices with a file sync in progress
   const [syncingDeviceIds, setSyncingDeviceIds] = useState<Set<Device["id"]>>(new Set());
+
+  // Devices with a session running
+  const [runningDeviceIds, setRunningDeviceIds] = useState<Set<Device["id"]>>(new Set());
+  useEffect(() => {
+    return window.dashboardAPI.onDeviceSessionState((update) => {
+      setRunningDeviceIds((current) => {
+        const next = new Set(current);
+        if (update.state === "running") next.add(update.id);
+        else next.delete(update.id);
+        return next;
+      });
+    });
+  }, []);
 
   // Load the stored devices once on mount
   useEffect(() => {
@@ -69,9 +89,19 @@ const App = () => {
     setDevices((current) => current.map((device) => device.id === id ? { ...device, status } : device));
   };
 
+  // Device info is only current while connected
+  useEffect(() => {
+    return window.dashboardAPI.onDeviceInfo(({ id, info }) => {
+      setDevices((current) => current.map((device) => device.id === id ? { ...device, info } : device));
+    });
+  }, []);
+
   useEffect(() => {
     return window.dashboardAPI.onDeviceUpdate((update: DeviceUpdate) => {
       setDeviceStatus(update.id, update.status);
+      if (update.status === "disconnected") {
+        setDevices((current) => current.map((device) => device.id === update.id ? { ...device, info: undefined } : device));
+      }
       if (update.error) {
         toasterRef.current?.show({
           message: `Connection Failed: ${update.error}`,
@@ -264,16 +294,26 @@ const App = () => {
                     <p style={{ marginBottom: "0px", fontSize: "12px", color: selectedDevice.status === "connected" ? "green" : "red" }}>{_.capitalize(selectedDevice.status)}</p>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "row", gap: "4px" }}>
-                    <p style={{ marginBottom: "0px", fontWeight: "bold", fontSize: "12px" }}>Software Version:</p>
-                    <p style={{ marginBottom: "0px", fontSize: "12px" }}>{selectedDevice.version}</p>
-                  </div>
+                  {/* Reported by the device, only shown while connected */}
+                  {selectedDevice.info && [
+                    ["Software Version", selectedDevice.info.version],
+                    ["Platform", selectedDevice.info.simulated ? "Simulated" : "Raspberry Pi"],
+                    ["Hostname", selectedDevice.info.hostname],
+                    ["Operating System", selectedDevice.info.os],
+                    ["Running Since", new Date(selectedDevice.info.started_at).toLocaleString()],
+                    ["Free Storage", formatBytes(selectedDevice.info.storage_free_bytes)],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: "flex", flexDirection: "row", gap: "4px" }}>
+                      <p style={{ marginBottom: "0px", fontWeight: "bold", fontSize: "12px" }}>{label}:</p>
+                      <p style={{ marginBottom: "0px", fontSize: "12px" }}>{value}</p>
+                    </div>
+                  ))}
 
                   {/* Device action buttons */}
                   <div style={{ display: "flex", flexDirection: "row", gap: "8px" }}>
                     <Button size={"small"} intent={"success"} icon={"play"} text={"Connect"} disabled={selectedDevice.status === "connected" || isBusy} onClick={() => handleConnectClick(selectedDevice)} />
                     <Button size={"small"} intent={"danger"} icon={"stop"} text={"Disconnect"} disabled={selectedDevice.status === "disconnected" || isBusy} onClick={() => handleDisconnectClick(selectedDevice)} />
-                    <Button size={"small"} intent={"primary"} text={"Sync Files"} icon={"refresh"} loading={syncingDeviceIds.has(selectedDevice.id)} disabled={selectedDevice.status !== "connected"} onClick={() => handleSyncClick(selectedDevice)} />
+                    <Button size={"small"} intent={"primary"} text={"Sync Data"} icon={"refresh"} loading={syncingDeviceIds.has(selectedDevice.id)} disabled={selectedDevice.status !== "connected"} onClick={() => handleSyncClick(selectedDevice)} />
                   </div>
                 </>
               ) : (
@@ -285,6 +325,7 @@ const App = () => {
           <DeviceEditDialog
             isOpen={deviceDialog.isOpen}
             device={deviceDialog.isEditing ? selectedDevice : undefined}
+            devices={devices}
             onClose={() => setDeviceDialog((current) => ({ ...current, isOpen: false }))}
             onSave={onDeviceSave}
             onRemove={onDeviceRemove}
@@ -298,6 +339,7 @@ const App = () => {
           {devices.length > 0 ? (
           <Tabs id={"DeviceTabs"} className={"device-tabs"} selectedTabId={selectedDevice?.id} onChange={(id) => setSelectedDeviceId(String(id))} animate>
             {devices.map((device) => {
+              const tabIcon = tabIconStyle(device.status, runningDeviceIds.has(device.id));
               return (
                 <Tab
                   key={device.id}
@@ -306,11 +348,7 @@ const App = () => {
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                       <Icon icon={DEVICE_ICON} />
                       {device.name}
-                      {device.status === "connecting" ? (
-                        <Spinner size={15} />
-                      ) : (
-                        <Icon icon={"offline"} color={device.status !== "connected" ? "red" : "green"} />
-                      )}
+                      <Icon icon={"offline"} color={tabIcon.color} className={tabIcon.className} />
                     </div>
                   }
                   panelClassName={"device-tab-panel"}

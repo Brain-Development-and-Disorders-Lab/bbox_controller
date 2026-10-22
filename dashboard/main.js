@@ -34,6 +34,17 @@ const sendCommandToDevice = (id, command) => {
 // Not strict, so a device can add fields without breaking older dashboards
 const count = z.int().nonnegative();
 const DeviceMessageSchema = z.discriminatedUnion("type", [
+  // Sent once when a dashboard connects
+  z.object({
+    type: z.literal("device_info"),
+    version: z.string(),
+    simulated: z.boolean(),
+    hostname: z.string(),
+    os: z.string(),
+    started_at: z.number(),
+    // -1 if the device could not read it
+    storage_free_bytes: z.number(),
+  }),
   z.object({
     type: z.literal("log"),
     level: z.enum(["trace", "debug", "info", "warning", "error", "critical"]),
@@ -80,6 +91,7 @@ const DeviceMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 const deviceMessageHandlers = {
+  device_info: (id, { type, ...info }) => notifyDashboard("device-info", { id, info }),
   log: (id, { level, timestamp, message }) => notifyDashboard("device-log", { id, level, timestamp, message }),
   test_state: (id, { test, state }) => notifyDashboard("device-test-state", { id, test, state }),
   input_state: (id, { state }) => notifyDashboard("device-input-state", { id, state }),
@@ -188,7 +200,7 @@ ipcMain.handle("device-data-sync", async (event, device) => {
   }
 
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: `Sync Files from ${device.name}`,
+    title: `Sync Data from ${device.name}`,
     buttonLabel: "Sync Here",
     properties: ["openDirectory", "createDirectory"],
   });

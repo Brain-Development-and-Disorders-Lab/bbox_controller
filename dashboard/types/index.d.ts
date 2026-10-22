@@ -10,7 +10,19 @@ export type Device = {
     ip: string;
     port: number;
   };
+  // Reported by the device when connected
+  info?: DeviceInfo;
+};
+
+// Sent by the device when the dashboard connects
+export type DeviceInfo = {
   version: string;
+  simulated: boolean;
+  hostname: string;
+  os: string;
+  started_at: number;
+  // Free space at connection time, -1 if unknown
+  storage_free_bytes: number;
 };
 
 // Persisted subset of `Device`
@@ -205,6 +217,8 @@ export type ProtocolParameterListProps = {
 export type DeviceEditDialogProps = {
   isOpen: boolean;
   device?: Device;
+  // Existing devices, used to block duplicate addresses
+  devices: Device[];
   onClose: () => void;
   onSave: (device: Device) => void;
   // Called once removal of the edited device has been confirmed
@@ -245,6 +259,7 @@ export type DashboardAPI = {
   getFilePath: (file: File) => string;
   // Subscriptions return an unsubscribe function
   onDeviceUpdate: (callback: (update: DeviceUpdate) => void) => () => void;
+  onDeviceInfo: (callback: (update: { id: Device["id"]; info: DeviceInfo }) => void) => () => void;
   onDeviceLog: (callback: (log: DeviceLog) => void) => () => void;
   onDeviceTestState: (callback: (update: DeviceTestState) => void) => () => void;
   onDeviceInputState: (callback: (update: DeviceInputState) => void) => () => void;

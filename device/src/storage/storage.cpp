@@ -1,36 +1,40 @@
 #include "storage/storage.h"
 
+#include <cstdlib>
 #include <fstream>
+#include <sstream>
 
 #include <spdlog/spdlog.h>
 
-Storage::Storage(std::filesystem::path root) : root_(std::move(root)) {}
-
-bool Storage::save(const std::string& name, const nlohmann::json& data) const {
-    const auto path = root_ / name;
-    std::error_code error;
-    std::filesystem::create_directories(path.parent_path(), error);
-
-    std::ofstream file(path);
-    if (!file) {
-        spdlog::error("[Storage] Unable to write {}", path.string());
-        return false;
-    }
-    file << data.dump(2);
-    return true;
+namespace {
+    constexpr const char* kRootName = "bbox_data";
 }
 
-std::optional<nlohmann::json> Storage::load(const std::string& name) const {
-    const auto path = root_ / name;
-    std::ifstream file(path);
-    if (!file) {
-        return std::nullopt;
-    }
+Storage::Storage() {
+    const char* home = std::getenv("HOME");
+    root_ = home ? std::filesystem::path(home) / kRootName : std::filesystem::current_path() / kRootName;
+    spdlog::info("[Storage] Data root: {}", root_.string());
+}
 
-    auto data = nlohmann::json::parse(file, nullptr, false);
-    if (data.is_discarded()) {
-        spdlog::error("[Storage] Invalid JSON in {}", path.string());
+std::vector<std::string> Storage::list() const {
+    std::vector<std::string> names;
+    std::error_code error;
+    for (auto it = std::filesystem::recursive_directory_iterator(root_, error);
+         !error && it != std::filesystem::recursive_directory_iterator(); it.increment(error)) {
+        if (it->is_regular_file()) {
+            names.push_back(std::filesystem::relative(it->path(), root_).generic_string());
+        }
+    }
+    return names;
+}
+
+std::optional<std::string> Storage::read(const std::string& name) const {
+    std::ifstream file(root_ / name, std::ios::binary);
+    if (!file) {
+        spdlog::error("[Storage] Unable to read {}", (root_ / name).string());
         return std::nullopt;
     }
-    return data;
+    std::ostringstream contents;
+    contents << file.rdbuf();
+    return contents.str();
 }

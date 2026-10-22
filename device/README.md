@@ -21,7 +21,7 @@ The WebSocket, logging, and JSON libraries (IXWebSocket, spdlog, nlohmann/json) 
 | Command | Result |
 | --- | --- |
 | `make mac` | Builds `dist/mac/behavior_box_device` for macOS, in simulation mode |
-| `make pi` | Not configured yet |
+| `make pi` | Builds `dist/pi/behavior_box_device` for the Raspberry Pi |
 | `make clean` | Deletes `dist/` |
 
 Every `.cpp` file under `src/` is compiled automatically, so new source files do not need to be added to the makefile. Files in `assets/` are copied next to the executable.
@@ -55,7 +55,9 @@ The water valve has no key. It is shown in the panel when a trial or test opens 
 
 ### Raspberry Pi
 
-The Pi build target is not configured yet, and `PiGpio` in [src/hardware/pi_gpio.h](src/hardware/pi_gpio.h) does not read the inputs or drive the pins. The pin assignments are defined in [src/hardware/pins.h](src/hardware/pins.h) (BCM numbering):
+Build with `make pi` on the Pi, after installing SDL3 and SDL3_ttf so that `pkg-config` can find them. If SDL was installed from source into `/usr/local`, run `sudo ldconfig` once after installing so the libraries are found at runtime.
+
+`PiGpio` in [src/hardware/pi_gpio.h](src/hardware/pi_gpio.h) does not read the inputs or drive the pins yet. The pin assignments are defined in [src/hardware/pins.h](src/hardware/pins.h) (BCM numbering):
 
 | Pin | Channel |
 | --- | --- |

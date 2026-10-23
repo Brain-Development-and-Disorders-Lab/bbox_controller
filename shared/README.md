@@ -31,7 +31,7 @@ Sending a test command while that test is running restarts it. The device logs a
 
 | Type | Fields | Description |
 | --- | --- | --- |
-| `device_info` | `version`, `simulated`, `hostname`, `os`, `started_at`, `storage_free_bytes` | Sent when a dashboard connects. `started_at` is milliseconds since the Unix epoch. `storage_free_bytes` is the free space on the data drive at connection time, or -1 if it cannot be read. |
+| `device_info` | `name`, `version`, `simulated`, `hostname`, `os`, `started_at`, `storage_free_bytes` | Sent when a dashboard connects. `name` is the device's name, also its Wi-Fi access point's SSID on the Pi. `started_at` is milliseconds since the Unix epoch. `storage_free_bytes` is the free space on the data drive at connection time, or -1 if it cannot be read. |
 | `log` | `level`, `timestamp`, `message` | A device log message. `level` is `trace`, `debug`, `info`, `warning`, `error`, or `critical`, and `timestamp` is milliseconds since the Unix epoch. |
 | `test_state` | `test`, `state` | A hardware test changed state. `state` is `running`, `passed`, or `failed`. |
 | `input_state` | `state` | The state of every input and output, as an object of booleans keyed `left_lever`, `right_lever`, `nose_poke`, `left_lever_light`, `right_lever_light`, `nose_light`, and `water_valve`. Sent when any of them changes. |

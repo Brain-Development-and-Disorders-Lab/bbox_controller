@@ -2,6 +2,8 @@
 
 Software for running behavioral training sessions on a behavior box. A Raspberry Pi in each box runs the device application, which reads the levers and nose poke, drives the lights, water valve, and stimulus displays, and records session data. The dashboard is a desktop application that connects to one or more devices over the network to run sessions, test hardware, and copy data.
 
+![The dashboard connected to a simulated device, with a session running. The left panel lists devices and shows the selected device's information. The right panel shows session controls, input status, hardware tests, session statistics, and the device's console log.](dashboard.png)
+
 ## Repository Structure
 
 ```text

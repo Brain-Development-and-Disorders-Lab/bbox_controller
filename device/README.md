@@ -14,6 +14,48 @@ On macOS, install SDL with Homebrew:
 brew install sdl3 sdl3_ttf pkg-config
 ```
 
+On Raspberry Pi OS Trixie or later, install SDL from the package manager:
+
+```bash
+sudo apt install libsdl3-0 libsdl3-ttf0
+```
+
+To build the device on the Pi, install the development packages and build tools instead:
+
+```bash
+sudo apt install build-essential pkg-config libsdl3-dev libsdl3-ttf-dev
+```
+
+Raspberry Pi OS Bookworm does not package SDL3, so build SDL3 and SDL3_ttf from source. Install the build tools and display libraries first:
+
+```bash
+sudo apt install build-essential cmake git pkg-config \
+  libdrm-dev libgbm-dev libegl-dev libgles-dev \
+  libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev
+```
+
+Then build and install SDL3:
+
+```bash
+git clone --depth 1 --branch release-3.2.0 https://github.com/libsdl-org/SDL.git
+cmake -S SDL -B SDL/build -DCMAKE_BUILD_TYPE=Release
+cmake --build SDL/build -j4
+sudo cmake --install SDL/build
+```
+
+Then SDL3_ttf, which builds its own copies of FreeType and HarfBuzz:
+
+```bash
+git clone --depth 1 --branch release-3.2.2 https://github.com/libsdl-org/SDL_ttf.git
+(cd SDL_ttf && ./external/download.sh)
+cmake -S SDL_ttf -B SDL_ttf/build -DCMAKE_BUILD_TYPE=Release -DSDLTTF_VENDORED=ON
+cmake --build SDL_ttf/build -j4
+sudo cmake --install SDL_ttf/build
+sudo ldconfig
+```
+
+Newer `release-3.x` tags can be used in place of the versions above. `pkg-config --modversion sdl3 sdl3-ttf` prints both versions when the installation has worked.
+
 The WebSocket, logging, and JSON libraries (IXWebSocket, spdlog, nlohmann/json) are included in `third_party/` and are compiled with the application.
 
 ## Building
@@ -21,7 +63,7 @@ The WebSocket, logging, and JSON libraries (IXWebSocket, spdlog, nlohmann/json) 
 | Command | Result |
 | --- | --- |
 | `make mac` | Builds `dist/mac/behavior_box_device` for macOS, in simulation mode |
-| `make pi` | Not configured yet |
+| `make pi` | Builds `dist/pi/behavior_box_device` for the Raspberry Pi |
 | `make clean` | Deletes `dist/` |
 
 Every `.cpp` file under `src/` is compiled automatically, so new source files do not need to be added to the makefile. Files in `assets/` are copied next to the executable.
@@ -29,10 +71,14 @@ Every `.cpp` file under `src/` is compiled automatically, so new source files do
 ## Running
 
 ```bash
-./dist/mac/behavior_box_device [port]
+./dist/mac/behavior_box_device [--name <name>] [port]
 ```
 
-The device listens for dashboard connections on port `8765`, or on `port` if one is given. Each display shows the device's network address and whether a dashboard is connected. Log messages are printed to the terminal and sent to connected dashboards.
+The device listens for dashboard connections on port `8765`, or on `port` if one is given. Log messages are printed to the terminal and sent to connected dashboards.
+
+The device names itself `bbox_device_<ID>` on each start, where `<ID>` is 8 random uppercase letters and digits. Use `--name` to give it a fixed name instead. On the Raspberry Pi the name is also the Wi-Fi network's name and password (see [Wi-Fi Access Point](#wi-fi-access-point)), so it must be 8 to 32 characters of letters, digits, `_`, or `-`.
+
+When no session is running, each display shows whether a dashboard is connected, the device's name, and its network address. Press `Esc` at any time to quit. A running session is stopped and its data saved first.
 
 ### Simulation Mode
 
@@ -55,7 +101,17 @@ The water valve has no key. It is shown in the panel when a trial or test opens 
 
 ### Raspberry Pi
 
-The Pi build target is not configured yet, and `PiGpio` in [src/hardware/pi_gpio.h](src/hardware/pi_gpio.h) does not read the inputs or drive the pins. The pin assignments are defined in [src/hardware/pins.h](src/hardware/pins.h) (BCM numbering):
+Each [release](https://github.com/Brain-Development-and-Disorders-Lab/bbox_controller/releases) includes `bbox-device-<version>-pi-arm64.tar.gz`, built for 64-bit Raspberry Pi OS Trixie or later. Install SDL3 and SDL3_ttf as described in [Requirements](#requirements), then extract and run it:
+
+```bash
+tar -xzf bbox-device-<version>-pi-arm64.tar.gz
+cd bbox-device-<version>-pi-arm64
+./behavior_box_device
+```
+
+To build on the Pi instead, run `make pi` after installing SDL3 and SDL3_ttf, then run `./dist/pi/behavior_box_device`.
+
+`PiGpio` in [src/hardware/pi_gpio.h](src/hardware/pi_gpio.h) does not read the inputs or drive the pins yet. The pin assignments are defined in [src/hardware/pins.h](src/hardware/pins.h) (BCM numbering):
 
 | Pin | Channel |
 | --- | --- |
@@ -68,6 +124,12 @@ The Pi build target is not configured yet, and `PiGpio` in [src/hardware/pi_gpio
 | 27 | Nose light (output) |
 
 On the Pi, each connected display gets a fullscreen window, up to two.
+
+#### Wi-Fi Access Point
+
+On startup the Pi switches its Wi-Fi (`wlan0`) to an access point, so the dashboard computer can join the device's own network. The network's name (SSID) and WPA2 password are both the device's name. This replaces any Wi-Fi network the Pi was connected to, and the access point is left running after the application quits. Dashboards connect to the address shown on the displays, `10.42.0.1:8765` by default.
+
+The access point is started with NetworkManager's `nmcli`, the default on Raspberry Pi OS Bookworm and later, using a connection named `bbox-hotspot`. The user running the application needs permission to manage network connections, as the default desktop user has. If the access point cannot be started, the error is logged and the device keeps running on its existing network.
 
 ## Session Data
 
@@ -94,7 +156,7 @@ src/
 ├── diagnostics/            Hardware tests requested from the dashboard
 ├── display/                Stimulus display windows and text rendering
 ├── hardware/               GPIO interface, pin numbers, simulated and Pi backends
-├── network/                WebSocket server and log forwarding
+├── network/                WebSocket server, log forwarding, device name, and Wi-Fi access point
 ├── session/                Protocol parsing, session running, data recording
 │   └── trials/             Trial implementations
 ├── simulation/             Simulation banner, status panel, and key bindings

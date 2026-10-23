@@ -19,17 +19,18 @@
 // All device components and management of the the main loop
 class Application {
 public:
+    /// @param name Device name, shown on the displays and sent to dashboards
     /// @param port WebSocket port the dashboard connects to
     /// @param simulate Use mock GPIO and windowed displays instead of the Pi hardware
     /// @param logSink Forwards log messages to connected dashboards
-    Application(int port, bool simulate, std::shared_ptr<DashboardSink> logSink);
+    Application(std::string name, int port, bool simulate, std::shared_ptr<DashboardSink> logSink);
 
-    /// Opens the displays and server, then runs the main loop until a window is closed
+    /// Opens the displays and server, then runs the main loop until a window is closed or Esc is pressed
     /// @return Process exit code, non-zero if startup failed
     int run();
 
 private:
-    /// Handles quitting and, when simulating, the keys standing in for the hardware
+    /// Handles quitting (Esc or closing a window) and, when simulating, the keys standing in for the hardware
     void handleEvent(const SDL_Event& event);
     /// Dispatches a dashboard command to the session, data sync, or hardware tests
     void handleMessage(const nlohmann::json& message);
@@ -45,6 +46,7 @@ private:
     /// Draws a frame on every display, with the simulator overlays when simulating
     void render();
 
+    std::string name_;
     bool simulate_;
     std::chrono::system_clock::time_point startedAt_ = std::chrono::system_clock::now();
     std::string address_;

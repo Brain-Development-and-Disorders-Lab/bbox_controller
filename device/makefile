@@ -16,7 +16,7 @@ SRCS := $(shell find $(SRC_DIR) -name '*.cpp') $(wildcard $(IXWEBSOCKET_DIR)/ixw
 INCLUDES := -I$(SRC_DIR) -I$(IXWEBSOCKET_DIR) -I$(SPDLOG_DIR) -I$(JSON_DIR)
 CXXFLAGS := -std=c++17 -pthread -MMD -MP
 
-# System dependencies (SDL3 and SDL3_ttf from Homebrew on macOS)
+# System dependencies (SDL3 and SDL3_ttf from Homebrew on macOS, or installed from source on the Pi)
 SDL_CFLAGS := $(shell pkg-config --cflags sdl3 sdl3-ttf)
 SDL_LIBS := $(shell pkg-config --libs sdl3 sdl3-ttf)
 
@@ -27,6 +27,8 @@ ASSETS := $(shell find $(ASSETS_DIR) -type f)
 # Objects are kept per target so rebuilds only compile changed files
 MAC_DIR := $(BUILD_DIR)/mac
 MAC_OBJS := $(SRCS:%.cpp=$(MAC_DIR)/obj/%.o)
+PI_DIR := $(BUILD_DIR)/pi
+PI_OBJS := $(SRCS:%.cpp=$(PI_DIR)/obj/%.o)
 
 # Default rule
 .PHONY: help
@@ -54,9 +56,19 @@ $(MAC_DIR)/obj/%.o: %.cpp
 
 # Build for Raspberry Pi
 .PHONY: pi
-pi:
-	@echo "The Raspberry Pi build is not configured."
-	@exit 1
+pi: $(PI_DIR)/$(TARGET) $(ASSETS:%=$(PI_DIR)/%)
+	@echo "Raspberry Pi Build Complete: $(PI_DIR)/$(TARGET)"
+
+$(PI_DIR)/$(TARGET): $(PI_OBJS)
+	$(HOST_CXX) -pthread $^ $(SDL_LIBS) -o $@
+
+$(PI_DIR)/$(ASSETS_DIR)/%: $(ASSETS_DIR)/%
+	@mkdir -p $(dir $@)
+	cp $< $@
+
+$(PI_DIR)/obj/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -DTARGET_PI $(INCLUDES) $(SDL_CFLAGS) -c $< -o $@
 
 # Clean up
 .PHONY: clean
@@ -64,4 +76,4 @@ clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Cleaned up build artifacts!"
 
--include $(MAC_OBJS:.o=.d)
+-include $(MAC_OBJS:.o=.d) $(PI_OBJS:.o=.d)

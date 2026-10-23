@@ -32,7 +32,7 @@ The interface reloads when files in `src/` change. Changes to `main.js` or `prel
 | `yarn vite:dev` | Starts the Vite development server on port 5173 |
 | `yarn electron:dev` | Opens the dashboard window using the development server, with developer tools open |
 | `yarn vite:build` | Builds the interface into `dist/` |
-| `yarn electron:build` | Builds the interface and packages the application with electron-builder |
+| `yarn electron:build` | Builds the interface and packages the application with electron-builder into `release/` |
 
 ## Using the Dashboard
 

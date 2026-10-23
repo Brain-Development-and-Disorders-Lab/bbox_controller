@@ -1,5 +1,6 @@
 {
   "name": "dashboard",
+  "productName": "Behavior Box Dashboard",
   "version": "1.4.0",
   "description": "Dashboard for managing behavior box devices",
   "author": "Henry Burgess",
@@ -23,6 +24,9 @@
   },
   "build": {
     "icon": "icon.png",
+    "directories": {
+      "output": "release"
+    },
     "mac": {
       "icon": "icon-mac.png"
     }

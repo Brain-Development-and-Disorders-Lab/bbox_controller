@@ -26,8 +26,9 @@ namespace {
     }
 }
 
-Application::Application(int port, bool simulate, std::shared_ptr<DashboardSink> logSink)
-    : simulate_(simulate),
+Application::Application(std::string name, int port, bool simulate, std::shared_ptr<DashboardSink> logSink)
+    : name_(std::move(name)),
+      simulate_(simulate),
       address_(localIpAddress() + ":" + std::to_string(port)),
       gpio_(createGpio(simulate)),
       server_(port, std::move(logSink)),
@@ -86,6 +87,13 @@ int Application::run() {
 void Application::handleEvent(const SDL_Event& event) {
     // Closing either simulator window shuts down the device, SDL only sends a quit event once every window is closed
     if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+        running_ = false;
+        return;
+    }
+
+    // Esc is the kill switch on every target, a running session is stopped and recorded as the device shuts down
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE) {
+        spdlog::info("Esc pressed, quitting");
         running_ = false;
         return;
     }
@@ -171,7 +179,7 @@ void Application::syncClients() {
     const int clientCount = server_.clientCount();
     if (clientCount != lastClientCount_) {
         lastClientCount_ = clientCount;
-        displays_.setMessage({clientCount > 0 ? "Connected to Dashboard" : "Waiting for connection...", address_});
+        displays_.setMessage({clientCount > 0 ? "Connected to Dashboard" : "Waiting for connection...", name_, address_});
     }
 }
 
@@ -189,6 +197,7 @@ nlohmann::json Application::deviceInfo() const {
 
     return {
         {"type", "device_info"},
+        {"name", name_},
         {"version", kDeviceVersion},
         {"simulated", simulate_},
         {"hostname", hostname},

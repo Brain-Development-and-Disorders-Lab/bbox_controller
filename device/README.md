@@ -14,7 +14,19 @@ On macOS, install SDL with Homebrew:
 brew install sdl3 sdl3_ttf pkg-config
 ```
 
-On the Raspberry Pi, build SDL3 and SDL3_ttf from source. Install the build tools and display libraries first:
+On Raspberry Pi OS Trixie or later, install SDL from the package manager:
+
+```bash
+sudo apt install libsdl3-0 libsdl3-ttf0
+```
+
+To build the device on the Pi, install the development packages and build tools instead:
+
+```bash
+sudo apt install build-essential pkg-config libsdl3-dev libsdl3-ttf-dev
+```
+
+Raspberry Pi OS Bookworm does not package SDL3, so build SDL3 and SDL3_ttf from source. Install the build tools and display libraries first:
 
 ```bash
 sudo apt install build-essential cmake git pkg-config \
@@ -89,7 +101,15 @@ The water valve has no key. It is shown in the panel when a trial or test opens 
 
 ### Raspberry Pi
 
-Build with `make pi` on the Pi, after installing SDL3 and SDL3_ttf as described in [Requirements](#requirements), then run `./dist/pi/behavior_box_device`.
+Each [release](https://github.com/Brain-Development-and-Disorders-Lab/bbox_controller/releases) includes `bbox-device-<version>-pi-arm64.tar.gz`, built for 64-bit Raspberry Pi OS Trixie or later. Install SDL3 and SDL3_ttf as described in [Requirements](#requirements), then extract and run it:
+
+```bash
+tar -xzf bbox-device-<version>-pi-arm64.tar.gz
+cd bbox-device-<version>-pi-arm64
+./behavior_box_device
+```
+
+To build on the Pi instead, run `make pi` after installing SDL3 and SDL3_ttf, then run `./dist/pi/behavior_box_device`.
 
 `PiGpio` in [src/hardware/pi_gpio.h](src/hardware/pi_gpio.h) does not read the inputs or drive the pins yet. The pin assignments are defined in [src/hardware/pins.h](src/hardware/pins.h) (BCM numbering):
 

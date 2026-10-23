@@ -1,176 +1,168 @@
-name: Create Release Packages
+name: Build Release
 
+# Builds the dashboard and device for each platform when a release is published, and attaches them to the release.
+# The release's tag must match the dashboard and device versions, e.g. `v1.4.0`.
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ github.event.release.tag_name }}
 
 jobs:
   verify-version:
-    name: Verify Version Matches Tag
+    name: Verify versions match tag
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get-version.outputs.version }}
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Get version from version.py
-        id: get-version
+      - name: Compare tag with dashboard and device versions
         run: |
-          VERSION=$(python3 -c "exec(open('version.py').read()); print(__version__)")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version in version.py: $VERSION"
-
-      - name: Verify tag matches version
-        run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          FILE_VERSION="${{ steps.get-version.outputs.version }}"
-
-          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
-            echo "Error: Tag version ($TAG_VERSION) does not match version.py ($FILE_VERSION)"
+          TAG_VERSION="${TAG#v}"
+          DASHBOARD_VERSION=$(jq -r .version dashboard/package.json)
+          DEVICE_VERSION=$(sed -n 's/.*kDeviceVersion = "\(.*\)".*/\1/p' device/src/version.h)
+          echo "Tag: $TAG_VERSION, dashboard: $DASHBOARD_VERSION, device: $DEVICE_VERSION"
+          if [ "$TAG_VERSION" != "$DASHBOARD_VERSION" ] || [ "$TAG_VERSION" != "$DEVICE_VERSION" ]; then
+            echo "::error::Tag $TAG does not match dashboard/package.json ($DASHBOARD_VERSION) and device/src/version.h ($DEVICE_VERSION)"
             exit 1
           fi
 
-          echo "Version verified: $TAG_VERSION"
-
-  create-packages:
-    name: Create Release Packages
+  dashboard:
+    name: Dashboard (${{ matrix.name }})
     needs: verify-version
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-latest
+            args: --mac dmg --arm64 --x64
+          - name: Windows
+            runner: windows-latest
+            args: --win nsis --x64
+    defaults:
+      run:
+        shell: bash
+        working-directory: dashboard
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create dashboard package (macOS)
-        run: |
-          mkdir -p dist
-          tar -czf "dist/BehaviorBoxController-${{ github.ref_name }}-dashboard-macos.tar.gz" \
-            packages/ \
-            apps/dashboard/ \
-            install/ \
-            version.py \
-            README.md
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: dashboard/yarn.lock
 
-      - name: Create dashboard package (Windows)
-        run: |
-          zip -r "dist/BehaviorBoxController-${{ github.ref_name }}-dashboard-windows.zip" \
-            packages/ \
-            apps/dashboard/ \
-            install/ \
-            version.py \
-            README.md
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Create dashboard package (Linux)
-        run: |
-          tar -czf "dist/BehaviorBoxController-${{ github.ref_name }}-dashboard-linux.tar.gz" \
-            packages/ \
-            apps/dashboard/ \
-            install/ \
-            version.py \
-            README.md
+      # Unsigned, since no signing certificates are configured
+      - name: Build and package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: >
+          yarn electron:build ${{ matrix.args }} --publish never
+          '-c.artifactName=bbox-dashboard-${version}-${os}-${arch}.${ext}'
 
-      - name: Create device package (Raspberry Pi)
-        run: |
-          tar -czf "dist/BehaviorBoxController-${{ github.ref_name }}-device-raspberrypi.tar.gz" \
-            packages/ \
-            apps/device/ \
-            install/ \
-            version.py \
-            README.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-${{ matrix.name }}
+          path: |
+            dashboard/release/*.dmg
+            dashboard/release/*.exe
+          if-no-files-found: error
 
-      - name: Create complete package
+  device-mac:
+    name: Device (macOS)
+    needs: verify-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL
+        run: brew install sdl3 sdl3_ttf pkg-config
+
+      - name: Build
+        working-directory: device
+        run: make mac
+
+      - name: Package
         run: |
-          tar -czf "dist/BehaviorBoxController-${{ github.ref_name }}-complete.tar.gz" \
-            packages/ \
-            apps/ \
-            install/ \
-            version.py \
-            README.md
+          NAME="bbox-device-${TAG#v}-mac-arm64"
+          mkdir -p "package/$NAME"
+          cp -R device/dist/mac/behavior_box_device device/dist/mac/assets device/README.md "package/$NAME/"
+          mkdir -p "package/$NAME/licenses"
+          for dir in device/third_party/*/; do
+            for file in "$dir"LICENSE*; do
+              cp "$file" "package/$NAME/licenses/$(basename "$dir")-$(basename "$file")"
+            done
+          done
+          tar -czf "$NAME.tar.gz" -C package "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: device-mac
+          path: bbox-device-*.tar.gz
+          if-no-files-found: error
+
+  device-pi:
+    name: Device (Raspberry Pi)
+    needs: verify-version
+    # Built natively on 64-bit ARM in Debian Trixie, which packages SDL3, so the binary runs on Raspberry Pi OS Trixie
+    # and later. SDL is not included, see device/README.md.
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+    steps:
+      - name: Install build tools and SDL
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates build-essential pkg-config \
+            libsdl3-dev libsdl3-ttf-dev
+
+      - uses: actions/checkout@v4
+
+      - name: Build
+        working-directory: device
+        run: make pi
+
+      - name: Package
+        run: |
+          NAME="bbox-device-${TAG#v}-pi-arm64"
+          mkdir -p "package/$NAME/licenses"
+          cp -R device/dist/pi/behavior_box_device device/dist/pi/assets device/README.md "package/$NAME/"
+          for dir in device/third_party/*/; do
+            for file in "$dir"LICENSE*; do
+              cp "$file" "package/$NAME/licenses/$(basename "$dir")-$(basename "$file")"
+            done
+          done
+          tar -czf "$NAME.tar.gz" -C package "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: device-pi
+          path: bbox-device-*.tar.gz
+          if-no-files-found: error
+
+  attach:
+    name: Attach to release
+    needs: [dashboard, device-mac, device-pi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
 
       - name: Generate checksums
-        run: |
-          cd dist
-          sha256sum *.tar.gz *.zip > checksums.txt
-          cat checksums.txt
+        working-directory: release
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-packages
-          path: dist/
-          retention-days: 5
-
-  create-release:
-    name: Create GitHub Release
-    needs: [verify-version, create-packages]
-    runs-on: ubuntu-latest
-    if: success()
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for changelog generation
-
-      - name: Download release packages
-        uses: actions/download-artifact@v4
-        with:
-          name: release-packages
-          path: dist/
-
-      - name: Generate release notes
-        id: release-notes
-        run: |
-          # Get the previous tag
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            echo "## Changes since $PREVIOUS_TAG" > release_notes.md
-            echo "" >> release_notes.md
-            git log $PREVIOUS_TAG..${{ github.ref_name }} --pretty=format:"- %s (%h)" >> release_notes.md
-          else
-            echo "## Initial Release" > release_notes.md
-            echo "" >> release_notes.md
-            echo "First release of Behavior Box Controller" >> release_notes.md
-          fi
-
-          echo "" >> release_notes.md
-          echo "## Installation" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "Download the appropriate package for your platform:" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "- **Dashboard (macOS)**: \`BehaviorBoxController-${{ github.ref_name }}-dashboard-macos.tar.gz\`" >> release_notes.md
-          echo "- **Dashboard (Windows)**: \`BehaviorBoxController-${{ github.ref_name }}-dashboard-windows.zip\`" >> release_notes.md
-          echo "- **Dashboard (Linux)**: \`BehaviorBoxController-${{ github.ref_name }}-dashboard-linux.tar.gz\`" >> release_notes.md
-          echo "- **Device (Raspberry Pi)**: \`BehaviorBoxController-${{ github.ref_name }}-device-raspberrypi.tar.gz\`" >> release_notes.md
-          echo "- **Complete (All components)**: \`BehaviorBoxController-${{ github.ref_name }}-complete.tar.gz\`" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "See \`install/README.md\` in the package for installation instructions." >> release_notes.md
-          echo "" >> release_notes.md
-          echo "## Checksums" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "\`\`\`" >> release_notes.md
-          cat dist/checksums.txt >> release_notes.md
-          echo "\`\`\`" >> release_notes.md
-
-          cat release_notes.md
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body_path: release_notes.md
-          files: |
-            dist/BehaviorBoxController-${{ github.ref_name }}-dashboard-macos.tar.gz
-            dist/BehaviorBoxController-${{ github.ref_name }}-dashboard-windows.zip
-            dist/BehaviorBoxController-${{ github.ref_name }}-dashboard-linux.tar.gz
-            dist/BehaviorBoxController-${{ github.ref_name }}-device-raspberrypi.tar.gz
-            dist/BehaviorBoxController-${{ github.ref_name }}-complete.tar.gz
-            dist/checksums.txt
-          token: ${{ secrets.GITHUB_TOKEN }}
-          draft: true
-          prerelease: false
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" release/* --clobber --repo "${{ github.repository }}"

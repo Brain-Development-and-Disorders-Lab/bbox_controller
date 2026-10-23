@@ -416,7 +416,7 @@ const createWindow = () => {
     mainWindow.loadURL("http://localhost:5173");
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(import.meta.dirname, "../dist/index.html"));
+    mainWindow.loadFile(path.join(import.meta.dirname, "dist/index.html"));
   }
   mainWindow.on("closed", () => (mainWindow = null));
 };
